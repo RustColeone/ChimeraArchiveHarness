@@ -197,8 +197,8 @@ class Head(Mind):
 
     def __init__(self, script):
         super().__init__(script)
-        self.reads, self.votes, self.notes = [], [], []
-        self.fail = set()
+        self.reads, self.votes, self.notes, self.shapes = [], [], [], []
+        self.fail, self.side = set(), None
 
     def __call__(self, messages, schema):
         system, last = messages[0]["content"], messages[-1]["content"]
@@ -207,6 +207,13 @@ class Head(Mind):
             if "read" in self.fail:
                 raise RuntimeError("no")
             return {**FORM, "language": "en"}
+        if system.startswith(G.SHAPE):
+            self.shapes.append(messages)
+            if "shape" in self.fail:
+                raise RuntimeError("no")
+            return {"side": self.side}
+        if "一直想让她变成这样" in last:
+            return {"name": "小绿茶", "what": "你先夸她，再让她显得不如你。"}
         if G.ASK in last:
             self.votes.append(messages)
             if "vote" in self.fail:
@@ -229,8 +236,9 @@ class Turns(unittest.IsolatedAsyncioTestCase):
             await self.core.stop()
         self._tmp.cleanup()
 
-    async def start(self, head, gut=True, role="friend"):
+    async def start(self, head, gut=True, role="friend", owner=False):
         self.core = await start_core(self.tmp, {
+            **({"owners": {"chat": ["alice"]}} if owner else {}),
             "extensions": [*make_config(self.tmp).raw["modules"]["paths"], str(ROOT / "extensions" / "students")],
             "extension_config": {"students": {"learn": True, "language": "en", "roles": {"chat:alice": role},
                                               "students": {"gpt": {"gut": gut}}}},
@@ -371,6 +379,90 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Right now you feel", script.seen("GPT"))
         self.assertNotIn("Right now you feel", script.seen("Gemini"))
         self.assertEqual(self.guts().of("gpt").report()["lessons"], 1)  # (the first message woke her)
+
+    async def days(self, chat, days):
+        """A message a day, on her gut's clock."""
+        real, clock = G.time, SimpleNamespace(monotonic=G.time.monotonic)
+        G.time = clock
+        self.addCleanup(setattr, G, "time", real)
+        for day in days:
+            clock.time = lambda day=day: real.time() + day * 86400
+            await self.say(chat, "你好绿茶")
+        G.time = real
+
+    async def test_a_side_grows_over_days_stays_when_her_memory_goes_and_objecting_ends_it(self):
+        script = room.Script(GPT=[room.turn(str(n)) for n in range(30)])
+        head = Head(script)
+        chat = await self.start(head, role="family")
+        gut = await self.awake(chat)
+        await self.say(chat, "hello again")
+        self.assertEqual(gut.sightings, [])  # ordinary chat: nothing noted, and the reading was still asked
+        self.assertEqual(len(head.shapes), 1)
+        head.side = {"name": "绿茶", "more": True, "what": "说别的女生不好"}
+        await self.days(chat, range(3))
+        self.assertEqual(gut.report()["sides"], {})  # three days is not enough, even for family
+        self.assertIn("绿茶 (说别的女生不好)", head.shapes[-1][0]["content"])  # she noted it under one name
+        await self.days(chat, range(3, 7))
+        self.assertEqual(gut.report()["sides"], {"小绿茶": "你先夸她，再让她显得不如你。"})
+        head.side = None
+        await self.say(chat, "嗯")
+        self.assertIn("(Right now your 小绿茶 side is showing: 你先夸她，再让她显得不如你。)", script.seen("GPT"))
+        self.assertIn("(Right now your 小绿茶 side is showing", head.notes[-1][0]["content"])
+        await self.core.stop()
+        self.core = None
+        for path in (self.tmp / "data" / "extensions" / "students").glob("gpt.db*"):
+            path.unlink()
+        script = room.Script(GPT=[room.turn(str(n)) for n in range(30)])
+        head = Head(script)
+        chat = await self.start(head, role="family")
+        gut = await self.awake(chat)
+        await self.say(chat, "好久不见")
+        self.assertIn("(Right now your 小绿茶 side is showing", script.seen("GPT"))
+        head.side = {"name": "端着", "more": False, "what": "别这样"}
+        for _ in range(8):
+            await self.say(chat, "别这样了")
+        self.assertEqual(gut.report()["sides"], {})
+        head.side = None
+        await self.say(chat, "嗯")
+        self.assertNotIn("side is showing", script.seen("GPT"))
+
+    async def test_a_failed_reading_of_the_person_loses_no_lesson(self):
+        script = room.Script(GPT=[room.turn("a"), room.turn("b")])
+        head = Head(script)
+        chat = await self.start(head)
+        gut = await self.awake(chat)
+        head.fail = {"shape"}
+        await self.say(chat, "one")
+        self.assertEqual(gut.report()["lessons"], 1)
+
+    async def test_who_she_already_is_is_no_side(self):
+        script = room.Script(GPT=[room.turn("a"), room.turn("b")])
+        head = Head(script)
+        chat = await self.start(head, role="family")
+        gut = await self.awake(chat)
+        head.side = {"name": "a", "more": True, "what": "x"}  # (a letter of her character)
+        await self.say(chat, "one")
+        self.assertEqual(gut.sightings, [])
+
+    async def test_the_owner_can_write_and_take_away_a_side(self):
+        script = room.Script(GPT=[room.turn("a"), room.turn("b")])
+        head = Head(script)
+        chat = await self.start(head, owner=True)
+        gut = await self.awake(chat)
+        self.assertIn("御姐 side: 你从容", await self.say(chat, "$side gpt 御姐 你从容，从上往下逗对方。"))
+        self.assertEqual(gut.report()["sides"], {"御姐": "你从容，从上往下逗对方。"})
+        self.assertIn("side 御姐: 你从容", await self.say(chat, "$gut"))
+        self.assertIn("Gone: 御姐", await self.say(chat, "$side gpt 御姐 off"))
+        self.assertEqual(gut.report()["sides"], {})
+        self.assertIn("Use `$side", await self.say(chat, "$side gpt 御姐"))
+
+    async def test_only_the_owner_can_change_her_sides(self):
+        script = room.Script(GPT=[room.turn("a"), room.turn("b")])
+        head = Head(script)
+        chat = await self.start(head)
+        gut = await self.awake(chat)
+        await self.say(chat, "$side gpt 御姐 你从容。")
+        self.assertEqual(gut.report()["sides"], {})
 
     async def test_gut_shows_where_she_stands(self):
         script = room.Script(GPT=[room.turn("a"), room.turn("b")])

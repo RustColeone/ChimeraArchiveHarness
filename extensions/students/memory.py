@@ -28,7 +28,7 @@ import mneme_llm
 from mneme_llm.decide import Predicate
 from mneme_llm.tools import SPECS, Toolbox
 
-from .gut import Guts
+from .gut import GROWS, Guts
 
 RESET = {"reset", "remove", "clear", "none"}
 DAY = 86400
@@ -773,12 +773,36 @@ def make_gut(book: Book, settings: Settings, guts: Guts):
             found = gut.report()
             lines.append(f"{book.shown(persona)}: {found['lessons']} lessons, born with {found['born']} (they count "
                          f"{found['starter']}), last balance {found.get('share', '?')}")
+            if owner and found["sides"]:
+                lines += [f"  side {name}: {what}" for name, what in found["sides"].items()]
+            if owner and found["noted"]:
+                lines.append("  noted: " + ", ".join(f"{name} {value}" for name, value in found["noted"].items())
+                             + f" (a side grows at {GROWS:g})")
             if owner and found.get("told"):
                 lines.append(f"  told: {found['told']}")
             if owner and found.get("note"):
                 lines.append(f"  her note: {found['note']}")
         return ToolResult.ok("\n".join(lines) or "No student has a gut yet.")
     return show
+
+
+def make_side(book: Book, settings: Settings, guts: Guts):
+    async def side(arguments, context) -> ToolResult:
+        """`$side <student> <side> <sentence>` writes a side's sentence, a better one than her model's or a new side;
+        `$side <student> <side> off` takes one away."""
+        words = str(arguments.get("text") or "").split(None, 2)
+        persona = book.find(words[0], book.subject(context.address.interface, context.sender.id)) if words else None
+        if len(words) < 3 or persona is None or not settings.of(persona).gut:
+            return ToolResult.fail("Use `$side <student> <side> <sentence>`, or `$side <student> <side> off`.",
+                                   "invalid_side")
+        gut = guts.of(persona)
+        if not gut.awake:
+            await asyncio.to_thread(gut.wake)
+        if words[2] == "off":
+            return ToolResult.ok(f"Gone: {words[1]}." if gut.drop_side(words[1]) else f"She has no side {words[1]}.")
+        gut.write_side(words[1], words[2])
+        return ToolResult.ok(f"{book.shown(persona)}'s {words[1]} side: {words[2]}")
+    return side
 
 
 def contributions(context, students: dict[str, dict]) -> dict:
@@ -810,7 +834,12 @@ def contributions(context, students: dict[str, dict]) -> dict:
                      *([Watcher("gut", guts.learn, personas=felt, timeout_s=120)] if felt else [])],
         "capabilities": [
             *([Capability("students.gut", "Where each student's gut stands.", make_gut(book, settings, guts),
-                          risk=Risk.READ, internal=True, command="gut")] if felt else []),
+                          risk=Risk.READ, internal=True, command="gut"),
+               Capability("students.side", "Write a side of a student's, or take one away.",
+                          make_side(book, settings, guts),
+                          {"text": {"type": "string", "description": "<student> <side> <sentence>, or <student> <side> off"}},
+                          risk=Risk.WRITE, access="creator", internal=True, command="side",
+                          command_argument="text")] if felt else []),
             Capability("students.alias", "Show or set what you call a student.", make_alias(book, facts),
                        {"text": {"type": "string", "description": "<student> <name>, <student> reset, or nothing"}},
                        risk=Risk.WRITE, internal=True, command="alias", command_argument="text"),

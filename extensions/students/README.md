@@ -328,6 +328,9 @@ flowchart TD
     W --> Z[A lesson: the form and the note, weighted by closeness]
     Z --> S[Every so often she sleeps: lessons and a fading starter, replayed]
     S --> N
+    A --> H[A short reading: is this person making something of her?]
+    H --> G[Wanted on separate days: a side, one sentence kept in her gut]
+    G --> O
 ```
 
 * **It adds no context.** However long she lives, her prompt gets one line of fixed size. Lessons are forms and feelings,
@@ -341,7 +344,15 @@ flowchart TD
 * **It never holds her up for long.** Her reading and vote run side by side, "Thinking…" beside them, within 3 seconds:
   what has not come by then does not count for this answer, and a reading that comes late still teaches. With nothing
   at all she answers as she would without a gut.
-* **Strangers teach nothing**, below closeness 40; they still meet who she has become.
+* **Strangers teach nothing**, below closeness 40; they still meet her temper and her words, but not her sides.
+* **A side grows from what people say they want.** After each reply a short reading of the last few messages, with no
+  character and no memory, notes whether the person called her a kind of character, asked for one, enjoyed it or objected.
+  Only what they say counts, not how she acts. "More" counts once a day per person, by closeness, half gone in two weeks;
+  wanted enough (about four days for family) her model writes one sentence, from what the word means and what they asked
+  for, and her gut keeps it, so it outlasts a wipe and a new model. At most two show, in the line, to people at closeness
+  40 or more. Objecting counts every time, in any words, against her strongest side: four times from family and it is
+  gone. `$gut` shows the owner what grew and what is noted; `$side <student> <side> <sentence>` writes a better sentence
+  or a new side, and `$side <student> <side> off` takes one away.
 * **Where it lives:** `<data>/gut/<persona>.db`, apart from her memory, so a wipe does not reach it. `Gut.forget(subject)`
   takes out what one person taught and rebuilds her from the rest; nothing calls it yet, since the app has no "forget
   me" command.
