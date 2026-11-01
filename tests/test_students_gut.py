@@ -455,6 +455,8 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Gone: 御姐", await self.say(chat, "$side gpt 御姐 off"))
         self.assertEqual(gut.report()["sides"], {})
         self.assertIn("Use `$side", await self.say(chat, "$side gpt 御姐"))
+        self.assertIn("cannot be a child", await self.say(chat, "$side gpt 萝莉 你很可爱。"))
+        self.assertEqual(gut.report()["sides"], {})
 
     async def test_only_the_owner_can_change_her_sides(self):
         script = room.Script(GPT=[room.turn("a"), room.turn("b")])

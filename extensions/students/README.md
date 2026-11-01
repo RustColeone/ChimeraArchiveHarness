@@ -352,7 +352,8 @@ flowchart TD
   for, and her gut keeps it, so it outlasts a wipe and a new model. At most two show, in the line, to people at closeness
   40 or more. Objecting counts every time, in any words, against her strongest side: four times from family and it is
   gone. `$gut` shows the owner what grew and what is noted; `$side <student> <side> <sentence>` writes a better sentence
-  or a new side, and `$side <student> <side> off` takes one away.
+  or a new side, and `$side <student> <side> off` takes one away. A side is never a child: words such as 萝莉 and 幼女 are
+  not noted, grown or written.
 * **Where it lives:** `<data>/gut/<persona>.db`, apart from her memory, so a wipe does not reach it. `Gut.forget(subject)`
   takes out what one person taught and rebuilds her from the rest; nothing calls it yet, since the app has no "forget
   me" command.

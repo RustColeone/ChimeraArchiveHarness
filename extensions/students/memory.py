@@ -800,7 +800,10 @@ def make_side(book: Book, settings: Settings, guts: Guts):
             await asyncio.to_thread(gut.wake)
         if words[2] == "off":
             return ToolResult.ok(f"Gone: {words[1]}." if gut.drop_side(words[1]) else f"She has no side {words[1]}.")
-        gut.write_side(words[1], words[2])
+        try:
+            gut.write_side(words[1], words[2])
+        except ValueError as error:
+            return ToolResult.fail(str(error), "invalid_side")
         return ToolResult.ok(f"{book.shown(persona)}'s {words[1]} side: {words[2]}")
     return side
 
