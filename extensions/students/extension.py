@@ -83,7 +83,7 @@ def read_students(root: Path = HERE) -> list[dict]:
             raise ValueError(f"{folder.name}/student.yml: `name` must be the folder's name")
         if not data.get("models"):
             raise ValueError(f"{folder.name}/student.yml: no `models`")
-        found.append({**data, "prompt": compose(folder, data.get("prompt") or ["prompt.md"]),
+        found.append({**data, "folder": str(folder), "prompt": compose(folder, data.get("prompt") or ["prompt.md"]),
                       "pictures": {**pictures(folder, data.get("pictures")), **ladder(folder, ladders.get(folder.name))}})
     return sorted(found, key=lambda data: (data.get("order", 1000), data["name"]))
 
@@ -155,7 +155,8 @@ def setup(context) -> Contributions:
         providers[name] = {**providers.get(name, {}), **dict(settings)}
     remembered = memory.contributions(context, {data["name"]: {"display_name": data["display_name"],
                                                              "aliases": list(data.get("aliases") or ()),
-                                                             "memory": dict(data.get("memory") or {})}
+                                                             "memory": dict(data.get("memory") or {}),
+                                                             "folder": data["folder"]}
                                                 for data in STUDENTS})
     return Contributions(personas=personas, providers=providers,
                          profiles={**profiles(STUDENTS), **dict(config.get("profiles") or {})}, **remembered)

@@ -1,7 +1,7 @@
 {
- "version": "1.15",
+ "version": "1.16",
  "constants": {
-  "CONTRACTS_VERSION": "1.15",
+  "CONTRACTS_VERSION": "1.16",
   "PART_PLACES": [
    "stable",
    "turn"
@@ -1007,7 +1007,7 @@
    ]
   },
   "PartContext": {
-   "doc": "What a computed prompt part may look at: the persona it is written for, the run's address and trigger, and (added in 1.9) the engine placing it, so a part can keep to some engines.",
+   "doc": "What a computed prompt part may look at: the persona it is written for, the run's address and trigger, (added in 1.9) the engine placing it, so a part can keep to some engines, and (added in 1.16) `models` and `history`, for a part that asks her model something or reads the conversation before she answers. Its model calls are counted in the run's usage but not against its budget, as a watcher's are.",
    "fields": [
     {
      "name": "persona",
@@ -1030,6 +1030,16 @@
      "name": "engine",
      "type": "str",
      "default": ""
+    },
+    {
+     "name": "models",
+     "type": "any",
+     "default": null
+    },
+    {
+     "name": "history",
+     "type": "any",
+     "default": null
     }
    ]
   },

@@ -126,6 +126,7 @@ class WhaleChanBot(Interface):
         self._speaking: asyncio.Task | None = None
         self._channels: dict[str, object] = {}
         self._progress: OrderedDict[str, discord.Message] = OrderedDict()
+        self._clearing: set[asyncio.Task] = set()
         self._owners: list[str] = []
         speak_up = dict(config.get("speak_up") or {})
         self.call_them = str(speak_up.get("call_them", "主人"))
@@ -536,8 +537,10 @@ class WhaleChanBot(Interface):
                     message = await pending.interaction.edit_original_response(content=f"-# ⏳ {reply.text}"[:LIMIT])
                     return Delivery(True, message_id=str(message.id))
                 return await self._show_progress(channel, reply)
-            if reply.run_id and reply.kind in ("text", "file", "notice"):
-                await self._clear_progress(reply.run_id)
+            if reply.run_id and reply.kind in ("text", "file", "notice"):  # (beside the reply: Discord is waited for once)
+                clearing = asyncio.create_task(self._clear_progress(reply.run_id))
+                self._clearing.add(clearing)
+                clearing.add_done_callback(self._clearing.discard)
             reference = (discord.MessageReference(message_id=int(reply.quote), channel_id=channel.id,
                                                   fail_if_not_exists=False)
                          if pending is None and reply.quote and str(reply.quote).isdigit() else None)

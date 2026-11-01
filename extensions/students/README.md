@@ -308,6 +308,47 @@ something to keep. Notes are found by their words (and their glosses): her part 
 the network, so mneme-llm's embeddings are not used. The `mneme-llm` command reads and changes it:
 `mneme-llm --db data/extensions/students/gpt.db --space gpt relations`.
 
+## Her gut
+
+What is left of her when her memory is wiped and her model is swapped ([gut.py](gut.py)). It is off until a student's
+`student.yml` says `memory: {gut: true}` (or `students: <name>: {gut: true}` in the settings).
+
+```mermaid
+flowchart TD
+    M[A message] --> R[Her model reads it into a small form, no history]
+    M --> L[Her memory is looked up]
+    L --> V[Her head votes seven numbers, with her memory in view]
+    R --> N[Her gut: a small network of her own, seven numbers]
+    N --> B{The balance: lived against known}
+    V --> B
+    T[Her tone: seven slow numbers, half gone in two weeks] --> O
+    B --> O[One soft line beside the message, with her words and the language]
+    O --> A[She answers: nothing is hidden in what she says]
+    A --> W[A watcher: she writes a private note, with the line in view]
+    W --> Z[A lesson: the form and the note, weighted by closeness]
+    Z --> S[Every so often she sleeps: lessons and a fading starter, replayed]
+    S --> N
+```
+
+* **It adds no context.** However long she lives, her prompt gets one line of fixed size. Lessons are forms and feelings,
+  never messages (her marks also keep the words she used).
+* **The balance moves by itself.** Nothing lived: her head decides alone. Memory wiped: her gut leads. Both full: about
+  even. A person who asks her to stop reaches her head through her memory, never the network directly.
+* **Her note is written after she has answered, in a call of its own**, with the line in view. Nothing is hidden in her
+  reply, so nothing has to be taken out of it, and nothing can reach a person. A note inside the reply failed twice on
+  her real prompts: the engine rebuilds history from what was delivered, so she stops writing what she cannot see, and
+  her real character wrote one on only 940 of 2,400 replies.
+* **It never holds her up for long.** Her reading and vote run side by side, "Thinking…" beside them, within 3 seconds:
+  what has not come by then does not count for this answer, and a reading that comes late still teaches. With nothing
+  at all she answers as she would without a gut.
+* **Strangers teach nothing**, below closeness 40; they still meet who she has become.
+* **Where it lives:** `<data>/gut/<persona>.db`, apart from her memory, so a wipe does not reach it. `Gut.forget(subject)`
+  takes out what one person taught and rebuilds her from the rest; nothing calls it yet, since the app has no "forget
+  me" command.
+* **She is born with something.** `tools/gut_starter.py <student>` puts 2,400 everyday messages to her real character
+  and writes `gut-starter.json.gz` in her folder. A student with none starts blank, and her head decides until she has lived.
+* `$gut` shows where it stands; the owner also sees the last line and her last note.
+
 ## Does a student know the other students?
 
 From her prompt, yes: the shared `school.md` names the club and each member, and her own prompt says how she sees

@@ -17,6 +17,7 @@ memory:                      # her memory's own settings (the students' config.y
   call_owner: 主人            # what she calls the bot's owner, as Whale-chan always has
   language: zh               # the lines her memory adds to her prompt, in Chinese
   memory_language: Chinese   # her notes also kept in Chinese, so they are found in either language
+  gut: true                  # what stays of her without her memory or her model (../README.md, "Her gut")
 prompt:
   - whale.md                 # who she is (Whale-chan's character)
   - prompt.md                # her part in the club

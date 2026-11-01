@@ -190,7 +190,8 @@ class SessionHandle:
             raise ValueError("A session can only render the prompt of its own personas")
         if place not in PART_PLACES:
             raise ValueError(f"place is one of {', '.join(PART_PLACES)}")
-        return match, PartContext(match, self.address, self.trigger, self.owner, self._engine)
+        return match, PartContext(match, self.address, self.trigger, self.owner, self._engine,
+                                  WatcherModels(self._manager, self.run_id, match.profile), self.history)
 
     def inbox(self) -> list[Request]:
         return self._manager.take_inbox(self.run_id)

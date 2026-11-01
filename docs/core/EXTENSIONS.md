@@ -284,7 +284,8 @@ agents:                           # (`personas:` before 2026-10-27, still read)
 A module gives its own personas parts (`Persona(..., parts=(...))`), and may add parts for others with
 `Contributions.prompt_parts`: `PromptPart(name, text, place="stable", order=100, personas=())`, for every
 persona, or for those in `personas`. Two modules may not add parts of the same name (the second fails to
-load). A part's `text` may be a function of a `PartContext` (`persona`, `address`, `trigger`, `owner`, and since 1.9
+load). A part's `text` may be a function of a `PartContext` (`persona`, `address`, `trigger`, `owner`, since 1.16 `models`
+and `history`, for a part that asks her model before she answers, counted in the run's usage but not its budget, and since 1.9
 `engine`, the engine placing it), called each time the part is used, so it should be quick. Since contracts 1.14 it
 may be async, for a part that looks something up (the students' memory waits on an embedding): `session.aprompt`
 awaits each in turn, for at most 8 seconds (one that takes longer is left out and audited), and

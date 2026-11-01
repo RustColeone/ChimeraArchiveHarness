@@ -28,6 +28,8 @@ import mneme_llm
 from mneme_llm.decide import Predicate
 from mneme_llm.tools import SPECS, Toolbox
 
+from .gut import Guts
+
 RESET = {"reset", "remove", "clear", "none"}
 DAY = 86400
 NAME_MAX = 40  # what the students call you
@@ -41,9 +43,10 @@ FORMER = {"room": "momochat", "assistant": "momochat", "chat": "momochat"}
 # What `students: <persona>:` (or her student.yml `memory:`, under it) may set for one student, over the settings for
 # all.
 OWN = ("learn", "notes", "mood", "classmates", "met_role", "owner_role", "writer_profile", "reflect_after_notes", "language",
-       "memory_language", "decisions", "config", "call_owner", "episodes", "said", "said_skip", "embed", "search")
+       "memory_language", "decisions", "config", "call_owner", "episodes", "said", "said_skip", "embed", "search", "gut")
 # What was said, kept word for word (mneme-llm 0.3): a file of an older mneme-llm keeps notes only.
 EPISODES = hasattr(mneme_llm.Mneme, "alook")
+STARTER = "gut-starter.json.gz"  # in her folder: the lessons she is born with (tools/gut_starter.py)
 TOOLBOXES = 64  # the newest runs' search tools kept (each remembers what its searches showed)
 # Interfaces whose people are another's (`platforms:` adds to it): Whale-chan's own bot is on Discord.
 PLATFORMS = {"whale_chan": "discord"}
@@ -98,6 +101,7 @@ class Settings:
         self.said_skip = whole(config.get("said_skip"), 15, 0, 200)
         self.embed = flag(config.get("embed"), True)
         self.search = flag(config.get("search"), True)
+        self.gut = flag(config.get("gut"), False)  # what stays of her without her memory or her model (gut.py)
         # Who judges her mood and what is worth keeping: luna (GPT-6 Luna's Decisions API with OPENAI_API_KEY, then
         # the local micro model, which learns from Luna, then her model), or core (her model alone, nothing learned).
         self.decisions = "core" if str(config.get("decisions") or "").strip().lower() == "core" else "luna"
@@ -518,7 +522,7 @@ def share(book: Book, settings: Settings, exchange, subject: str, notes, facts) 
     return heard
 
 
-def make_part(book: Book, settings: Settings):
+def make_part(book: Book, settings: Settings, guts: Guts | None = None):
     async def text(context) -> str:
         """Who the person is to her, what they call her, her notes for this message, what was said before that bears
         on it (her first look), her mood's news (until she has replied) and how her classmates seem today; nothing
@@ -531,9 +535,20 @@ def make_part(book: Book, settings: Settings):
         own = settings.of(persona.name)
         subject = book.subject(context.address.interface, trigger.sender.id)
         person = called(book, persona.name, subject, context.owner, trigger.sender)
+        turn = guts.begin(context, subject) if guts is not None and own.gut and not impulse(trigger) else None
         memory = book.open(persona.name)
+
+        async def with_gut(kept: str) -> str:
+            """What she keeps of them, and the line from her gut, which reads it first."""
+            if turn is None:
+                return kept
+            relationship = memory.relations.get(subject) if memory is not None else None
+            exchanges = memory.episodes.count(subject) if memory is not None and EPISODES else 0
+            line = await turn.feel(context.history, kept, relationship.closeness if relationship else 0.0, exchanges)
+            return "\n\n".join(part for part in (kept, line) if part)
+
         if memory is None:  # (nothing kept of anyone yet)
-            return no_notes(person, own.language) if own.learn and own.notes else ""
+            return await with_gut(no_notes(person, own.language) if own.learn and own.notes else "")
         who = "\n".join(line for line in (memory.relations.line(subject, person),
                                           memory.aliases.line(subject, person)) if line)
         query = impulse(trigger) or trigger.text  # (speaking up, her notes for what moves her)
@@ -546,7 +561,7 @@ def make_part(book: Book, settings: Settings):
         # replayed) shows it each time; without the watcher, at once.
         news = (memory.mood.news(subject, mark=not own.learn) or "") if own.mood else ""
         others = classmates_line(book, persona.name, subject, own.language) if own.classmates else ""
-        return "\n\n".join(part for part in (who, notes, said, news, others) if part)
+        return await with_gut("\n\n".join(part for part in (who, notes, said, news, others) if part))
     return text
 
 
@@ -745,6 +760,27 @@ def make_bond(book: Book):
     return bond
 
 
+def make_gut(book: Book, settings: Settings, guts: Guts):
+    async def show(arguments, context) -> ToolResult:
+        """`$gut`: where each student's gut stands; nothing of what she was told is shown to anyone but the owner."""
+        lines, owner = [], str(getattr(context.access, "value", context.access)) == "creator"
+        for persona in settings.personas:
+            if not settings.of(persona).gut:
+                continue
+            gut = guts.of(persona)
+            if not gut.awake:
+                await asyncio.to_thread(gut.wake)
+            found = gut.report()
+            lines.append(f"{book.shown(persona)}: {found['lessons']} lessons, born with {found['born']} (they count "
+                         f"{found['starter']}), last balance {found.get('share', '?')}")
+            if owner and found.get("told"):
+                lines.append(f"  told: {found['told']}")
+            if owner and found.get("note"):
+                lines.append(f"  her note: {found['note']}")
+        return ToolResult.ok("\n".join(lines) or "No student has a gut yet.")
+    return show
+
+
 def contributions(context, students: dict[str, dict]) -> dict:
     """The memory's prompt part, watcher, commands and facts, for these students (persona → display name and other
     names), or those of them `personas:` names."""
@@ -765,10 +801,16 @@ def contributions(context, students: dict[str, dict]) -> dict:
     learns = settings.learn or any(flag(own.get("learn"), False) for own in settings.students.values())
     searching = tuple(name for name in keep if settings.of(name).search) if EPISODES else ()
     spec = {item["name"]: item for item in SPECS}
+    felt = tuple(name for name in keep if settings.of(name).gut)
+    guts = Guts(Path(context.data_dir) / "gut", {name: Path(students[name]["folder"]) / STARTER for name in felt
+                                                 if students[name].get("folder")}) if felt else None
     return {
-        "prompt_parts": [PromptPart("memory", make_part(book, settings), place="turn", order=50, personas=keep)],
-        "watchers": [Watcher("memory", make_learner(book, settings), personas=keep, timeout_s=180)] if learns else [],
+        "prompt_parts": [PromptPart("memory", make_part(book, settings, guts), place="turn", order=50, personas=keep)],
+        "watchers": [*([Watcher("memory", make_learner(book, settings), personas=keep, timeout_s=180)] if learns else []),
+                     *([Watcher("gut", guts.learn, personas=felt, timeout_s=120)] if felt else [])],
         "capabilities": [
+            *([Capability("students.gut", "Where each student's gut stands.", make_gut(book, settings, guts),
+                          risk=Risk.READ, internal=True, command="gut")] if felt else []),
             Capability("students.alias", "Show or set what you call a student.", make_alias(book, facts),
                        {"text": {"type": "string", "description": "<student> <name>, <student> reset, or nothing"}},
                        risk=Risk.WRITE, internal=True, command="alias", command_argument="text"),

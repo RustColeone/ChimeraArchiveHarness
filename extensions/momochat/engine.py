@@ -17,6 +17,7 @@ its watcher), and an agent has none.
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import json
 import re
@@ -205,8 +206,13 @@ class MomoChatEngine(Engine):
     async def _take_turn(self, session: Session, state: dict, turn: dict) -> RunYield | None:
         """Her steps until she answers (None), or a wait (the run's yield)."""
         turn["status"] = "active"
+        thinking = False
         if "parts" not in turn:  # her prompt parts, rendered once a turn: a part may look something up
-            turn["parts"] = {place: await session.aprompt(turn["persona"], place) for place in ("stable", "turn")}
+            async def render() -> None:
+                turn["parts"] = {place: await session.aprompt(turn["persona"], place) for place in ("stable", "turn")}
+            # "Thinking…" goes out beside them: a part may ask her model first, and she should not sit silent for it.
+            thinking = turn["steps"] == 0 and not turn["pending"] and self._style(session) in ANSWER_ONLY
+            await asyncio.gather(render(), *([session.progress("Thinking…")] if thinking else []))
             await session.save(state)
         try:
             if turn["pending"]:
@@ -222,7 +228,7 @@ class MomoChatEngine(Engine):
                     await self._close(session, state, turn)
                     return None
                 turn["steps"] += 1
-                if turn["steps"] == 1 and self._style(session) in ANSWER_ONLY:
+                if turn["steps"] == 1 and not thinking and self._style(session) in ANSWER_ONLY:
                     await session.progress("Thinking…")
                 step = await self._step(session, state, turn)
                 self._record(session, state, turn, step)

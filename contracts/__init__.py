@@ -30,7 +30,8 @@ from contracts.watchers import Exchange, WatchContext, Watcher
 # 1.15: 1.14 plus the effort "none" (no thinking), Persona.effort, how hard she thinks in a conversation, and
 #       AdapterResult.cost, what the provider says it charged; the log (Session.logbook, ToolContext.logbook,
 #       WatchContext.logbook) in place of Session.diary, which no engine used
-CONTRACTS_VERSION = "1.15"
+# 1.16: 1.15 plus PartContext.models and PartContext.history, for a prompt part that asks her model before she answers
+CONTRACTS_VERSION = "1.16"
 
 __all__ = [
     "AdapterFactory", "AdapterResult", "Image", "ModelAdapter", "NotConfigured",

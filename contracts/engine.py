@@ -58,14 +58,18 @@ PART_PLACES = ("stable", "turn")
 
 @dataclass(frozen=True)
 class PartContext:
-    """What a computed prompt part may look at: the persona it is written for, the run's address and trigger, and
-    (added in 1.9) the engine placing it, so a part can keep to some engines."""
+    """What a computed prompt part may look at: the persona it is written for, the run's address and trigger,
+    (added in 1.9) the engine placing it, so a part can keep to some engines, and (added in 1.16) `models` and
+    `history`, for a part that asks her model something or reads the conversation before she answers. Its model calls
+    are counted in the run's usage but not against its budget, as a watcher's are."""
 
     persona: "Persona"
     address: Address
     trigger: Request
     owner: bool = False
     engine: str = ""
+    models: Any = None  # a `Models` (None outside a run)
+    history: Any = None  # a `History` (None outside a run)
 
 
 @dataclass(frozen=True)

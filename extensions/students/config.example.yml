@@ -18,6 +18,8 @@
 # notes: true                   # keep notes, and give her those that fit each message
 # mood: true                    # judge her mood after each exchange; tell her its news once
 # classmates: true              # tell her how the other students seem today (read from their files: no model call)
+# gut: false                    # what stays of her without her memory or her model (see the README); usually set per
+#                               # student, under `students: <name>:` or `memory:` in her student.yml
 # met_role: acquaintance        # the role someone gets when they first talk with her ("": leave them without one)
 # owner_role: creator           # the bot's owner's, when they first talk with her ("": as anyone else's)
 # writer_profile: deepseek      # the model profile for mneme-llm's own calls (left out: her own)
