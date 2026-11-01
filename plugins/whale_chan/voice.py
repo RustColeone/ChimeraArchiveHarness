@@ -10,7 +10,7 @@ file can be deleted to keep the module light.
 
 She speaks through the `whale_chan.speak` capability, so the core's permissions apply and a model can choose to
 send a voice note ("say goodnight to me"); the chat engine also uses it for her own first messages
-(speak-up) and in conversations switched to voice with `/voice on`.
+(speak-up) and in conversations switched to voice with `/voice on`. `/voice off` stops all of it in that chat.
 """
 
 from __future__ import annotations
@@ -140,11 +140,14 @@ def backend(config: Mapping[str, Any]):
     return OpenAIVoice(config)
 
 
-def capability(config: Mapping[str, Any]) -> Capability:
+def capability(config: Mapping[str, Any], silenced=lambda address: False) -> Capability:
+    """`silenced(address)`: the chat has her voice switched off (her bot knows; `/voice off`)."""
     voice = backend(config)
     limit = int(config.get("max_chars", 600))
 
     async def speak(arguments, tool) -> ToolResult:
+        if silenced(tool.address):
+            return ToolResult.fail("Voice messages are switched off in this chat: answer in text.", "voice_off")
         text = speakable(str(arguments.get("text", "")))
         if not text:
             return ToolResult.fail("There is nothing to say aloud in that text.", "empty")

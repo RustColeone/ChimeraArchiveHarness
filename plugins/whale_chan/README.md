@@ -126,7 +126,7 @@ modules:
   `$speakup now` on any interface.
 * **Voice.** `/voice on` (or `$voice on`) makes her short replies voice messages in that chat (`/voice off`, `/voice`
   shows which; the bot answers these itself, and keeps the choice in its bottle); her own speak-ups come as voice
-  messages too, and an answer for which she already sent one herself (`whale_chan.speak`) gets no second. OpenAI speech (`gpt-4o-mini-tts`, voice
+  messages too unless that chat is switched off, which also refuses `whale_chan.speak` there, and an answer for which she already sent one herself (`whale_chan.speak`) gets no second. OpenAI speech (`gpt-4o-mini-tts`, voice
   `coral`, with a style instruction) by default; Piper, a local voice, is an optional backend
   ([`voice_piper.py`](voice_piper.py)), not installed by default and safe to delete. Code, links and math
   are never read aloud, and replies over 400 characters stay text.
@@ -164,7 +164,7 @@ Her speak-ups are MomoChat turns from her own impulse (`extra.speak_up`), with n
 **Outgoing** ([`bot.py`](bot.py), `deliver`). It posts text (rendered, split, with display math turned into PNG
 images in a thread), files, notices in her own words (`NOTICES`) and the progress line. For slash commands the first
 reply replaces the placeholder and later ones follow up; `private` replies are ephemeral. Then, for a short answer
-in a chat with `/voice on` or one to her own speak-up, it says it aloud too (`_speak`: the voice backend in a
+in a chat with `/voice on` or one to her own speak-up in a chat not switched off, it says it aloud too (`_speak`: the voice backend in a
 thread, then a Discord voice message), once per run, and not when the run already sent a voice file of hers. It
 returns a `Delivery`: not sent for 403/404, uncertain for 5xx errors.
 
@@ -229,7 +229,8 @@ Safety:
   with no tools, moves her mood and writes no note, and the mark typed by a person is an ordinary message; her old
   memory settings are reported as moved.
 * `VoiceTests` (the bot itself, with a fake channel): `/voice on` makes short answers voice messages too, once per
-  answer and never code; her own first message is spoken; no second voice message when she sent one herself.
+  answer and never code; her own first message is spoken; no second voice message when she sent one herself; `/voice off` stops her first
+  messages and refuses `whale_chan.speak` in that chat.
 * `SpeakUpRuleTests`, `WhaleBotExtrasTests`: the speak-up rules, and only the owner steers them; a voice message is
   measured for Discord.
 

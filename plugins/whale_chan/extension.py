@@ -90,6 +90,7 @@ def setup(context) -> Contributions:
                   **custom, "options": {**chat_options(config), **dict(custom.get("options") or {})}}
     bot = WhaleChanBot(name, token, context.data_dir, config=config, persona=persona,
                        voice={**speech, "enabled": speaking})
+    capabilities = [voice.capability(speech, silenced=bot.silenced)] if speaking else []
     return Contributions(capabilities=[*capabilities, *bot.capabilities()], interfaces=[bot],
                          assignments={f"{name}:*": assignment},
                          admission={f"{name}:*": {"enabled": True, "require_mention_in_groups": True}},

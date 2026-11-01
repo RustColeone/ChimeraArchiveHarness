@@ -419,9 +419,16 @@ class WhaleChanBot(Interface):
             return f"🎙️ 语音回复现在是{'开' if on else '关'}着的（/voice on 或 /voice off）"
         return "🎙️ 好～之后人家会用语音回你！" if on else "💬 好的，之后用文字回你～"
 
+    def silenced(self, address: Address) -> bool:
+        """`/voice off` in this chat: no voice at all, her own first messages and her own choice included."""
+        return (self.port is not None and address.interface == self.name
+                and self.port.bottle.get(f"voice:{address.conversation}") == "off")
+
     def _wants_voice(self, reply: Reply) -> bool:
-        """A short answer in a chat switched to voice, or one to her own impulse (speaking up), once per run."""
-        if self.voice is None or reply.kind != "text" or not reply.run_id or reply.run_id in self._voiced:
+        """A short answer in a chat switched to voice, or one to her own impulse (speaking up) in a chat not switched
+        off, once per run."""
+        if self.voice is None or reply.kind != "text" or not reply.run_id or reply.run_id in self._voiced \
+                or self.silenced(reply.address):
             return False
         speak_up = str(reply.in_reply_to or "").startswith("speak-up-") and self.voice.get("speak_up", True)
         if not speak_up and self.port.bottle.get(f"voice:{reply.address.conversation}") != "on":

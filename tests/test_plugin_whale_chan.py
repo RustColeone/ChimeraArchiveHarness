@@ -552,6 +552,41 @@ class VoiceTests(unittest.IsolatedAsyncioTestCase):
             await self.reply(bot, "主人在吗", run="r2", to="speak-up-1-99")
         self.assertEqual(used, ["quick", "slow"])
 
+    async def test_voice_off_is_off_for_her_own_first_messages_too(self):
+        bot = self.bot()
+        voice = sys.modules[self.module.__name__.rsplit(".", 1)[0] + ".voice"]
+
+        def synthesize(self_, text, path):
+            return (path.write_bytes(b"OggS " + text.encode()), path)[1]
+        with patch.object(voice.OpenAIVoice, "synthesize", synthesize), patch.dict(os.environ, {"OPENAI_API_KEY": "k"}):
+            await self.reply(bot, "主人在吗", run="r1", to="speak-up-1-1")  # nobody chose: her first messages are spoken
+            bot._voice_command("dm:1", ["off"])
+            await self.reply(bot, "主人还在吗", run="r2", to="speak-up-1-2")
+            await self.reply(bot, "你回来啦", run="r3")
+            bot._voice_command("dm:1", ["on"])
+            await self.reply(bot, "晚安", run="r4", to="speak-up-1-3")
+        self.assertEqual(self.spoken, ["OggS 主人在吗".encode(), "OggS 晚安".encode()])
+        self.assertEqual(self.channel.texts(), ["主人在吗", "主人还在吗", "你回来啦", "晚安"])
+
+    async def test_voice_off_refuses_a_voice_message_she_chose_herself(self):
+        from contracts import Address
+        bot = self.bot()
+        voice = sys.modules[self.module.__name__.rsplit(".", 1)[0] + ".voice"]
+        speak = voice.capability({}, silenced=bot.silenced)
+        made = []
+
+        def synthesize(self_, text, path):
+            made.append(text)
+            return (path.write_bytes(b"OggS"), path)[1]
+        here = SimpleNamespace(address=Address("whale_chan", "dm:1"), workspace=tempfile.mkdtemp())
+        elsewhere = SimpleNamespace(address=Address("web", "dm:1"), workspace=tempfile.mkdtemp())
+        with patch.object(voice.OpenAIVoice, "synthesize", synthesize), patch.dict(os.environ, {"OPENAI_API_KEY": "k"}):
+            self.assertTrue((await speak.run({"text": "晚安"}, here)).ok)
+            bot._voice_command("dm:1", ["off"])
+            self.assertEqual((await speak.run({"text": "晚安"}, here)).error_code, "voice_off")
+            self.assertTrue((await speak.run({"text": "晚安"}, elsewhere)).ok)  # another interface's chat of the same name
+        self.assertEqual(made, ["晚安", "晚安"])
+
     def test_the_cloned_voice_sends_her_clip_and_makes_a_voice_message(self):
         from core.loader import import_extension
         _, module = import_extension(PLUGIN)

@@ -46,7 +46,8 @@ history_chars: 40000            # and at most this many characters of them
 #   call_them: 主人
 
 # Her voice: short replies as Discord voice messages, in her own speak-ups and in chats switched on with
-# /voice on; models can also send one (whale_chan.speak). OpenAI speech by default (OPENAI_API_KEY).
+# /voice on; models can also send one (whale_chan.speak). /voice off stops all of it in that chat. OpenAI speech by
+# default (OPENAI_API_KEY).
 # voice:
 #   enabled: true
 #   model: gpt-4o-mini-tts
