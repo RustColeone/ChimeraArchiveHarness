@@ -353,7 +353,6 @@ flowchart TD
   the side she is in: four times from family and it is gone.
 * **A side's name comes from one list**, `NAMES` in [`gut.py`](gut.py): 144 words for a character. Anything can be noted,
   but her model has to pick one of these for it, or no side grows and `$side` refuses it. To allow a word, add it there.
-  She is a grown woman, so no child's stage is on the list.
 * **She is in one side at a time, for a month at least.** A side is a character, not a mood. When the month is over her
   sides are drawn again by weight, so one of three parts to one gets about three months in four; a side she has just
   grown waits its turn. A weight is how much people asked, half gone in three months, or a number set by hand. Only a

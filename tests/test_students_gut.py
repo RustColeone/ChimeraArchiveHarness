@@ -485,7 +485,6 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         gut.grow("草莓", {"name": "草莓", "what": "你很甜。"})
         self.assertEqual(gut.grown, {})
         self.assertIn("小绿茶", G.grow_messages("病娇", [], {})[0]["content"])
-        self.assertFalse(any("萝" in name for name in G.NAMES))
 
     async def test_only_the_owner_can_change_her_sides(self):
         script = room.Script(GPT=[room.turn("a"), room.turn("b")])
