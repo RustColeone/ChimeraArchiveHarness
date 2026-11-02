@@ -451,12 +451,41 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         gut = await self.awake(chat)
         self.assertIn("御姐 side: 你从容", await self.say(chat, "$side gpt 御姐 你从容，从上往下逗对方。"))
         self.assertEqual(gut.report()["sides"], {"御姐": "你从容，从上往下逗对方。"})
-        self.assertIn("side 御姐: 你从容", await self.say(chat, "$gut"))
+        shown = await self.say(chat, "$gut")
+        self.assertIn("side 御姐 (6.0): 你从容", shown)
+        self.assertIn("she is in 御姐 for 30 more days at least", shown)
+        self.assertIn("御姐 side: 3", await self.say(chat, "$side gpt 御姐 3"))
+        self.assertEqual(gut.report()["sides"], {"御姐": "你从容，从上往下逗对方。"})  # a number sets how much of her, not her sentence
+        self.assertEqual(gut.weight("御姐"), 3)
+        self.assertIn("She has no side 三无", await self.say(chat, "$side gpt 三无 3"))
         self.assertIn("Gone: 御姐", await self.say(chat, "$side gpt 御姐 off"))
         self.assertEqual(gut.report()["sides"], {})
         self.assertIn("Use `$side", await self.say(chat, "$side gpt 御姐"))
-        self.assertIn("cannot be a child", await self.say(chat, "$side gpt 萝莉 你很可爱。"))
+        self.assertIn("Not a side she can have: 草莓", await self.say(chat, "$side gpt 草莓 你很甜。"))
         self.assertEqual(gut.report()["sides"], {})
+
+    async def test_she_stays_in_one_side_for_a_month(self):
+        script = room.Script(GPT=[room.turn(str(n)) for n in range(6)])
+        chat = await self.start(Head(script), owner=True)
+        gut = await self.awake(chat)
+        gut.write_side("御姐", "你从容。", 3)
+        gut.write_side("病娇", "你只要他。", 1)
+        held = gut.holding()
+        await self.say(chat, "嗯")
+        self.assertEqual(script.seen("GPT").count("side is showing"), 1)
+        self.assertIn(f"your {held[0]} side", script.seen("GPT"))
+        self.assertEqual(gut.holding(G.time.time() + 29 * 86400), held)
+        for_months = {tuple(gut.holding(G.time.time() + month * G.HOLD)) for month in range(1, 200)}
+        self.assertEqual(for_months, {("御姐",), ("病娇",)})
+
+    async def test_a_side_only_takes_a_name_on_the_list(self):
+        gut = G.Gut(self.tmp / "list.db")
+        gut.wake()
+        self.addCleanup(gut.close)
+        gut.grow("草莓", {"name": "草莓", "what": "你很甜。"})
+        self.assertEqual(gut.grown, {})
+        self.assertIn("小绿茶", G.grow_messages("病娇", [], {})[0]["content"])
+        self.assertFalse(any("萝" in name for name in G.NAMES))
 
     async def test_only_the_owner_can_change_her_sides(self):
         script = room.Script(GPT=[room.turn("a"), room.turn("b")])

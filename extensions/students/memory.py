@@ -774,7 +774,8 @@ def make_gut(book: Book, settings: Settings, guts: Guts):
             lines.append(f"{book.shown(persona)}: {found['lessons']} lessons, born with {found['born']} (they count "
                          f"{found['starter']}), last balance {found.get('share', '?')}")
             if owner and found["sides"]:
-                lines += [f"  side {name}: {what}" for name, what in found["sides"].items()]
+                lines += [f"  side {name} ({found['weights'][name]}): {what}" for name, what in found["sides"].items()]
+                lines.append(f"  she is in {', '.join(found['held'])} for {found['days']} more days at least")
             if owner and found["noted"]:
                 lines.append("  noted: " + ", ".join(f"{name} {value}" for name, value in found["noted"].items())
                              + f" (a side grows at {GROWS:g})")
@@ -786,20 +787,35 @@ def make_gut(book: Book, settings: Settings, guts: Guts):
     return show
 
 
+def number(text: str) -> float | None:
+    """A weight for `$side`: a number above nothing, or None for a sentence."""
+    try:
+        value = float(text)
+    except ValueError:
+        return None
+    return value if 0 < value < 1000 else None
+
+
 def make_side(book: Book, settings: Settings, guts: Guts):
     async def side(arguments, context) -> ToolResult:
         """`$side <student> <side> <sentence>` writes a side's sentence, a better one than her model's or a new side;
-        `$side <student> <side> off` takes one away."""
+        `$side <student> <side> <number>` sets how much of her it is; `$side <student> <side> off` takes one away."""
         words = str(arguments.get("text") or "").split(None, 2)
         persona = book.find(words[0], book.subject(context.address.interface, context.sender.id)) if words else None
         if len(words) < 3 or persona is None or not settings.of(persona).gut:
-            return ToolResult.fail("Use `$side <student> <side> <sentence>`, or `$side <student> <side> off`.",
-                                   "invalid_side")
+            return ToolResult.fail("Use `$side <student> <side> <sentence>`, `$side <student> <side> <number>`, or "
+                                   "`$side <student> <side> off`.", "invalid_side")
         gut = guts.of(persona)
         if not gut.awake:
             await asyncio.to_thread(gut.wake)
         if words[2] == "off":
             return ToolResult.ok(f"Gone: {words[1]}." if gut.drop_side(words[1]) else f"She has no side {words[1]}.")
+        weight = number(words[2])
+        if weight is not None:
+            if words[1] not in gut.grown:
+                return ToolResult.fail(f"She has no side {words[1]}.", "invalid_side")
+            gut.write_side(words[1], gut.grown[words[1]], weight)
+            return ToolResult.ok(f"{book.shown(persona)}'s {words[1]} side: {weight:g}")
         try:
             gut.write_side(words[1], words[2])
         except ValueError as error:
@@ -840,7 +856,7 @@ def contributions(context, students: dict[str, dict]) -> dict:
                           risk=Risk.READ, internal=True, command="gut"),
                Capability("students.side", "Write a side of a student's, or take one away.",
                           make_side(book, settings, guts),
-                          {"text": {"type": "string", "description": "<student> <side> <sentence>, or <student> <side> off"}},
+                          {"text": {"type": "string", "description": "<student> <side> <sentence>, <student> <side> <number>, or <student> <side> off"}},
                           risk=Risk.WRITE, access="creator", internal=True, command="side",
                           command_argument="text")] if felt else []),
             Capability("students.alias", "Show or set what you call a student.", make_alias(book, facts),

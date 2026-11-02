@@ -329,7 +329,7 @@ flowchart TD
     Z --> S[Every so often she sleeps: lessons and a fading starter, replayed]
     S --> N
     A --> H[A short reading: is this person making something of her?]
-    H --> G[Wanted on separate days: a side, one sentence kept in her gut]
+    H --> G[Wanted on separate days: a side, a name from the list and one sentence, kept in her gut]
     G --> O
 ```
 
@@ -349,11 +349,20 @@ flowchart TD
   character and no memory, notes whether the person called her a kind of character, asked for one, enjoyed it or objected.
   Only what they say counts, not how she acts. "More" counts once a day per person, by closeness, half gone in two weeks;
   wanted enough (about four days for family) her model writes one sentence, from what the word means and what they asked
-  for, and her gut keeps it, so it outlasts a wipe and a new model. At most two show, in the line, to people at closeness
-  40 or more. Objecting counts every time, in any words, against her strongest side: four times from family and it is
-  gone. `$gut` shows the owner what grew and what is noted; `$side <student> <side> <sentence>` writes a better sentence
-  or a new side, and `$side <student> <side> off` takes one away. A side is never a child: words such as 萝莉 and 幼女 are
-  not noted, grown or written.
+  for, and her gut keeps it, so it outlasts a wipe and a new model. Objecting counts every time, in any words, against
+  the side she is in: four times from family and it is gone.
+* **A side's name comes from one list**, `NAMES` in [`gut.py`](gut.py): 144 words for a character. Anything can be noted,
+  but her model has to pick one of these for it, or no side grows and `$side` refuses it. To allow a word, add it there.
+  She is a grown woman, so no child's stage is on the list.
+* **She is in one side at a time, for a month at least.** A side is a character, not a mood. When the month is over her
+  sides are drawn again by weight, so one of three parts to one gets about three months in four; a side she has just
+  grown waits its turn. A weight is how much people asked, half gone in three months, or a number set by hand. Only a
+  side going away ends the month sooner. It shows in the line, to people at closeness 40 or more. Weight works only as
+  how often: words like "mostly" change nothing, and two sides at once can wipe each other out (三无 fell from 27 of 40
+  to 4 beside 御姐 and 腹黑).
+* **`$gut`** shows the owner her sides with their weights, the one she is in and what is noted.
+  `$side <student> <side> <sentence>` writes a better sentence or a new side, `$side <student> <side> <number>` sets how
+  much of her it is, and `$side <student> <side> off` takes one away.
 * **Where it lives:** `<data>/gut/<persona>.db`, apart from her memory, so a wipe does not reach it. `Gut.forget(subject)`
   takes out what one person taught and rebuilds her from the rest; nothing calls it yet, since the app has no "forget
   me" command.
