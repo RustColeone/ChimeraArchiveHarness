@@ -365,12 +365,13 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
                                  "chat:dm2": {"engine": "room", "personas": ["gemini"]}})
         await self.say(chat, "GPT, my violin teacher is Anna Berlinova")  # no note: only the words keep it
         await self.say(chat, "GPT, who teaches me the violin?")
-        self.assertIn("Said before with Alice", self.seen(script, "GPT"))  # on screen too: asked, she is shown it
+        surface = memory_module().SURFACE  # (mneme-llm's surface: a file of 0.3 still leaves out what is on screen)
+        (self.assertIn if surface else self.assertNotIn)("Said before with Alice", self.seen(script, "GPT"))
         await self.say(chat, "who teaches me the violin?", conversation="dm")
         turn = self.seen(script, "GPT")
         self.assertIn("Said before with Alice", turn)
         self.assertIn("Alice: GPT, my violin teacher is Anna Berlinova\nGPT: Anna, noted.", turn)
-        self.assertNotIn("same person and this same thing", turn)  # their own conversation: no data label
+        (self.assertNotIn if surface else self.assertIn)("same person and this same thing", turn)  # no label: their own
         self.assertIn("search for it", turn)  # she has the tools
         await self.say(chat, "who teaches me the violin?", conversation="dm2")
         self.assertIn("Anna Berlinova", self.seen(script, "Gemini"))  # a group chat: she heard it too
