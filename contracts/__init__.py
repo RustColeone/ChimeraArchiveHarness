@@ -31,7 +31,9 @@ from contracts.watchers import Exchange, WatchContext, Watcher
 #       AdapterResult.cost, what the provider says it charged; the log (Session.logbook, ToolContext.logbook,
 #       WatchContext.logbook) in place of Session.diary, which no engine used
 # 1.16: 1.15 plus PartContext.models and PartContext.history, for a prompt part that asks her model before she answers
-CONTRACTS_VERSION = "1.16"
+# 1.17: 1.16 plus PartContext.since (Session.aprompt takes it), when the thread a part is written for began, and
+# ToolContext.memory, a persona's own store, for a command that changes what her engine reads
+CONTRACTS_VERSION = "1.17"
 
 __all__ = [
     "AdapterFactory", "AdapterResult", "Image", "ModelAdapter", "NotConfigured",

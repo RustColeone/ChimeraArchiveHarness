@@ -11,6 +11,9 @@ timeout_s: 35                   # seconds a model call may take
 tool_calls: true                # function calls where the model can make them (false: JSON steps only)
 history_limit: 30               # messages every speaker reads word for word (at most 150)
 history_chars: 0                # and at most this many characters of them (0: no budget)
+surface: false                  # about a month of the chat word for word in place of history_limit, for a model
+                                # with a long window and a prompt cache
+history_window: 1048576         # tokens the model reads at most, which the surface stays under
 compact: true                   # fold older messages into the conversation's rolling summary
 compact_every: 20               # ...once this many have scrolled out (one call to compact_profile)
 compact_profile: default        # the model profile that writes the summary

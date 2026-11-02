@@ -9,12 +9,20 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import math
+import re
 import time
 
 from contracts import FileRef, ModelError, ModelRequest, Session
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".gif", ".webp")
 NEW_THREAD = {"/new", "/reset", "/clear"}
+REACH = 200  # messages of the chat a thread is read from
+SURFACE_REACH = 30000  # and with `surface` on
+# The surface, as mneme-llm counts it: what the last SURFACE_DAYS talking days hold, never less than SURFACE_FLOOR
+# tokens, let go at twice that, with SURFACE_CAP the top whatever the rest says, or 80% of the model's window.
+SURFACE_DAYS, SURFACE_FLOOR, SURFACE_CAP, SURFACE_WINDOW = 30, 70_000, 504_000, 1_048_576
+DAY_STARTS = 4  # a talking day turns at 4 in the morning
+WIDE = re.compile("[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]")
 # How an interface marks a message it sent on a persona's own impulse (with `extra.speak_up`, Whale-chan's bot
 # speaking up): in history it is her impulse, not something the person said.
 IMPULSE = "⟨speak-up⟩ "
@@ -57,6 +65,35 @@ def combine_images(*groups) -> tuple[FileRef, ...]:
             seen.add(file.path)
             result.append(file)
     return tuple(result[-6:])
+
+
+def new_thread(text: str) -> list[str] | None:
+    """`/new` with at most one word after it, as that word (or nothing), or None for anything else."""
+    words = text.strip().lower().split()
+    return words[1:] if 1 <= len(words) <= 2 and words[0] in NEW_THREAD else None
+
+
+def tokens(item) -> float:
+    """About what a message costs a model (within 3% of DeepSeek's count on two months of chat)."""
+    wide = len(WIDE.findall(item.text))
+    return wide * .85 + (len(item.text) - wide) * .3 + 1.2
+
+
+def talking_day(at: float) -> int:
+    return (dt.datetime.fromtimestamp(at).astimezone() - dt.timedelta(hours=DAY_STARTS)).toordinal()
+
+
+def surface_bounds(items, window: int = SURFACE_WINDOW) -> tuple[int, int]:
+    """What the surface keeps and what it may reach, given what is in it and what the model reads at most."""
+    days: dict[int, int] = {}  # (a quarter of an hour's day: a day turns on one)
+    for item in items:
+        days.setdefault(int(item.at // 900), 0)
+    days = {quarter: talking_day(quarter * 900.0) for quarter in days}
+    edge = (sorted(set(days.values()))[-SURFACE_DAYS:] or [0])[0]
+    recent = sum(tokens(item) for item in items if days[int(item.at // 900)] >= edge)
+    top = min(SURFACE_CAP, window * 4 // 5)
+    keep = min(max(SURFACE_FLOOR, int(recent)), top * 2 // 3)
+    return keep, min(2 * keep, top)
 
 
 def is_command(text: str) -> bool:
@@ -105,11 +142,14 @@ def flag(value, default: bool) -> bool:
 
 
 class Reading:
-    """The conversation as one run's speakers read it (the engine's settings under the assignment's options)."""
+    """The conversation as one run's speakers read it (the engine's settings under the assignment's options), or as
+    `persona` does, whose own `/new` the others are not held to."""
 
-    def __init__(self, session: Session, settings):
-        self.session, self.settings = session, settings
+    def __init__(self, session: Session, settings, persona: str = ""):
+        self.session, self.settings, self.persona = session, settings, persona
         options = session.options
+        self.surface = flag(options.get("surface"), settings.surface)
+        self.window_tokens = number(options.get("history_window"), settings.history_window, 1000, 100_000_000)
         self.limit = number(options.get("history_limit") or None, settings.history_limit, 1, 150)
         self.chars = number(options.get("history_chars"), settings.history_chars, 0, 400000)
         self.compact = flag(options.get("compact"), settings.compact)
@@ -119,15 +159,18 @@ class Reading:
 
     # ---- the thread -------------------------------------------------------------------------------------------
     def thread_since(self) -> float:
-        """When this conversation's thread began: its last `/new` (0: never). A thread begun with the chat engine of a
-        student's own bot (kept in her memory then) counts too."""
+        """When this conversation's thread began: its last `/new` (0: never). One begun for a student alone counts too
+        (`/new <her>`, or her own bot's chat engine, kept in her memory then), and the last time her memory was wiped,
+        wherever that was typed."""
         session = self.session
         since = float(session.store(conversation=True).get("thread_since") or 0)
-        for persona in session.personas:
-            since = max(since, float(session.memory(persona.name).get(f"thread_since:{session.address}") or 0))
+        for name in [self.persona] if self.persona else [persona.name for persona in session.personas]:
+            memory = session.memory(name)
+            since = max(since, float(memory.get(f"thread_since:{session.address}") or 0),
+                        float(memory.get("thread_since") or 0))
         return since
 
-    def conversation(self, reach: int = 200) -> list:
+    def conversation(self, reach: int = REACH) -> list:
         """The thread before this request, without `$commands` and their answers. "Before" is by position: everything
         recorded ahead of the trigger, even in the same second (some platforms send whole seconds)."""
         session = self.session
@@ -141,7 +184,7 @@ class Reading:
             items = [item for item in items if item.at < session.trigger.received_at]
         since = self.thread_since()
         commands = {item.message_id for item in items if item.direction == "in" and is_command(item.text)}
-        items = [item for item in items if item.at > since and item.text.strip().lower() not in NEW_THREAD
+        items = [item for item in items if item.at > since and new_thread(item.text) is None
                  and not (item.direction == "in" and is_command(item.text))
                  and not (item.direction == "out" and item.reply_to and item.reply_to in commands)]
         if session.options.get("history_scope") == "sender" and not session.trigger.is_direct:
@@ -155,7 +198,11 @@ class Reading:
     def split(self) -> tuple[list, list]:
         """The thread as (older, window): the window is the last `history_limit` messages (within `history_chars`,
         newest first, when that is set), read word for word; the summary covers the older ones, so each message is in
-        one or the other. A second is never split between them: the summary's `upto` is a time."""
+        one or the other. A second is never split between them: the summary's `upto` is a time. With `surface`, all of
+        it after the summary is the window, so that a provider's cache keeps serving it, up to its top; `fold` lets the
+        older part go there."""
+        if self.surface:
+            return self._surface(self.conversation(SURFACE_REACH))
         items = self.conversation()
         start = max(0, len(items) - self.limit)
         if self.chars:
@@ -168,6 +215,34 @@ class Reading:
         while 0 < start < len(items) and items[start - 1].at >= items[start].at:
             start -= 1
         return items[:start], items[start:]
+
+    def _surface(self, items: list) -> tuple[list, list]:
+        summary = self.summary()
+        upto = summary.upto if summary and math.isfinite(summary.upto) else 0.0
+        held = next((index for index, item in enumerate(items) if item.at > upto), len(items))
+        _, top = surface_bounds(items[held:], self.window_tokens)
+        start, used = len(items), 0.0
+        while start > held and used + tokens(items[start - 1]) <= top:
+            start -= 1
+            used += tokens(items[start])
+        return items[:start], items[start:]
+
+    def _leaving(self) -> list:
+        """What the surface lets go now: nothing until it reaches its top, then all but what it keeps."""
+        older, window = self.split()
+        summary = self.summary()
+        covered = summary.upto if summary and math.isfinite(summary.upto) else self.thread_since()
+        fresh = [item for item in older if item.at > covered]
+        keep, top = surface_bounds(window, self.window_tokens)
+        left = sum(tokens(item) for item in window)
+        if left < top and not fresh:
+            return []
+        for index, item in enumerate(window):
+            if left <= keep and (not index or window[index - 1].at < item.at):
+                break
+            fresh.append(item)
+            left -= tokens(item)
+        return fresh
 
     def window(self) -> list:
         return self.split()[1]
@@ -194,17 +269,22 @@ class Reading:
             return  # it failed recently: not on every message (each try costs a model call)
         summary = self.summary()
         covered = summary.upto if summary and math.isfinite(summary.upto) else self.thread_since()
-        older, _ = self.split()
-        fresh = [item for item in older if item.at > covered]
-        if len(fresh) < self.compact_every:
-            return
+        if self.surface:
+            fresh = self._leaving()
+            if not fresh:
+                return
+        else:
+            older, _ = self.split()
+            fresh = [item for item in older if item.at > covered]
+            if len(fresh) < self.compact_every:
+                return
         lines = "\n".join(line(item, True, set()) for item in fresh)
         try:
             result = await session.models.generate(ModelRequest(
                 [{"role": "system", "content": COMPACT},
                  {"role": "user", "content": f"Summary so far:\n{summary.text if summary else '(none yet)'}\n\n"
                                              f"New messages:\n{lines}"}],
-                profile=self.compact_profile, max_tokens=900, effort="low"))
+                profile=self.compact_profile, max_tokens=2000 if self.surface else 900, effort="low"))
         except ModelError:
             store.set("compact_retry_at", time.time() + COMPACT_RETRY_S)
             return

@@ -51,9 +51,11 @@ MOVED = {"prompt": "extensions/students/deepseek/ (whale.md, prompt.md)",
          "diary": "nowhere: a student's memory is the students module's"}
 # How MomoChat runs her chats: a chat app's, short and casual, at the effort in her student.yml (none: she answers at
 # once); `style: full` and `effort: high` in her settings make this a chat client, thorough and slow. Her settings of
-# these names (style, max_steps, ...) win, and the assignment's own `options` over them.
-OPTIONS = {"style": "chat", "max_steps": 10, "max_tokens": 8000, "history_limit": 60,
-           "history_chars": 40000, "timeout_s": 240, "compact": False, "new_chat_text": "🐳 好的主人，新的对话开始啦～"}
+# these names (style, max_steps, ...) win, and the assignment's own `options` over them. `surface`: DeepSeek reads a
+# million tokens and caches them, so about a month of the chat stays word for word; on a smaller model set
+# `history_window`, or `surface: false` for `history_limit` and `history_chars`.
+OPTIONS = {"style": "chat", "max_steps": 10, "max_tokens": 8000, "surface": True, "history_limit": 60,
+           "history_chars": 40000, "timeout_s": 240, "compact": True, "new_chat_text": "🐳 好的主人，新的对话开始啦～"}
 
 
 def chat_options(config) -> dict:

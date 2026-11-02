@@ -27,6 +27,7 @@ to a character is a change to a file, not to code.
 | Prompt part | `memory` | Her memory of the person, each turn of a conversation ([Her memory](#her-memory)) |
 | Watcher | `memory` | After each of her messages in a conversation, what she learns from it |
 | Capabilities | `students.alias`, `students.bond`, `students.callme`, `students.link` | `$alias`, `$bond`, `$callme` and `$link` (typed only) |
+| Capabilities | `students.first`, `students.new` | `$first` and `$new`: the first prompt she keeps of you, and starting over deeper than `/new` (see below) |
 | Capabilities | `students.search_memory`, `students.read_memory` | Her tools to look through everything said before with the person (offered to the students' turns only) |
 | Facts | `students.alias`, `students.bond`, `students.mood`, `students.plans`, `students.called`, `students.accounts` | Where she stands with each person, what she calls them and their accounts, for the pages |
 | Declares | `requires=("package:mneme-llm>=0.2",)`, `formerly=("companion",)` | Her memory was the companion module until 2026-10-27: its data folder, settings and facts are this module's (contracts 1.11) |
@@ -267,6 +268,28 @@ wins.
 <name>`), then `call_owner` set for her alone (`students: {gpt: {call_owner: …}}`, the owner only), then the one you
 asked of every student (`$callme <name>`), then `call_owner` for all (the owner only), then your name in `people:`,
 then the name you have where you wrote. The pages show which applies (`students.called`).
+
+### Starting over, and your first prompt
+
+With mneme-llm's surface, her gut reads the newest 3,000 tokens of her own copy of what you said, so it learns the same
+on any host, and everything is searched as one call: a look, and when you reach back to something from before, a search
+as well, however faded, which also covers what is still on screen, so she never says she can't find what she can see.
+In your own conversation with her what she remembers comes with no data label; in a group, it keeps it.
+
+| Type | Clears | Keeps |
+| --- | --- | --- |
+| `/new` | The context, for every student here | What she remembers, and her gut |
+| `/new <student>` | The context, for her alone | What she remembers, and her gut |
+| `$new deep [student]` | The context and everything she remembers of everyone: notes and every word | Her gut, and who people are to her |
+| `$new gut [student]` | All of that, and what people taught her gut: her lessons, tone and sides | Her character, and who people are to her |
+
+`$new` is for the creator only, asks to be confirmed first, and with no student covers every student. Its words do not
+come back.
+
+The first thing you say to her, usually who you want her to be, stays apart from the conversation, where it does not
+fade. `$first` shows it, `$first <text>` sets it for every student, `$first clear` takes it away, and `$first on` sends it
+when a fresh chat starts (off by default, since you may have grown away from it). A student first (`$first <student> ...`)
+is her alone.
 
 ### Settings of her memory
 

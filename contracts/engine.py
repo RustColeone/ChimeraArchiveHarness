@@ -61,7 +61,8 @@ class PartContext:
     """What a computed prompt part may look at: the persona it is written for, the run's address and trigger,
     (added in 1.9) the engine placing it, so a part can keep to some engines, and (added in 1.16) `models` and
     `history`, for a part that asks her model something or reads the conversation before she answers. Its model calls
-    are counted in the run's usage but not against its budget, as a watcher's are."""
+    are counted in the run's usage but not against its budget, as a watcher's are. `since` (added in 1.17) is when the
+    thread she is in began, as the engine says (`Session.aprompt`): 0 when it never was started over."""
 
     persona: "Persona"
     address: Address
@@ -70,6 +71,7 @@ class PartContext:
     engine: str = ""
     models: Any = None  # a `Models` (None outside a run)
     history: Any = None  # a `History` (None outside a run)
+    since: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -345,7 +347,7 @@ class Session(Protocol):
         is left out (and logged); none can fail the run. An async part is left out too: use `aprompt`."""
         ...
 
-    async def aprompt(self, persona: str, place: str = "stable") -> str:
+    async def aprompt(self, persona: str, place: str = "stable", since: float = 0.0) -> str:
         """`prompt`, with async parts awaited (added in 1.14): each in turn, for at most a few seconds (one that takes
         longer is left out, and logged). Render once per turn: a part may cost a lookup."""
         ...

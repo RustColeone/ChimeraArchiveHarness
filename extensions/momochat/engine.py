@@ -27,11 +27,12 @@ from typing import Any
 from contracts import Engine, EngineSpec, ModelError, ModelRequest, RunYield, Session, ToolResult, ToolSpec
 
 from . import group, steps
-from .history import NEW_THREAD, Reading, add_images, combine_images, flag, images, line, number
+from .history import Reading, add_images, combine_images, flag, images, line, new_thread, number
 from .steps import ASK, HAND_OFF, PASS
 
 VERSION = 2  # of the state a run saves (runs another engine saved start over: their calls are `c…`, ours `m…`)
 STYLES = ("brief", "full", "chat")
+DEEPER = ("deep", "gut")  # what `/new` leaves to `$new`
 DAY = 86400
 ANSWER_ONLY = ("full", "chat")  # the styles that post only her answer, her notes while working shown as progress
 FAILURES = {
@@ -67,6 +68,8 @@ class Settings:
         self.style = str(config.get("style") or "brief") if str(config.get("style") or "brief") in STYLES else "brief"
         self.chime_in = flag(config.get("chime_in"), False)
         self.compact = flag(config.get("compact"), True)
+        self.surface = flag(config.get("surface"), False)  # about a month of the chat word for word, not `history_limit`
+        self.history_window = number(config.get("history_window"), 1_048_576, 1000, 100_000_000)
         self.compact_every = number(config.get("compact_every"), 20, 1, 1000)
         self.compact_profile = str(config.get("compact_profile") or "default")
         self.new_chat_text = str(config.get("new_chat_text") or "New chat started.")
@@ -117,16 +120,33 @@ class MomoChatEngine(Engine):
     def _group(self, session: Session) -> bool:
         return len(session.personas) > 1
 
+    def _new_thread(self, session: Session) -> str:
+        """`/new` starts a fresh thread here for everyone, and `/new <student>` for her alone; what to answer, or "" for
+        a message that is no such thing. Going deeper is a command of its own, for the creator (`$new`)."""
+        words = new_thread(session.trigger.text)
+        if words is None:
+            return ""
+        at = session.trigger.received_at
+        if not words:
+            session.store(conversation=True).set("thread_since", at)
+            return str(session.options.get("new_chat_text") or self.settings.new_chat_text)
+        if words[0] in DEEPER:
+            return f"That is `$new {words[0]}`: only the creator can use it, and it asks first."
+        named = next((persona for persona in session.personas
+                      if words[0] in (persona.name.lower(), persona.display_name.lower())), None)
+        if named is None:
+            return ""
+        session.memory(named.name).set(f"thread_since:{session.address}", at)
+        return f"New chat with {named.display_name}."
+
     # ---- run ----------------------------------------------------------------------------------------------------
     async def run(self, session: Session) -> RunYield:
         state = session.state if (session.state or {}).get("v") == VERSION else None
         if state is None:
-            command = session.trigger.text.strip().lower()
-            if command in NEW_THREAD:
-                session.store(conversation=True).set("thread_since", session.trigger.received_at)
+            answer = self._new_thread(session)
+            if answer:
                 await session.save({"v": VERSION, "done": True})
-                await session.reply(str(session.options.get("new_chat_text") or self.settings.new_chat_text),
-                                    label="new chat")  # (not something she said: her memory keeps nothing of it)
+                await session.reply(answer, label="new chat")  # (not something she said: her memory keeps nothing of it)
                 return RunYield.DONE
             state = {"v": VERSION, "turns": [], "current": 0, "event_cursor": -1, "call_seq": 0, "native_seq": 0,
                      "quote": None, "images": [], "handoffs": 0, "opened": False}
@@ -209,7 +229,8 @@ class MomoChatEngine(Engine):
         thinking = False
         if "parts" not in turn:  # her prompt parts, rendered once a turn: a part may look something up
             async def render() -> None:
-                turn["parts"] = {place: await session.aprompt(turn["persona"], place) for place in ("stable", "turn")}
+                since = Reading(session, self.settings, turn["persona"]).thread_since()
+                turn["parts"] = {place: await session.aprompt(turn["persona"], place, since) for place in ("stable", "turn")}
             # "Thinking…" goes out beside them: a part may ask her model first, and she should not sit silent for it.
             thinking = turn["steps"] == 0 and not turn["pending"] and self._style(session) in ANSWER_ONLY
             await asyncio.gather(render(), *([session.progress("Thinking…")] if thinking else []))
@@ -566,7 +587,7 @@ class MomoChatEngine(Engine):
             context.append(turn["instruction"])
         if turn["optional"]:
             context.append(steps.PASS_RULE[native])
-        reading = Reading(session, self.settings)
+        reading = Reading(session, self.settings, turn["persona"])
         messages: list[dict] = [{"role": "system", "content": system}]
         summary = reading.summary()
         if summary:

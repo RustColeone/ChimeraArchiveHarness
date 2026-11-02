@@ -64,7 +64,11 @@ closing step says what is done and what is not. `max_turns` (12) bounds the turn
 and the group's rules. Then the conversation: the thread since the last `/new`, its last `history_limit` messages
 (30) word for word (at most `history_chars` characters of them, when set; a second is never split), older ones as the
 conversation's rolling summary (rewritten by one `compact_profile` call once `compact_every`, 20, have scrolled
-out; `core.search_history` finds their words), with `$commands` and their answers left out. Then the turn's context:
+out; `core.search_history` finds their words), with `$commands` and their answers left out. With `surface` on, she
+reads about a month word for word instead: what the last 30 talking days hold, never less than 70,000 tokens. It does
+not slide, so a provider's cache keeps serving it: nothing leaves until it holds twice that, up to 504,000 tokens or 80%
+of `history_window`, and then the older part folds into the summary at once. A day turns at 4 in the morning, and only
+days someone talked count. Then the turn's context:
 the time, her turn parts (a student's memory of the person, from the students module: her notes and her first look
 at what was said before), other requests in progress, what was said in this run before her, and why she speaks if
 nobody asked her. Then the message and her turn so far. Her prompt parts are rendered once at the start of her turn
@@ -80,7 +84,8 @@ group. `chat`: a chat app (Whale-chan's bot): short and casual, her notes while 
 the answer posted. `full`: a personal AI chat client: the same, with complete answers in Markdown and LaTeX.
 
 **Threads.** `/new` (or `/reset`, `/clear`) starts a fresh thread in that conversation (`new_chat_text` answers):
-earlier messages stay in history but are no longer read, and the summary of before is set aside.
+earlier messages stay in history but are no longer read, and the summary of before is set aside. `/new <student>` does
+it for her alone. Going deeper is for the creator: `$new deep` and `$new gut`, from the students module.
 
 **Her own impulse.** A request an interface marks `extra.speak_up` (Whale-chan's bot speaking up; its text starts
 `⟨speak-up⟩ `, which history shows as her own impulse) is her own wish to message someone: one step from the motive,
@@ -109,6 +114,8 @@ default of the assignment option of the same name, which wins:
 | `tool_calls` | true | Function calls where the model can make them (false: JSON steps only) |
 | `history_limit` | 30 | Messages read word for word (at most 150) |
 | `history_chars` | 0 | At most this many characters of them (0: no budget) |
+| `surface` | false | About a month word for word in place of `history_limit`, for a model with a long window and a prompt cache |
+| `history_window` | 1048576 | Tokens the model reads at most, which the surface stays under |
 | `compact` | true | Fold older messages into the conversation's rolling summary |
 | `compact_every` | 20 | Fold once this many have scrolled out |
 | `compact_profile` | `default` | The model profile that writes the summary |

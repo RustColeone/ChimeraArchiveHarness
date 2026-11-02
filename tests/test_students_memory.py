@@ -96,6 +96,8 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
     async def test_asked_about_the_past_she_gets_a_search_and_her_closest_notes(self):
         module = memory_module()
         own = module.Settings({"language": "en"}, self.tmp)
+        module.SURFACE, surface = False, module.SURFACE  # (what a file of mneme-llm 0.3 still does)
+        self.addCleanup(setattr, module, "SURFACE", surface)
         memory, searched = self.asked_memory()
         text = await module.first_look(memory, "chat:alice", "what car do I drive?", "Alice", "chat:dm", own)
         self.assertEqual(searched, ["what car do I drive?"])  # we search for her: she need not choose to
@@ -107,6 +109,8 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
     async def test_ordinary_chat_costs_no_search(self):
         module = memory_module()
         own = module.Settings({"language": "en"}, self.tmp)
+        module.SURFACE, surface = False, module.SURFACE
+        self.addCleanup(setattr, module, "SURFACE", surface)
         memory, searched = self.asked_memory(recall=0.02)
         self.assertEqual(await module.first_look(memory, "chat:alice", "long day", "Alice", "chat:dm", own), "the look's own")
         self.assertEqual(searched, [])
@@ -148,7 +152,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse((book.folder / "claude.db").exists())  # looking never makes a file for someone
         persona, trigger = SimpleNamespace(name="gpt", display_name="GPT"), SimpleNamespace(
             origin="person", sender=SimpleNamespace(id="alice", name="Alice"),
-            text="hello", extra={})
+            text="hello", extra={}, is_direct=True)
         context = SimpleNamespace(persona=persona, trigger=trigger, address=SimpleNamespace(interface="chat",
                                   conversation="dm"), owner=False, engine="momochat")
         self.assertIn("Gemini seems in high spirits today", await memory.make_part(book, settings)(context))
@@ -361,12 +365,12 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
                                  "chat:dm2": {"engine": "room", "personas": ["gemini"]}})
         await self.say(chat, "GPT, my violin teacher is Anna Berlinova")  # no note: only the words keep it
         await self.say(chat, "GPT, who teaches me the violin?")
-        self.assertNotIn("Said before with Alice", self.seen(script, "GPT"))  # still on screen in this chat
+        self.assertIn("Said before with Alice", self.seen(script, "GPT"))  # on screen too: asked, she is shown it
         await self.say(chat, "who teaches me the violin?", conversation="dm")
         turn = self.seen(script, "GPT")
         self.assertIn("Said before with Alice", turn)
         self.assertIn("Alice: GPT, my violin teacher is Anna Berlinova\nGPT: Anna, noted.", turn)
-        self.assertIn("same person and this same thing", turn)  # the check before she says she remembers
+        self.assertNotIn("same person and this same thing", turn)  # their own conversation: no data label
         self.assertIn("search for it", turn)  # she has the tools
         await self.say(chat, "who teaches me the violin?", conversation="dm2")
         self.assertIn("Anna Berlinova", self.seen(script, "Gemini"))  # a group chat: she heard it too

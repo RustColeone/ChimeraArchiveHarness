@@ -132,6 +132,10 @@ class ToolContext(Protocol):
         `conversation`, one of the run's personas, and the caller (`person`); no arguments: the module's
         store everywhere (the same as `storage`)."""
 
+    def memory(self, persona: str) -> Store:
+        """A persona's private store, as `Session.memory` opens it (added in 1.17), for a command that changes what her
+        engine reads. Any persona there is, as a typed command has none of its own."""
+
 
 Handler = Callable[[Mapping[str, Any], ToolContext], Awaitable[ToolResult]]
 

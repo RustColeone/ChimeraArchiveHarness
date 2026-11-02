@@ -450,9 +450,9 @@ def written(text: str) -> dict | None:
     return {"feel": {name: round(value, 3) for name, value in feel.items() if value}, "mood": mood}
 
 
-def earlier(items, said: str, name: str, limit: int = HISTORY) -> list[dict]:
-    """What was said before the message she is answering, as her turns and theirs."""
-    items = [item for item in items if item.kind == "text" and item.text]
+def earlier(items, said: str, name: str, limit: int = HISTORY, since: float = 0.0) -> list[dict]:
+    """What was said before the message she is answering and after `since`, as her turns and theirs."""
+    items = [item for item in items if item.kind == "text" and item.text and item.at > since]
     at = next((i for i in range(len(items) - 1, -1, -1) if items[i].direction == "in" and items[i].text == said), None)
     messages: list[dict] = []
     for item in items[:at][-limit:]:
@@ -773,6 +773,19 @@ class Gut:
         self.sleep()
         return gone
 
+    def wipe(self) -> int:
+        """All she learned of anyone goes, her sides and her tone with it, and she is as she was born. How many lessons
+        went."""
+        with self.lock:
+            with self._open() as db:
+                gone = db.execute("delete from lessons").rowcount
+                for table in ("people", "sightings", "sides", "state"):
+                    db.execute(f"delete from {table}")
+            self.awake = False
+        self.wake()
+        self.sleep()
+        return gone
+
     def report(self) -> dict:
         return {"lessons": len(self.net.lessons), "starter": round(self.net.share(), 2), "born": len(self.net.born),
                 "tone": {name: round(value, 3) for name, value in self.tone.v.items()}, "sides": dict(self.grown),
@@ -795,6 +808,7 @@ class Turn:
         self.began = time.monotonic()
         self.reading = asyncio.ensure_future(self.ask(reading_messages(said), 300))
         self.told, self.closeness, self.language = "", 0.0, ""
+        self.before: list[dict] | None = None  # what her vote read, for her note
 
     async def ask(self, messages: list[dict], tokens: int, timeout: float = 30.0) -> str:
         result = await self.models.generate(ModelRequest(messages, persona=self.persona.name, effort="none",
@@ -808,11 +822,14 @@ class Turn:
         except Exception:  # (a failed call, or late: there is no form)
             return None
 
-    async def feel(self, history, memory: str, closeness: float, exchanges: int) -> str:
-        """The line beside the message; "" when nothing came in time, and she answers as she would without a gut."""
+    async def feel(self, history, memory: str, closeness: float, exchanges: int, before: list[dict] | None = None,
+                   since: float = 0.0) -> str:
+        """The line beside the message; "" when nothing came in time, and she answers as she would without a gut.
+        `before` is what her vote and her note read, the newest of her memory's copy of the conversation, so she learns
+        the same on any host; with nothing there, the chat's history since `since`."""
         said = self.said
-        voting = asyncio.ensure_future(self.ask(vote_messages(self.persona.prompt, earlier(
-            history.recent(HISTORY + 2), said, self.persona.display_name), memory, said), 160))
+        self.before = before or earlier(history.recent(HISTORY + 2), said, self.persona.display_name, since=since)
+        voting = asyncio.ensure_future(self.ask(vote_messages(self.persona.prompt, self.before, memory, said), 160))
         await asyncio.wait({self.reading, voting}, timeout=max(.1, TIME_LIMIT - (time.monotonic() - self.began)))
         if not voting.done():
             voting.cancel()
@@ -864,7 +881,9 @@ class Guts:
         turn = self.turns.pop((exchange.persona.name, exchange.trigger.id), None)
         if turn is None:
             return
-        before = earlier(context.history.recent(HISTORY + 4), turn.said, exchange.persona.display_name)
+        before = turn.before
+        if before is None:  # (her vote never started)
+            before = earlier(context.history.recent(HISTORY + 4), turn.said, exchange.persona.display_name)
         for result in await asyncio.gather(self._note(turn, before, exchange, context),
                                            self._shape(turn, before, exchange, context), return_exceptions=True):
             if isinstance(result, BaseException):

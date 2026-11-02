@@ -1,7 +1,7 @@
 {
- "version": "1.16",
+ "version": "1.17",
  "constants": {
-  "CONTRACTS_VERSION": "1.16",
+  "CONTRACTS_VERSION": "1.17",
   "PART_PLACES": [
    "stable",
    "turn"
@@ -1007,7 +1007,7 @@
    ]
   },
   "PartContext": {
-   "doc": "What a computed prompt part may look at: the persona it is written for, the run's address and trigger, (added in 1.9) the engine placing it, so a part can keep to some engines, and (added in 1.16) `models` and `history`, for a part that asks her model something or reads the conversation before she answers. Its model calls are counted in the run's usage but not against its budget, as a watcher's are.",
+   "doc": "What a computed prompt part may look at: the persona it is written for, the run's address and trigger, (added in 1.9) the engine placing it, so a part can keep to some engines, and (added in 1.16) `models` and `history`, for a part that asks her model something or reads the conversation before she answers. Its model calls are counted in the run's usage but not against its budget, as a watcher's are. `since` (added in 1.17) is when the thread she is in began, as the engine says (`Session.aprompt`): 0 when it never was started over.",
    "fields": [
     {
      "name": "persona",
@@ -1040,6 +1040,11 @@
      "name": "history",
      "type": "any",
      "default": null
+    },
+    {
+     "name": "since",
+     "type": "float",
+     "default": 0.0
     }
    ]
   },
@@ -2479,6 +2484,12 @@
        "type": "str",
        "keyword_only": false,
        "default": "stable"
+      },
+      {
+       "name": "since",
+       "type": "float",
+       "keyword_only": false,
+       "default": 0.0
       }
      ],
      "returns": "str",
@@ -2758,6 +2769,19 @@
     }
    ],
    "methods": [
+    {
+     "name": "memory",
+     "async": false,
+     "parameters": [
+      {
+       "name": "persona",
+       "type": "str",
+       "keyword_only": false
+      }
+     ],
+     "returns": "Store",
+     "doc": "A persona's private store, as `Session.memory` opens it (added in 1.17), for a command that changes what her engine reads. Any persona there is, as a typed command has none of its own."
+    },
     {
      "name": "progress",
      "async": true,

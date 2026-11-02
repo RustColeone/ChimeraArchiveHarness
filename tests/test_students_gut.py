@@ -99,10 +99,11 @@ class Parts(unittest.TestCase):
         self.assertIsNone(G.vector('{"sad": "x"}'))
 
     def test_what_came_before_the_message(self):
-        item = lambda direction, text, name="": SimpleNamespace(direction=direction, text=text, sender_name=name, kind="text")
+        item = lambda direction, text, name="": SimpleNamespace(direction=direction, text=text, sender_name=name, kind="text", at=9.0)
         items = [item("in", "a"), item("out", "b", "Her"), item("out", "c", "Other"), item("in", "now"), item("out", "reply", "Her")]
         self.assertEqual(G.earlier(items, "now", "Her"), [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"},
                                                           {"role": "user", "content": "c"}])
+        self.assertEqual(G.earlier(items, "now", "Her", since=9.0), [])  # (a `/new` after them)
 
 
 class Kept(unittest.TestCase):

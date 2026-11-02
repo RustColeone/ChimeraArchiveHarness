@@ -26,6 +26,7 @@ from contracts import Capability, ModelRequest, PromptPart, Risk, ToolResult, Wa
 
 import mneme_llm
 from mneme_llm.decide import Predicate
+from mneme_llm.i18n import say
 from mneme_llm.tools import SPECS, Toolbox
 
 from .gut import GROWS, Guts
@@ -46,6 +47,9 @@ OWN = ("learn", "notes", "mood", "classmates", "met_role", "owner_role", "writer
        "memory_language", "decisions", "config", "call_owner", "episodes", "said", "said_skip", "embed", "search", "gut")
 # What was said, kept word for word (mneme-llm 0.3): a file of an older mneme-llm keeps notes only.
 EPISODES = hasattr(mneme_llm.Mneme, "alook")
+# Her copy of the conversation, her first prompt and a look with a search in one call (mneme-llm's surface).
+SURFACE = hasattr(mneme_llm.Mneme, "arecollect")
+DEEPER = ("deep", "gut")  # what `$new` clears: her memory; and what people taught her gut
 STARTER = "gut-starter.json.gz"  # in her folder: the lessons she is born with (tools/gut_starter.py)
 TOOLBOXES = 64  # the newest runs' search tools kept (each remembers what its searches showed)
 # Interfaces whose people are another's (`platforms:` adds to it): Whale-chan's own bot is on Discord.
@@ -406,10 +410,17 @@ async def asks_back(memory, query: str) -> bool:
     return found is None or found.probability >= 0.5
 
 
-async def first_look(memory, subject: str, query: str, person: str, conversation: str, own) -> str:
+async def first_look(memory, subject: str, query: str, person: str, conversation: str, own, direct: bool = False) -> str:
     """What was said that bears on the message. When they ask about something from before, also what a search finds,
     past what has faded out of the look. Their same question asked before is left out: all it holds is what she said
-    then, and an "I don't remember" found again is said again."""
+    then, and an "I don't remember" found again is said again. `direct`: their own conversation with her."""
+    if SURFACE:
+        back = await memory.asks_back(query) if own.search else False
+        said = await memory.arecollect(subject, query, user_name=person, budget=own.said, conversation=conversation,
+                                       skip=own.said_skip, search=own.search, own=direct, back=back)
+        closest = await closest_notes(memory, subject, query) if back and own.notes else []
+        head = CLOSEST["zh" if own.language.startswith("zh") else "en"]
+        return "\n\n".join(part for part in (said, "\n".join([head, *closest]) if closest else "") if part)
     asked = await asyncio.gather(memory.episodes.alook(subject, query, budget=own.said, conversation=conversation,
                                                        skip=own.said_skip, cut=memory.said_cut),
                                  asks_back(memory, query) if own.search else _nothing(False))
@@ -537,6 +548,9 @@ def make_part(book: Book, settings: Settings, guts: Guts | None = None):
         person = called(book, persona.name, subject, context.owner, trigger.sender)
         turn = guts.begin(context, subject) if guts is not None and own.gut and not impulse(trigger) else None
         memory = book.open(persona.name)
+        since = float(getattr(context, "since", 0.0) or 0.0)  # (contracts 1.17; an older core gives none)
+        if SURFACE and memory is not None and since > memory.surface.began(subject):
+            memory.surface.clear(subject)  # (a `/new`: her copy starts over with the chat)
 
         async def with_gut(kept: str) -> str:
             """What she keeps of them, and the line from her gut, which reads it first."""
@@ -544,7 +558,9 @@ def make_part(book: Book, settings: Settings, guts: Guts | None = None):
                 return kept
             relationship = memory.relations.get(subject) if memory is not None else None
             exchanges = memory.episodes.count(subject) if memory is not None and EPISODES else 0
-            line = await turn.feel(context.history, kept, relationship.closeness if relationship else 0.0, exchanges)
+            before = memory.surface.slice(subject) if memory is not None and SURFACE else None
+            line = await turn.feel(context.history, kept, relationship.closeness if relationship else 0.0, exchanges,
+                                   before, since)
             return "\n\n".join(part for part in (kept, line) if part)
 
         if memory is None:  # (nothing kept of anyone yet)
@@ -554,15 +570,24 @@ def make_part(book: Book, settings: Settings, guts: Guts | None = None):
         query = impulse(trigger) or trigger.text  # (speaking up, her notes for what moves her)
         notes, said = await asyncio.gather(  # (each waits on the same query's embedding)
             memory.memory.acontext(subject, query, user_name=person) if own.notes else _nothing(""),
-            first_look(memory, subject, query, person, where(context.address), own) if EPISODES and own.said
-            else _nothing(""))
+            first_look(memory, subject, query, person, where(context.address), own, trigger.is_direct)
+            if EPISODES and own.said else _nothing(""))
         notes = (notes or no_notes(person, own.language)) if own.notes else ""
         # Her mood's news is told once: marked by the watcher once she has replied, so a step asked twice (or a run
         # replayed) shows it each time; without the watcher, at once.
         news = (memory.mood.news(subject, mark=not own.learn) or "") if own.mood else ""
         others = classmates_line(book, persona.name, subject, own.language) if own.classmates else ""
-        return await with_gut("\n\n".join(part for part in (who, notes, said, news, others) if part))
+        return await with_gut("\n\n".join(part for part in (opening(memory, subject, person), who, notes, said, news,
+                                                             others) if part))
     return text
+
+
+def opening(memory, subject: str, person: str) -> str:
+    """Their first prompt, at the start of a fresh chat, when they asked for it to go in (`$first on`)."""
+    first = memory.surface.first(subject) if SURFACE else None
+    if first is None or not first.send or not memory.surface.empty(subject):
+        return ""
+    return say(memory.memory.words, "surface.first", who=person, text=first.text)
 
 
 def writer(models, profile: str | None):
@@ -760,6 +785,79 @@ def make_bond(book: Book):
     return bond
 
 
+def make_first(book: Book):
+    def shown(persona: str, subject: str) -> str:
+        memory, name = book.open(persona), book.shown(persona)
+        first = memory.surface.first(subject) if memory is not None else None
+        if first is None:
+            return f"{name}: nothing kept yet"
+        return (f"{name}: {first.text}\n  ({'you set this' if first.by_command else 'the first thing you said'}; "
+                f"{'goes in when a fresh chat starts' if first.send else 'only kept'})")
+
+    async def first(arguments, context) -> ToolResult:
+        """`$first` shows the first prompt each student keeps of you, `$first <text>` sets it for every student,
+        `$first on` sends it when a fresh chat starts, `$first off` only keeps it, `$first clear` takes it away. A student
+        first (`$first <student> ...`) is her alone."""
+        subject = book.subject(context.address.interface, context.sender.id)
+        text = str(arguments.get("text") or "").strip()
+        word, _, rest = text.partition(" ")
+        persona = book.find(word, subject) if word else None
+        if persona:
+            text = rest.strip()
+        personas = [persona] if persona else book.known()
+        if not personas:
+            return ToolResult.ok("No students yet.")
+        if not text:
+            return ToolResult.ok("\n".join(shown(item, subject) for item in personas))
+        memories = {item: book.open(item, create=True) for item in personas}
+        shown_as = book.shown(persona) if persona else "every student"
+        if text.casefold() in ("on", "off"):
+            sent = [memory.surface.send_first(subject, text.casefold() == "on") for memory in memories.values()]
+            if not any(sent):
+                return ToolResult.fail("There is no first prompt yet: set one with `$first <text>`.", "no_first")
+            return ToolResult.ok(f"It goes in when a fresh chat starts, for {shown_as}." if text.casefold() == "on"
+                                 else f"It is only kept now, for {shown_as}.")
+        if text.casefold() == "clear":
+            for memory in memories.values():
+                memory.surface.drop_first(subject)
+            return ToolResult.ok(f"Taken away, for {shown_as}.")
+        for memory in memories.values():
+            memory.surface.set_first(subject, text)
+        return ToolResult.ok(f"Kept, for {shown_as}. `$first on` sends it when a fresh chat starts.")
+    return first
+
+
+def make_new(book: Book, settings: Settings, guts: "Guts | None"):
+    async def new(arguments, context) -> ToolResult:
+        """`$new deep` clears what the students remember of everyone, for good; `$new gut` clears what people taught
+        their guts as well, and they are as they were born. With a student named, only her. `/new` is the everyday one,
+        which clears the context only."""
+        words = str(arguments.get("text") or "").split()
+        persona = book.find(words[1], book.subject(context.address.interface, context.sender.id)) if len(words) == 2 else None
+        if not words or words[0] not in DEEPER or len(words) > 2 or (len(words) == 2 and persona is None):
+            return ToolResult.fail("Use `$new deep`, `$new gut`, `$new deep <student>` or `$new gut <student>`. `/new` "
+                                   "clears the context only.", "invalid_new")
+        now, kept, lessons = time.time(), 0, 0
+        for name in [persona] if persona else book.known():
+            memory = book.open(name)
+            if memory is not None:
+                for someone in memory.everyone():
+                    kept += memory.wipe(someone)
+            try:
+                context.memory(name).set("thread_since", now)  # (her context goes with it, in every chat)
+            except ValueError:  # (a student no longer here keeps a file, and has no context)
+                pass
+            if words[0] == "gut" and guts is not None and settings.of(name).gut:
+                gut = guts.of(name)
+                if not gut.awake:
+                    await asyncio.to_thread(gut.wake)
+                lessons += await asyncio.to_thread(gut.wipe)
+        shown = book.shown(persona) if persona else "Every student"
+        told = f"{shown}: {kept} exchanges gone for good, with her notes"
+        return ToolResult.ok(told + (f", and {lessons} lessons of her gut." if words[0] == "gut" else "."))
+    return new
+
+
 def make_gut(book: Book, settings: Settings, guts: Guts):
     async def show(arguments, context) -> ToolResult:
         """`$gut`: where each student's gut stands; nothing of what she was told is shown to anyone but the owner."""
@@ -859,6 +957,15 @@ def contributions(context, students: dict[str, dict]) -> dict:
                           {"text": {"type": "string", "description": "<student> <side> <sentence>, <student> <side> <number>, or <student> <side> off"}},
                           risk=Risk.WRITE, access="creator", internal=True, command="side",
                           command_argument="text")] if felt else []),
+            *([Capability("students.first", "Show or set the first prompt the students keep of you.", make_first(book),
+                          {"text": {"type": "string", "description": "<text>, on, off, clear, a student first, or nothing"}},
+                          risk=Risk.WRITE, internal=True, command="first", command_argument="text"),
+               Capability("students.new", "Start over deeper than /new: what the students remember, for good.",
+                          make_new(book, settings, guts),
+                          {"text": {"type": "string", "description": "deep or gut, and a student, or every student"}},
+                          risk=Risk.WRITE, access="creator", confirm=True, internal=True, command="new",
+                          command_argument="text", describe=lambda arguments: "Erase for good what is kept of everyone: "
+                          f"{str(arguments.get('text') or '').strip() or 'nothing named'}")] if SURFACE else []),
             Capability("students.alias", "Show or set what you call a student.", make_alias(book, facts),
                        {"text": {"type": "string", "description": "<student> <name>, <student> reset, or nothing"}},
                        risk=Risk.WRITE, internal=True, command="alias", command_argument="text"),
@@ -880,5 +987,6 @@ def contributions(context, students: dict[str, dict]) -> dict:
         ],
         # Each changes only what is yours (your name for her, her name for you, your own accounts: a link needs a
         # code from the account it joins), and only you can type them (models are not offered them).
-        "permissions": {"*": {"rules": {"students.alias": "auto", "students.callme": "auto", "students.link": "auto"}}},
+        "permissions": {"*": {"rules": {"students.alias": "auto", "students.callme": "auto", "students.link": "auto",
+                                        **({"students.first": "auto"} if SURFACE else {})}}},
     }

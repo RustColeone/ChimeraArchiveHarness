@@ -47,6 +47,7 @@ class ToolsHandle:
 
 
 SUMMARY_CHARS = 8000
+READS_MOST = 200  # messages a capability reads at once
 
 
 class HistoryHandle:
@@ -91,7 +92,7 @@ class ReadingHistory:
         self._history = history
 
     def recent(self, limit: int = 30) -> list[HistoryItem]:
-        return self._history.recent(limit)
+        return self._history.recent(min(limit, READS_MOST))
 
     def search(self, text: str, limit: int = 20) -> list[HistoryItem]:
         return self._history.search(text, limit)
@@ -180,18 +181,18 @@ class SessionHandle:
         match, context = self._part_context(persona, place)
         return self._manager.render_prompt(match, place, context)
 
-    async def aprompt(self, persona: str, place: str = "stable") -> str:
-        match, context = self._part_context(persona, place)
+    async def aprompt(self, persona: str, place: str = "stable", since: float = 0.0) -> str:
+        match, context = self._part_context(persona, place, since)
         return await self._manager.arender_prompt(match, place, context)
 
-    def _part_context(self, persona: str, place: str):
+    def _part_context(self, persona: str, place: str, since: float = 0.0):
         match = next((item for item in self.personas if item.name == persona), None)
         if match is None:
             raise ValueError("A session can only render the prompt of its own personas")
         if place not in PART_PLACES:
             raise ValueError(f"place is one of {', '.join(PART_PLACES)}")
         return match, PartContext(match, self.address, self.trigger, self.owner, self._engine,
-                                  WatcherModels(self._manager, self.run_id, match.profile), self.history)
+                                  WatcherModels(self._manager, self.run_id, match.profile), self.history, since)
 
     def inbox(self) -> list[Request]:
         return self._manager.take_inbox(self.run_id)
@@ -258,6 +259,11 @@ class ToolContextHandle:
     def store(self, *, conversation: bool = False, persona: str | None = None, person: bool = False):
         return module_store(self._manager, self._extension, self.address, self.sender, self._personas,
                             conversation=conversation, persona=persona, person=person)
+
+    def memory(self, persona: str) -> Any:
+        if persona not in self._manager.personas:
+            raise ValueError(f"No persona named {persona!r}")
+        return self._manager.tank.store("persona:" + persona)
 
     async def schedule(self, at: float, text: str) -> str:
         return self._manager.gateway.schedule(self.address, at, text, self.sender)

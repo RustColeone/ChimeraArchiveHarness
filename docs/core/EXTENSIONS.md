@@ -285,8 +285,8 @@ A module gives its own personas parts (`Persona(..., parts=(...))`), and may add
 `Contributions.prompt_parts`: `PromptPart(name, text, place="stable", order=100, personas=())`, for every
 persona, or for those in `personas`. Two modules may not add parts of the same name (the second fails to
 load). A part's `text` may be a function of a `PartContext` (`persona`, `address`, `trigger`, `owner`, since 1.16 `models`
-and `history`, for a part that asks her model before she answers, counted in the run's usage but not its budget, and since 1.9
-`engine`, the engine placing it), called each time the part is used, so it should be quick. Since contracts 1.14 it
+and `history`, for a part that asks her model before she answers, counted in the run's usage but not its budget, since 1.9
+`engine`, the engine placing it, and since 1.17 `since`, when the thread began, as the engine told `session.aprompt`), called each time the part is used, so it should be quick. Since contracts 1.14 it
 may be async, for a part that looks something up (the students' memory waits on an embedding): `session.aprompt`
 awaits each in turn, for at most 8 seconds (one that takes longer is left out and audited), and
 `session.prompt` leaves it out. A persona's own part shadows a module's part
@@ -777,7 +777,8 @@ for nobody in particular: a group run whose engine did not say, a typed command,
 owner approved it); `display` (what the calling conversation can show, e.g. `max_upload_mb` for fitting files);
 `history` (contracts 1.6: the calling conversation's history to read, `recent`, `search` and `summary`, as engines see
 it; for capabilities that carry a conversation elsewhere or work from it, such as Chimera's `chimera.invite` to the
-Classroom; a capability cannot change it);
+Classroom; a capability cannot change it); `memory(persona)` (contracts 1.17: a persona's own store, as
+`session.memory` opens it, for a command that changes what her engine reads);
 `files` (files people attached to the run's requests; `own_files`: only those of the person who started the run, which is what anything writing them somewhere should use); `storage` (your extension's private store, shared by your capabilities, the same as `store()`; `store(conversation=, persona=, person=)` scopes it, see [Storing data](#storing-data); committed on
 `set`); `models` (model calls through the core, counted in the run's budget); `workspace` (a
 directory for this run's output files); `await progress(text)`; `await schedule(at, text)`

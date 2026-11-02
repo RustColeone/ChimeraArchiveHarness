@@ -32,5 +32,7 @@ EXTENSION = Extension("momochat", setup, contracts="1", version="1", formerly=("
     Setting("chime_in", "A group message naming no one: whose turn it is answers, the others may join in", "boolean",
             False),
     Setting("compact", "Fold messages older than history_limit into the chat's rolling summary", "boolean", True),
+    Setting("surface", "Read about a month of the chat word for word in place of history_limit, for a model with a "
+            "long window and a prompt cache", "boolean", False),
     Setting("tool_calls", "Let models that can call tools do so natively (false: JSON steps only)", "boolean", True),
 ))
