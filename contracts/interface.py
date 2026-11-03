@@ -100,35 +100,35 @@ class InterfacePort(Protocol):
 
     def models_ready(self, profile: str) -> bool:
         """Whether some candidate of the model profile can be called (its provider has a key), for showing who
-        can answer before anyone asks (added in 1.7; engines and capabilities have `Models.ready`)."""
+        can answer before anyone asks (engines and capabilities have `Models.ready`)."""
 
     def publish(self, *, link: str | None = None, status: Mapping[str, Any] | None = None) -> None:
         """Tell the other interfaces where people reach this one (`link`, a URL) and a small public status (JSON,
-        at most 16 KB), so they can link to it and show what happens there (added in 1.7). Each call replaces
+        at most 16 KB), so they can link to it and show what happens there. Each call replaces
         what it names; `status` may describe a place, see PLACE_STATUS. Kept while the core runs."""
 
     def directory(self) -> Mapping[str, Mapping[str, Any]]:
-        """What every interface has published: name → `{"link", "status", "ready"}` (added in 1.7)."""
+        """What every interface has published: name → `{"link", "status", "ready"}`."""
 
     def approval_status(self, approval_id: str) -> str | None:
         """`pending`, `approved`, `denied` or `expired` for an approval asked in one of this interface's
-        conversations, else None (added in 1.7). An interface that shows approval cards asks this, so a card decided
+        conversations, else None. An interface that shows approval cards asks this, so a card decided
         elsewhere (typed, in another interface) or expired with its run stops offering its buttons."""
 
     def personas(self) -> Sequence[Mapping[str, Any]]:
-        """Every persona the core has, in the order modules gave them (added in 1.9): `name`, `display_name`,
+        """Every persona the core has, in the order modules gave them: `name`, `display_name`,
         `aliases`, `pictures` (kind → absolute image path, see Persona) and `ready` (some candidate of
         her profile can be called). Pages show the students from this rather than keeping their own list."""
 
     def prices(self) -> Any:
-        """Added in 1.12: the core's model prices (contracts.Prices), to show them on a page."""
+        """the core's model prices (contracts.Prices), to show them on a page."""
 
     def spending(self, days: int = 14) -> Sequence[Mapping[str, Any]]:
-        """Added in 1.12: what was spent each day (everything: chats, sessions, memories), newest last, for the last
+        """what was spent each day (everything: chats, sessions, memories), newest last, for the last
         `days` days: `[{day, total, personas: {name: dollars}}]`."""
 
     def stamina(self, persona: str | None = None) -> Mapping[str, Any] | None:
-        """Added in 1.12: what a persona has spent today against her daily allowance, and the account she spends from:
+        """what a persona has spent today against her daily allowance, and the account she spends from:
         `{today: {spent, allowance, left, day}, account: {provider, kind (balance or budget), currency, total, left,
         as_of}}` (allowance and left None without a daily limit; account None when none is set up). None for one the
         core does not know. With no persona: everyone's day against the day's total, `{today: {...}}`. A run that
@@ -136,7 +136,7 @@ class InterfacePort(Protocol):
 
     def facts(self, persona: str, sender_id: str | None = None) -> Mapping[str, Any]:
         """What modules publish about a persona (`<module>.<key>` → value, see contracts.Facts), and with
-        `sender_id`, what they publish about her and that person of this interface over it (added in 1.9)."""
+        `sender_id`, what they publish about her and that person of this interface over it."""
 
     def log(self, event: str, **fields: Any) -> None: ...
 

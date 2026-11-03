@@ -38,4 +38,4 @@ def setup(context):
     ], permissions=dict(context.config.get("suggest") or {}))
 
 
-EXTENSION = Extension("guarded", setup, contracts="1")
+EXTENSION = Extension("guarded", setup)

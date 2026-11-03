@@ -137,10 +137,7 @@ class Context:
                                           tools)
             answer["seat"] = seat.persona  # whose answer it is, even when a replay is driven by whoever took over
             answer["effort"] = effort  # and how hard she thought (the one replaying may have another limit)
-            # Priced now and kept with the answer: a later price list never rewrites what a past step cost. (The
-            # core prices every answer; a core before 1.12 does not, and then the price list is asked here.)
-            if answer.get("price") is None and self.prices is not None:
-                answer["price"] = self.prices.price(answer["provider"], answer["model"])
+            # Priced by the core and kept with the answer: a later price list never rewrites what a past step cost.
             self.done[key] = answer
             if self.staffing:
                 self.done[self.staffing] = seat.persona
@@ -199,7 +196,7 @@ class Context:
                 "replay": dict(result.replay) if getattr(result, "replay", None) else None,
                 "seconds": round(result.duration_s or time.monotonic() - started, 3),
                 "fallbacks": list(result.fallbacks),
-                # priced by the core (contracts 1.12), cache hits at their price
+                # priced by the core, cache hits at their price
                 "price": dict(result.price) if getattr(result, "price", None) else None,
                 "cost": getattr(result, "cost", None)}
 

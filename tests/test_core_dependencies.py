@@ -41,7 +41,7 @@ def setup(context):
     return Contributions({contributions})
 
 
-EXTENSION = Extension({name!r}, setup, contracts="1"{declared})
+EXTENSION = Extension({name!r}, setup{declared})
 """
 
 
@@ -129,7 +129,7 @@ class LoadingTests(Base):
     async def test_a_module_whose_setup_fails_is_left_out_and_the_core_runs(self):
         broken = self.module("broken", body="from contracts import Extension\n"
                                             "def setup(context):\n    raise RuntimeError('no disk')\n"
-                                            "EXTENSION = Extension('broken', setup, contracts='1')\n")
+                                            "EXTENSION = Extension('broken', setup)\n")
         core = await self.build(broken)
         self.assertIn("setup failed: RuntimeError: no disk", core.skipped["broken"])
         await core.start()

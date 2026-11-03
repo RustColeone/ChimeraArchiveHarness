@@ -1,4 +1,4 @@
-"""Watchers: modules that learn from what personas say, whichever engine they spoke in (added in 1.9)."""
+"""Watchers: modules that learn from what personas say, whichever engine they spoke in."""
 
 from __future__ import annotations
 

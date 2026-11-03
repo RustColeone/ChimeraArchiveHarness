@@ -1,4 +1,4 @@
-"""Facts: small public values modules publish about personas, for interfaces to show (contracts 1.9).
+"""Facts: small public values modules publish about personas, for interfaces to show.
 
 Kept in the tank's store `core:facts`, one entry per persona (`["gpt"]`) and per persona and person
 (`["gpt", "webui", "creator"]`), each `{"<module>.<key>": value}`. Modules write through their own handle, so

@@ -367,7 +367,7 @@ class Gateway:
                                     {"detail": detail}, ()))
 
     def publish(self, interface: str, link: str | None, status) -> None:
-        """An interface's link and public status, for the others (InterfacePort.publish, contracts 1.7)."""
+        """An interface's link and public status, for the others (InterfacePort.publish)."""
         entry = dict(self._published.get(interface) or {"link": "", "status": {}})
         if link is not None:
             if not isinstance(link, str) or len(link) > 2048 or (link and not link.startswith(("http://", "https://"))):

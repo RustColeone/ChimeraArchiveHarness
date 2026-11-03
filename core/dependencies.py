@@ -1,4 +1,4 @@
-"""Declared dependencies (contracts 1.10): the order modules load in, and whether a Python package a module requires
+"""Declared dependencies: the order modules load in, and whether a Python package a module requires
 is installed.
 
 A module declares the modules it `requires` and `uses` (contracts.Extension). Each loads after those of them that

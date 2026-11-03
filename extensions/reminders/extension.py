@@ -113,4 +113,4 @@ def setup(context) -> Contributions:
     ])
 
 
-EXTENSION = Extension("reminders", setup, contracts="1", version="1", description="One-time reminders")
+EXTENSION = Extension("reminders", setup, description="One-time reminders")

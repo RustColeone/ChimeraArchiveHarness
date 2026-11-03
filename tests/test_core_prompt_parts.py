@@ -32,7 +32,7 @@ def setup(context):
                                        PromptPart("only_pat", "Only for Pat.", personas="p")])
 
 
-EXTENSION = Extension("partsmod", setup, contracts="1")
+EXTENSION = Extension("partsmod", setup)
 '''
 
 
@@ -356,7 +356,7 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
             (module / "extension.py").write_text(
                 "from contracts import Contributions, Extension, PromptPart\n"
                 f"EXTENSION = Extension({name!r}, lambda context: Contributions("
-                "prompt_parts=[PromptPart('house', 'Rules.')]), contracts='1')\n", encoding="utf-8")
+                "prompt_parts=[PromptPart('house', 'Rules.')]))\n", encoding="utf-8")
         extensions = [*make_config(self.tmp).raw["modules"]["paths"], str(self.tmp / "one"), str(self.tmp / "two")]
         core, _ = await self.core([], overrides={"extensions": extensions})
         self.assertIn("already registered by 'one'", core.skipped["two"])  # the second is left out

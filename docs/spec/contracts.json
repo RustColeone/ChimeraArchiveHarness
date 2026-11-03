@@ -1,7 +1,7 @@
 {
- "version": "1.17",
+ "version": "2.0",
  "constants": {
-  "CONTRACTS_VERSION": "1.17",
+  "CONTRACTS_VERSION": "2.0",
   "PART_PLACES": [
    "stable",
    "turn",
@@ -168,7 +168,7 @@
    ]
   },
   "Capability": {
-   "doc": "One action. `name` is `<extension>.<action>`. `parameters` are JSON-schema properties; `required` lists mandatory ones. `needs` lists Display features the conversation must support (for example `files`). `internal` capabilities are callable by engines but not offered to models as tools. `access` is the lowest level that may call it (`member`, `admin`, `creator`; `owner_only` means `creator`). The caller's level is `ToolContext.access`, so a capability may also do more for higher levels (an admin sees every conversation's items, a member only their own). `command`, when set, makes the capability available as `$<command> <text>`, with the text passed as `command_argument`. It may be a name or a `Command` declaring options and a template for interfaces with native command menus; a name becomes a `Command` with one option for `command_argument`. `risk` is the tier (see Risk). Attributes refine it; the core enforces them and configuration can only make them stricter: * `private`: shows the owner's private data (messages, screen, clipboard, files). Offered only in conversations private to the owner; its run's output goes nowhere else. * `subject`: the parameter that permission rules and saved grants match on (a unit, a chat, a path); `subject_kind=\"path\"` also makes the core refuse secret paths (`.env`, keys) to models. * `escalate(arguments)`: may return a higher tier for a call (never a lower one). * `never_auto`: a model's call always asks the owner; no rule or grant changes that. * `grantable`: the owner may answer an approval with \"always allow\" for that exact subject in that conversation (needs `subject`). * `confirm`: even the owner's own typed command asks for a one-tap confirmation. * `describe(arguments)`: one plain line for approval prompts (\"Restart navidrome.service\"). `personas` (added in 1.14), when given, are the only personas it is offered to: an engine that says whose turn it is (`Tools.list(persona)`) leaves it out of others', and a call made for another persona is refused. Without a persona, a run with any of them is offered it.",
+   "doc": "One action. `name` is `<extension>.<action>`. `parameters` are JSON-schema properties; `required` lists mandatory ones. `needs` lists Display features the conversation must support (for example `files`). `internal` capabilities are callable by engines but not offered to models as tools. `access` is the lowest level that may call it (`member`, `admin`, `creator`; `owner_only` means `creator`). The caller's level is `ToolContext.access`, so a capability may also do more for higher levels (an admin sees every conversation's items, a member only their own). `command`, when set, makes the capability available as `$<command> <text>`, with the text passed as `command_argument`. It may be a name or a `Command` declaring options and a template for interfaces with native command menus; a name becomes a `Command` with one option for `command_argument`. `risk` is the tier (see Risk). Attributes refine it; the core enforces them and configuration can only make them stricter: * `private`: shows the owner's private data (messages, screen, clipboard, files). Offered only in conversations private to the owner; its run's output goes nowhere else. * `subject`: the parameter that permission rules and saved grants match on (a unit, a chat, a path); `subject_kind=\"path\"` also makes the core refuse secret paths (`.env`, keys) to models. * `escalate(arguments)`: may return a higher tier for a call (never a lower one). * `never_auto`: a model's call always asks the owner; no rule or grant changes that. * `grantable`: the owner may answer an approval with \"always allow\" for that exact subject in that conversation (needs `subject`). * `confirm`: even the owner's own typed command asks for a one-tap confirmation. * `describe(arguments)`: one plain line for approval prompts (\"Restart navidrome.service\"). `personas`, when given, are the only personas it is offered to: an engine that says whose turn it is (`Tools.list(persona)`) leaves it out of others', and a call made for another persona is refused. Without a persona, a run with any of them is offered it.",
    "fields": [
     {
      "name": "name",
@@ -324,7 +324,7 @@
    ]
   },
   "Context": {
-   "doc": "What a `context` part gives: the conversation as chat messages, oldest first, up to the moment `upto`. An engine reads these in place of its own window and summary, and of its thread only what came after `upto`. So a module that keeps a conversation decides how much of it she reads, and compacts it. Added in 1.17.",
+   "doc": "What a `context` part gives: the conversation as chat messages, oldest first, up to the moment `upto`. An engine reads these in place of its own window and summary, and of its thread only what came after `upto`. So a module that keeps a conversation decides how much of it she reads, and compacts it.",
    "fields": [
     {
      "name": "messages",
@@ -337,7 +337,7 @@
    ]
   },
   "Contributions": {
-   "doc": "What an extension adds. Besides interfaces, engines, capabilities and personas, an extension may suggest defaults so it works when dropped in: model `providers` (name → settings, as in core.yml; configured settings win key by key) and `profiles` (name → ordered candidates, as in core.yml), and `assignments` and `admission` rules for its own interfaces' addresses (`<interface>:*` or `<interface>:<conversation>`). core.yml and runtime edits always win. `permissions` suggests permission defaults in the core.yml `permissions:` form (`{pattern: {use, tiers, rules}}`): `use` and `tiers` only for its own interfaces' addresses, `rules` only for its own capabilities. The module's config.yml `permissions:` overrides these, and core.yml overrides both, setting by setting. `adapters` adds provider kinds (kind → AdapterFactory) for APIs the built-in kinds do not speak; its providers, and core.yml's, may then use `kind: <that kind>`. A kind that already exists is refused. `watchers` (added in 1.9) see every persona's delivered messages, whichever engine she spoke in (see Watcher).",
+   "doc": "What an extension adds. Besides interfaces, engines, capabilities and personas, an extension may suggest defaults so it works when dropped in: model `providers` (name → settings, as in core.yml; configured settings win key by key) and `profiles` (name → ordered candidates, as in core.yml), and `assignments` and `admission` rules for its own interfaces' addresses (`<interface>:*` or `<interface>:<conversation>`). core.yml and runtime edits always win. `permissions` suggests permission defaults in the core.yml `permissions:` form (`{pattern: {use, tiers, rules}}`): `use` and `tiers` only for its own interfaces' addresses, `rules` only for its own capabilities. The module's config.yml `permissions:` overrides these, and core.yml overrides both, setting by setting. `adapters` adds provider kinds (kind → AdapterFactory) for APIs the built-in kinds do not speak; its providers, and core.yml's, may then use `kind: <that kind>`. A kind that already exists is refused. `watchers` see every persona's delivered messages, whichever engine she spoke in (see Watcher).",
    "fields": [
     {
      "name": "interfaces",
@@ -550,7 +550,7 @@
    ]
   },
   "Extension": {
-   "doc": "Declared as `EXTENSION` in an extension's `extension.py`. `setup` receives an ExtensionContext and returns Contributions. `contracts` is the major contracts version the extension was written for. `settings` declares what the module can be set up with (see Setting); it is read without running `setup`. `requires` and `uses` (added in 1.10) declare the other modules it builds on, by module name. Without one it `requires`, the module is not loaded (and says why); a Python package is `package:<name>` or `package:<name>>=<version>`. Without one it `uses`, it loads, minus what that module would add: its setup is told which are there (`ExtensionContext.present`). Every engine and persona its defaults name must belong to the core or to a module it declares, or it is refused.",
+   "doc": "Declared as `EXTENSION` in an extension's `extension.py`. `setup` receives an ExtensionContext and returns Contributions. `settings` declares what the module can be set up with (see Setting); it is read without running `setup`. `requires` and `uses` declare the other modules it builds on, by module name. Without one it `requires`, the module is not loaded (and says why); a Python package is `package:<name>` or `package:<name>>=<version>`. Without one it `uses`, it loads, minus what that module would add: its setup is told which are there (`ExtensionContext.present`). Every engine and persona its defaults name must belong to the core or to a module it declares, or it is refused.",
    "fields": [
     {
      "name": "name",
@@ -559,16 +559,6 @@
     {
      "name": "setup",
      "type": "Callable"
-    },
-    {
-     "name": "contracts",
-     "type": "str",
-     "default": "1"
-    },
-    {
-     "name": "version",
-     "type": "str",
-     "default": "0"
     },
     {
      "name": "description",
@@ -757,7 +747,7 @@
    ]
   },
   "ModelRequest": {
-   "doc": "One language-model call. `messages` use roles `system`, `user` and `assistant` with plain-text content. With `tools` (1.7), an `assistant` message may also carry `tool_calls` (a list of {id, name, arguments}, as the result gave them) and `replay` (the result's `replay`, sent back as it is), and a `tool` message carries `tool_call_id` and the call's result as `content`. `profile` names a configured profile (an ordered list of provider/model candidates); `None` uses the session persona's profile, or `default`. With `output_schema`, the result's `data` is the parsed, schema-validated JSON object. `images` (local JPEG, PNG, GIF or WebP files, at most 6) are shown with the last user message. Candidates that cannot see images are tried last and are told images were attached instead. `persona` names the session persona the call is for, so her `$model` choice applies and her message can say which model wrote it; without it, the core uses the run's only persona with this profile. With `tools` (1.7), the model answers in words and calls: the result's `tool_calls` are checked against the tools' `parameters`, and `output_schema` is not used. Candidates are tried in order while they can call tools; the first that cannot ends the request with `ModelError(\"tools_unsupported\")`. Tool names may hold dots (`web.search`); an adapter maps them to what its API allows and back.",
+   "doc": "One language-model call. `messages` use roles `system`, `user` and `assistant` with plain-text content. With `tools`, an `assistant` message may also carry `tool_calls` (a list of {id, name, arguments}, as the result gave them) and `replay` (the result's `replay`, sent back as it is), and a `tool` message carries `tool_call_id` and the call's result as `content`. `profile` names a configured profile (an ordered list of provider/model candidates); `None` uses the session persona's profile, or `default`. With `output_schema`, the result's `data` is the parsed, schema-validated JSON object. `images` (local JPEG, PNG, GIF or WebP files, at most 6) are shown with the last user message. Candidates that cannot see images are tried last and are told images were attached instead. `persona` names the session persona the call is for, so her `$model` choice applies and her message can say which model wrote it; without it, the core uses the run's only persona with this profile. With `tools`, the model answers in words and calls: the result's `tool_calls` are checked against the tools' `parameters`, and `output_schema` is not used. Candidates are tried in order while they can call tools; the first that cannot ends the request with `ModelError(\"tools_unsupported\")`. Tool names may hold dots (`web.search`); an adapter maps them to what its API allows and back.",
    "fields": [
     {
      "name": "messages",
@@ -1011,7 +1001,7 @@
    ]
   },
   "PartContext": {
-   "doc": "What a computed prompt part may look at: the persona it is written for, the run's address and trigger, (added in 1.9) the engine placing it, so a part can keep to some engines, and (added in 1.16) `models` and `history`, for a part that asks her model something or reads the conversation before she answers. Its model calls are counted in the run's usage but not against its budget, as a watcher's are. `since` (added in 1.17) is when the thread she is in began, as the engine says (`Session.aprompt`): 0 when it never was started over.",
+   "doc": "What a computed prompt part may look at: the persona it is written for, the run's address and trigger, the engine placing it, so a part can keep to some engines, and `models` and `history`, for a part that asks her model something or reads the conversation before she answers. Its model calls are counted in the run's usage but not against its budget, as a watcher's are. `since` is when the thread she is in began, as the engine says (`Session.aprompt`): 0 when it never was started over.",
    "fields": [
     {
      "name": "persona",
@@ -1053,7 +1043,7 @@
    ]
   },
   "Persona": {
-   "doc": "Who speaks: data, not behaviour. A persona with her model profile is an agent; any engine can use any of them. `parts` are prompt parts of its own (its personality, say), which engines place beside `prompt` (see PromptPart). Added in 1.9: `aliases`, other names people call her by (\"Luna, …\" still calls on GPT); `pictures`, kind → image file (`avatar`, square; `card`, 3:4; any other kind a page knows), which interfaces show from `InterfacePort.personas`. Added in 1.11: `description`, one line on who she is, for engines that write their own prompts around her rather than placing `prompt` (Chimera's work prompts); `profiles`, her model profiles by tier besides `profile`: `own` (her own models only, with nobody else's as a fallback, so the model family answering is hers) and `strong` (her strongest models). An engine asking for a tier she has not named uses `own`, then `profile`. Added in 1.13: `allowance`, her own default daily allowance in dollars (0: no daily limit; None: the core's default). The owner's settings come first: core.yml `stamina:` (`personas`, then `allowance`) and `$stamina`. Added in 1.15: `effort`, how hard she thinks in a conversation (an `Effort`; empty: the engine's setting). A session's own `effort` comes first; \"none\" answers at once, without a thinking phase.",
+   "doc": "Who speaks: data, not behaviour. A persona with her model profile is an agent; any engine can use any of them. `parts` are prompt parts of its own (its personality, say), which engines place beside `prompt` (see PromptPart). `aliases`, other names people call her by (\"Luna, …\" still calls on GPT); `pictures`, kind → image file (`avatar`, square; `card`, 3:4; any other kind a page knows), which interfaces show from `InterfacePort.personas`. `description`, one line on who she is, for engines that write their own prompts around her rather than placing `prompt` (Chimera's work prompts); `profiles`, her model profiles by tier besides `profile`: `own` (her own models only, with nobody else's as a fallback, so the model family answering is hers) and `strong` (her strongest models). An engine asking for a tier she has not named uses `own`, then `profile`. `allowance`, her own default daily allowance in dollars (0: no daily limit; None: the core's default). The owner's settings come first: core.yml `stamina:` (`personas`, then `allowance`) and `$stamina`. `effort`, how hard she thinks in a conversation (an `Effort`; empty: the engine's setting). A session's own `effort` comes first; \"none\" answers at once, without a thinking phase.",
    "fields": [
     {
      "name": "name",
@@ -1110,7 +1100,7 @@
    ]
   },
   "PromptPart": {
-   "doc": "A piece of a persona's prompt that engines place for it: its personality, house rules, memory, anything. `text` is the text, or a function of a `PartContext` returning it (\"\" adds nothing); since 1.14 the function may be async (a part that looks something up), and engines render it with `Session.aprompt` (`Session.prompt` leaves an async part out). `place` says where an engine puts it: `stable` in the system prompt (the same every turn, so the provider's prompt cache keeps serving it), `turn` in the turn's context after the history (it may change every turn), `context` (added in 1.17) in place of the history: its function returns a `Context`, or None to leave it to the engine (`Session.context` gives the first). Parts come in `order` (lower first). A module's part is for the personas it names (`personas`), or for every persona when it names none; a persona's own parts are its own. Engines get them rendered with `Session.prompt`.",
+   "doc": "A piece of a persona's prompt that engines place for it: its personality, house rules, memory, anything. `text` is the text, or a function of a `PartContext` returning it (\"\" adds nothing); the function may be async (a part that looks something up), and engines render it with `Session.aprompt`. `place` says where an engine puts it: `stable` in the system prompt (the same every turn, so the provider's prompt cache keeps serving it), `turn` in the turn's context after the history (it may change every turn), `context` in place of the history: its function returns a `Context`, or None to leave it to the engine (`Session.context` gives the first). Parts come in `order` (lower first). A module's part is for the personas it names (`personas`), or for every persona when it names none; a persona's own parts are its own. Engines get them rendered with `Session.prompt`.",
    "fields": [
     {
      "name": "name",
@@ -1356,7 +1346,7 @@
    ]
   },
   "ToolCall": {
-   "doc": "One function call in a model's answer (added in 1.7). `arguments` is the parsed JSON object, checked against the tool's `parameters`; `id` pairs the call with its result in later messages.",
+   "doc": "One function call in a model's answer. `arguments` is the parsed JSON object, checked against the tool's `parameters`; `id` pairs the call with its result in later messages.",
    "fields": [
     {
      "name": "id",
@@ -1411,7 +1401,7 @@
    ]
   },
   "ToolSpec": {
-   "doc": "A function the model may call (added in 1.7): `parameters` is the JSON schema of its arguments (an object).",
+   "doc": "A function the model may call: `parameters` is the JSON schema of its arguments (an object).",
    "fields": [
     {
      "name": "name",
@@ -1546,12 +1536,12 @@
      "async": false,
      "parameters": [],
      "returns": "list[dict]",
-     "doc": "Added in 1.11: the agents loaded so far (the core's and those of the modules set up before this one, so every module it requires or uses that is there), as `InterfacePort.personas` describes them, each with the `module` that added her, her `description`, `profile`, `profiles` and `models` (`default` and each tier → the candidates, `{provider, model}`). Called any time after setup, it lists them all."
+     "doc": "the agents loaded so far (the core's and those of the modules set up before this one, so every module it requires or uses that is there), as `InterfacePort.personas` describes them, each with the `module` that added her, her `description`, `profile`, `profiles` and `models` (`default` and each tier → the candidates, `{provider, model}`). Called any time after setup, it lists them all."
     }
    ]
   },
   "Facts": {
-   "doc": "Small public values a module publishes about a persona (added in 1.9): her mood or level, or, with `person`, where she stands with one person (their bond, the name they call her). Interfaces read them with `InterfacePort.facts` to show them on a page; nothing else does, so a fact is never a module's private state. A module writes only its own keys (lowercase letters, digits and `_`); readers see them as `<module>.<key>`. `person` is `(interface, sender id)`, the person as one interface knows them (`Exchange.person`). A value is JSON, at most 4 KB once encoded; setting None deletes it. Facts last across restarts.",
+   "doc": "Small public values a module publishes about a persona: her mood or level, or, with `person`, where she stands with one person (their bond, the name they call her). Interfaces read them with `InterfacePort.facts` to show them on a page; nothing else does, so a fact is never a module's private state. A module writes only its own keys (lowercase letters, digits and `_`); readers see them as `<module>.<key>`. `person` is `(interface, sender id)`, the person as one interface knows them (`Exchange.person`). A value is JSON, at most 4 KB once encoded; setting None deletes it. Facts last across restarts.",
    "attributes": [],
    "methods": [
     {
@@ -1796,7 +1786,7 @@
       }
      ],
      "returns": "str | none",
-     "doc": "`pending`, `approved`, `denied` or `expired` for an approval asked in one of this interface's conversations, else None (added in 1.7). An interface that shows approval cards asks this, so a card decided elsewhere (typed, in another interface) or expired with its run stops offering its buttons."
+     "doc": "`pending`, `approved`, `denied` or `expired` for an approval asked in one of this interface's conversations, else None. An interface that shows approval cards asks this, so a card decided elsewhere (typed, in another interface) or expired with its run stops offering its buttons."
     },
     {
      "name": "cancel",
@@ -1854,7 +1844,7 @@
      "async": false,
      "parameters": [],
      "returns": "Mapping",
-     "doc": "What every interface has published: name → `{\"link\", \"status\", \"ready\"}` (added in 1.7)."
+     "doc": "What every interface has published: name → `{\"link\", \"status\", \"ready\"}`."
     },
     {
      "name": "facts",
@@ -1873,7 +1863,7 @@
       }
      ],
      "returns": "Mapping",
-     "doc": "What modules publish about a persona (`<module>.<key>` → value, see contracts.Facts), and with `sender_id`, what they publish about her and that person of this interface over it (added in 1.9)."
+     "doc": "What modules publish about a persona (`<module>.<key>` → value, see contracts.Facts), and with `sender_id`, what they publish about her and that person of this interface over it."
     },
     {
      "name": "log",
@@ -1904,7 +1894,7 @@
       }
      ],
      "returns": "bool",
-     "doc": "Whether some candidate of the model profile can be called (its provider has a key), for showing who can answer before anyone asks (added in 1.7; engines and capabilities have `Models.ready`)."
+     "doc": "Whether some candidate of the model profile can be called (its provider has a key), for showing who can answer before anyone asks (engines and capabilities have `Models.ready`)."
     },
     {
      "name": "notify",
@@ -2014,7 +2004,7 @@
      "async": false,
      "parameters": [],
      "returns": "Sequence",
-     "doc": "Every persona the core has, in the order modules gave them (added in 1.9): `name`, `display_name`, `aliases`, `pictures` (kind → absolute image path, see Persona) and `ready` (some candidate of her profile can be called). Pages show the students from this rather than keeping their own list."
+     "doc": "Every persona the core has, in the order modules gave them: `name`, `display_name`, `aliases`, `pictures` (kind → absolute image path, see Persona) and `ready` (some candidate of her profile can be called). Pages show the students from this rather than keeping their own list."
     },
     {
      "name": "policy",
@@ -2034,7 +2024,7 @@
      "async": false,
      "parameters": [],
      "returns": "any",
-     "doc": "Added in 1.12: the core's model prices (contracts.Prices), to show them on a page."
+     "doc": "the core's model prices (contracts.Prices), to show them on a page."
     },
     {
      "name": "publish",
@@ -2054,7 +2044,7 @@
       }
      ],
      "returns": "none",
-     "doc": "Tell the other interfaces where people reach this one (`link`, a URL) and a small public status (JSON, at most 16 KB), so they can link to it and show what happens there (added in 1.7). Each call replaces what it names; `status` may describe a place, see PLACE_STATUS. Kept while the core runs."
+     "doc": "Tell the other interfaces where people reach this one (`link`, a URL) and a small public status (JSON, at most 16 KB), so they can link to it and show what happens there. Each call replaces what it names; `status` may describe a place, see PLACE_STATUS. Kept while the core runs."
     },
     {
      "name": "set_owners",
@@ -2112,7 +2102,7 @@
       }
      ],
      "returns": "Sequence",
-     "doc": "Added in 1.12: what was spent each day (everything: chats, sessions, memories), newest last, for the last `days` days: `[{day, total, personas: {name: dollars}}]`."
+     "doc": "what was spent each day (everything: chats, sessions, memories), newest last, for the last `days` days: `[{day, total, personas: {name: dollars}}]`."
     },
     {
      "name": "stamina",
@@ -2126,7 +2116,7 @@
       }
      ],
      "returns": "Mapping | none",
-     "doc": "Added in 1.12: what a persona has spent today against her daily allowance, and the account she spends from: `{today: {spent, allowance, left, day}, account: {provider, kind (balance or budget), currency, total, left, as_of}}` (allowance and left None without a daily limit; account None when none is set up). None for one the core does not know. With no persona: everyone's day against the day's total, `{today: {...}}`. A run that reaches her allowance, the total, or its own `budget_usd` waits for the owner."
+     "doc": "what a persona has spent today against her daily allowance, and the account she spends from: `{today: {spent, allowance, left, day}, account: {provider, kind (balance or budget), currency, total, left, as_of}}` (allowance and left None without a daily limit; account None when none is set up). None for one the core does not know. With no persona: everyone's day against the day's total, `{today: {...}}`. A run that reaches her allowance, the total, or its own `budget_usd` waits for the owner."
     },
     {
      "name": "submit",
@@ -2144,7 +2134,7 @@
    ]
   },
   "Logbook": {
-   "doc": "A conversation's log (added in 1.15, in place of the diary, which only kept what a persona noted of someone): what happened here, written by modules through the handles they already have, read by engines, and by people with `$log`. The core logs by itself every write and critical action that ran. A model never writes here directly, only through a capability a module offers. It is not the audit log, the core's own record for the owner, which models never read.",
+   "doc": "A conversation's log: what happened here, written by modules through the handles they already have, read by engines, and by people with `$log`. The core logs by itself every write and critical action that ran. A model never writes here directly, only through a capability a module offers. It is not the audit log, the core's own record for the owner, which models never read.",
    "attributes": [],
    "methods": [
     {
@@ -2225,7 +2215,7 @@
    ]
   },
   "ModelAdapter": {
-   "doc": "Talks to one provider's API: one `complete` call is one request, returning the raw text. The core does the rest (fallback between candidates, schema validation, spacing, images for models that cannot see). `messages` use roles `system`, `user` and `assistant`. With `schema`, ask the API for JSON matching it (natively if it can, otherwise in the prompt). `images` go with the last user message. Raise NotConfigured when the provider cannot be used; any other exception moves on to the next candidate. An adapter may also define `async list_models()`, the models its provider offers: IDs, or (ID, release date or datetime) pairs so a provider's `models_since` setting can apply. One that can call tools sets `supports_tools = True` and takes `tools` (1.7): it offers them as the API's functions, returns the calls in `tool_calls`, and translates `tool_calls`/`replay` on assistant messages and `tool` messages into the API's own form. The core passes `tools` only when a request has some.",
+   "doc": "Talks to one provider's API: one `complete` call is one request, returning the raw text. The core does the rest (fallback between candidates, schema validation, spacing, images for models that cannot see). `messages` use roles `system`, `user` and `assistant`. With `schema`, ask the API for JSON matching it (natively if it can, otherwise in the prompt). `images` go with the last user message. Raise NotConfigured when the provider cannot be used; any other exception moves on to the next candidate. An adapter may also define `async list_models()`, the models its provider offers: IDs, or (ID, release date or datetime) pairs so a provider's `models_since` setting can apply. One that can call tools sets `supports_tools = True` and takes `tools`: it offers them as the API's functions, returns the calls in `tool_calls`, and translates `tool_calls`/`replay` on assistant messages and `tool` messages into the API's own form. The core passes `tools` only when a request has some.",
    "attributes": [],
    "methods": [
     {
@@ -2315,12 +2305,12 @@
       }
      ],
      "returns": "bool",
-     "doc": "Whether some candidate of `profile` (default: the run's first persona's) has its provider configured, so a call can be tried (added in 1.6). Engines use it to pick who works before trying; a call can still fail."
+     "doc": "Whether some candidate of `profile` (default: the run's first persona's) has its provider configured, so a call can be tried. Engines use it to pick who works before trying; a call can still fail."
     }
    ]
   },
   "Prices": {
-   "doc": "Model prices, as the core keeps them (added in 1.12): a list fetched once a day (Artificial Analysis's, with a key) under the owner's own figures (core.yml `prices:`). Every ModelResult already carries its price and cost; this is for pages and engines that show prices or estimate before a call.",
+   "doc": "Model prices, as the core keeps them: a list fetched once a day (Artificial Analysis's, with a key) under the owner's own figures (core.yml `prices:`). Every ModelResult already carries its price and cost; this is for pages and engines that show prices or estimate before a call.",
    "attributes": [],
    "methods": [
     {
@@ -2492,7 +2482,7 @@
       }
      ],
      "returns": "str",
-     "doc": "`prompt`, with async parts awaited (added in 1.14): each in turn, for at most a few seconds (one that takes longer is left out, and logged). Render once per turn: a part may cost a lookup. `since` (added in 1.17): when the thread she is in began, which the part reads as `PartContext.since`."
+     "doc": "`prompt`, with async parts awaited: each in turn, for at most a few seconds (one that takes longer is left out, and logged). Render once per turn: a part may cost a lookup. `since`: when the thread she is in began, which the part reads as `PartContext.since`."
     },
     {
      "name": "context",
@@ -2511,7 +2501,7 @@
       }
      ],
      "returns": "Context | none",
-     "doc": "What a module keeps of this conversation for her, if one does (added in 1.17). She reads it in place of the engine's own window; it may change between her steps, so an engine asks each time it builds a request."
+     "doc": "What a module keeps of this conversation for her, if one does. She reads it in place of the engine's own window; it may change between her steps, so an engine asks each time it builds a request."
     },
     {
      "name": "inbox",
@@ -2652,7 +2642,7 @@
       }
      ],
      "returns": "Store",
-     "doc": "A key-value store of this engine's module (added in 1.5), scoped by any combination of: this `conversation`, one of the session's personas (across conversations), and the trigger's sender (`person`, across conversations). No arguments: the module's store everywhere. Each module's stores are its own; the core keeps them and never reads them."
+     "doc": "A key-value store of this engine's module, scoped by any combination of: this `conversation`, one of the session's personas (across conversations), and the trigger's sender (`person`, across conversations). No arguments: the module's store everywhere. Each module's stores are its own; the core keeps them and never reads them."
     }
    ]
   },
@@ -2727,7 +2717,7 @@
    ]
   },
   "ToolContext": {
-   "doc": "Handles the core gives a capability for one call. `display` is what the calling conversation can show (for example its upload limit). `files` are the files people attached to the run's requests, oldest first; `own_files` only those the person who started the run attached (in a group, others may add messages to a run). `schedule` delivers a message to this conversation once, later; it survives restarts. Interfaces receive it as a notice with code `reminder` (`data`: `scheduled_id`, `sender_id`, `sender_name`). `history` (added in 1.6) reads the calling conversation's history (`recent`, `search`, `summary`), for capabilities that carry a conversation somewhere else or work from it; capabilities cannot change it. `logbook` (added in 1.15) is the conversation's log, for what a person may want to find later. `persona` (added in 1.14) is the persona whose turn made the call, as the engine said (`Tools.call`), or the run's only persona; \"\" when nobody in particular (a group run whose engine did not say, a typed command, a call carried out once the owner approved it).",
+   "doc": "Handles the core gives a capability for one call. `display` is what the calling conversation can show (for example its upload limit). `files` are the files people attached to the run's requests, oldest first; `own_files` only those the person who started the run attached (in a group, others may add messages to a run). `schedule` delivers a message to this conversation once, later; it survives restarts. Interfaces receive it as a notice with code `reminder` (`data`: `scheduled_id`, `sender_id`, `sender_name`). `history` reads the calling conversation's history (`recent`, `search`, `summary`), for capabilities that carry a conversation somewhere else or work from it; capabilities cannot change it. `logbook` is the conversation's log, for what a person may want to find later. `persona` is the persona whose turn made the call, as the engine said (`Tools.call`), or the run's only persona; \"\" when nobody in particular (a group run whose engine did not say, a typed command, a call carried out once the owner approved it).",
    "attributes": [
     {
      "name": "address",
@@ -2798,7 +2788,7 @@
       }
      ],
      "returns": "Store",
-     "doc": "A persona's private store, as `Session.memory` opens it (added in 1.17), for a command that changes what her engine reads. Any persona there is, as a typed command has none of its own."
+     "doc": "A persona's private store, as `Session.memory` opens it, for a command that changes what her engine reads. Any persona there is, as a typed command has none of its own."
     },
     {
      "name": "progress",
@@ -2862,7 +2852,7 @@
       }
      ],
      "returns": "Store",
-     "doc": "A key-value store of this capability's module (added in 1.5), scoped by any combination of this `conversation`, one of the run's personas, and the caller (`person`); no arguments: the module's store everywhere (the same as `storage`)."
+     "doc": "A key-value store of this capability's module, scoped by any combination of this `conversation`, one of the run's personas, and the caller (`person`); no arguments: the module's store everywhere (the same as `storage`)."
     },
     {
      "name": "unschedule",
@@ -2925,7 +2915,7 @@
       }
      ],
      "returns": "Sequence",
-     "doc": "Capability schemas this session may offer to a model; with `persona` (added in 1.14), to that persona's turn (a capability for some personas only is left out of the others')."
+     "doc": "Capability schemas this session may offer to a model; with `persona`, to that persona's turn (a capability for some personas only is left out of the others')."
     }
    ]
   },

@@ -26,8 +26,7 @@ class RunYield(str, Enum):
     WAIT_APPROVAL = "waiting_approval"
 
 
-# The message a run's task is cancelled with when the core stops (added in 1.7): the run stays open and is replayed
-# on the next start, so an engine that keeps state elsewhere must not record it as cancelled. Any other cancellation
+# The message a run's task is cancelled with when the core stops: the run stays open and is replayed on the next start, so an engine that keeps state elsewhere must not record it as cancelled. Any other cancellation
 # (`$cancel`, a conversation cancelled) is final.
 SHUTDOWN = "core-shutdown"
 
@@ -46,7 +45,7 @@ PART_PLACES = ("stable", "turn", "context")
 class Context:
     """What a `context` part gives: the conversation as chat messages, oldest first, up to the moment `upto`. An engine
     reads these in place of its own window and summary, and of its thread only what came after `upto`. So a module that
-    keeps a conversation decides how much of it she reads, and compacts it. Added in 1.17."""
+    keeps a conversation decides how much of it she reads, and compacts it."""
 
     messages: tuple[Mapping[str, str], ...]
     upto: float
@@ -55,9 +54,9 @@ class Context:
 @dataclass(frozen=True)
 class PartContext:
     """What a computed prompt part may look at: the persona it is written for, the run's address and trigger,
-    (added in 1.9) the engine placing it, so a part can keep to some engines, and (added in 1.16) `models` and
+    the engine placing it, so a part can keep to some engines, and `models` and
     `history`, for a part that asks her model something or reads the conversation before she answers. Its model calls
-    are counted in the run's usage but not against its budget, as a watcher's are. `since` (added in 1.17) is when the
+    are counted in the run's usage but not against its budget, as a watcher's are. `since` is when the
     thread she is in began, as the engine says (`Session.aprompt`): 0 when it never was started over."""
 
     persona: "Persona"
@@ -74,11 +73,10 @@ class PartContext:
 class PromptPart:
     """A piece of a persona's prompt that engines place for it: its personality, house rules, memory, anything.
 
-    `text` is the text, or a function of a `PartContext` returning it ("" adds nothing); since 1.14 the function may
-    be async (a part that looks something up), and engines render it with `Session.aprompt` (`Session.prompt` leaves
-    an async part out). `place` says where an
+    `text` is the text, or a function of a `PartContext` returning it ("" adds nothing); the function may be async (a
+    part that looks something up), and engines render it with `Session.aprompt`. `place` says where an
     engine puts it: `stable` in the system prompt (the same every turn, so the provider's prompt cache keeps
-    serving it), `turn` in the turn's context after the history (it may change every turn), `context` (added in 1.17)
+    serving it), `turn` in the turn's context after the history (it may change every turn), `context`
     in place of the history: its function returns a `Context`, or None to leave it to the engine (`Session.context`
     gives the first). Parts come in `order`
     (lower first). A module's part is for the personas it names (`personas`), or for every persona when it names
@@ -105,7 +103,7 @@ class PromptPart:
         object.__setattr__(self, "personas", tuple(personas))
 
 
-# The model tiers a persona may name besides her `profile` (Persona.profiles, added in 1.11).
+# The model tiers a persona may name besides her `profile` (Persona.profiles).
 TIERS = ("own", "strong")
 
 
@@ -114,19 +112,19 @@ class Persona:
     """Who speaks: data, not behaviour. A persona with her model profile is an agent; any engine can use any of them.
     `parts` are prompt parts of its own (its personality, say), which engines place beside `prompt` (see PromptPart).
 
-    Added in 1.9: `aliases`, other names people call her by ("Luna, …" still calls on GPT); `pictures`, kind → image
+    `aliases`, other names people call her by ("Luna, …" still calls on GPT); `pictures`, kind → image
     file (`avatar`, square; `card`, 3:4; any other kind a page knows), which interfaces show from
     `InterfacePort.personas`.
 
-    Added in 1.11: `description`, one line on who she is, for engines that write their own prompts around her rather
+    `description`, one line on who she is, for engines that write their own prompts around her rather
     than placing `prompt` (Chimera's work prompts); `profiles`, her model profiles by tier besides `profile`: `own`
     (her own models only, with nobody else's as a fallback, so the model family answering is hers) and `strong` (her
     strongest models). An engine asking for a tier she has not named uses `own`, then `profile`.
 
-    Added in 1.13: `allowance`, her own default daily allowance in dollars (0: no daily limit; None: the core's
+    `allowance`, her own default daily allowance in dollars (0: no daily limit; None: the core's
     default). The owner's settings come first: core.yml `stamina:` (`personas`, then `allowance`) and `$stamina`.
 
-    Added in 1.15: `effort`, how hard she thinks in a conversation (an `Effort`; empty: the engine's setting). A
+    `effort`, how hard she thinks in a conversation (an `Effort`; empty: the engine's setting). A
     session's own `effort` comes first; "none" answers at once, without a thinking phase."""
 
     name: str
@@ -225,7 +223,7 @@ class Activity:
 
 class Tools(Protocol):
     def list(self, persona: str = "") -> Sequence[Mapping[str, Any]]:
-        """Capability schemas this session may offer to a model; with `persona` (added in 1.14), to that persona's
+        """Capability schemas this session may offer to a model; with `persona`, to that persona's
         turn (a capability for some personas only is left out of the others')."""
 
     async def call(self, name: str, arguments: Mapping[str, Any], call_id: str | None = None, *,
@@ -284,8 +282,7 @@ class LogEntry:
 
 
 class Logbook(Protocol):
-    """A conversation's log (added in 1.15, in place of the diary, which only kept what a persona noted of someone):
-    what happened here, written by modules through the handles they already have, read by engines, and by people with
+    """A conversation's log: what happened here, written by modules through the handles they already have, read by engines, and by people with
     `$log`. The core logs by itself every write and critical action that ran. A model never writes here directly, only
     through a capability a module offers. It is not the audit log, the core's own record for the owner, which models
     never read."""
@@ -320,10 +317,10 @@ class Session(Protocol):
     options: Mapping[str, Any]
     owner: bool  # the trigger's sender is an owner of its interface (never for routines)
     access: str  # the trigger's sender's effective level: member, admin or creator
-    logbook: Logbook  # this conversation's log (added in 1.15)
+    logbook: Logbook  # this conversation's log
 
     def store(self, *, conversation: bool = False, persona: str | None = None, person: bool = False) -> Store:
-        """A key-value store of this engine's module (added in 1.5), scoped by any combination of: this
+        """A key-value store of this engine's module, scoped by any combination of: this
         `conversation`, one of the session's personas (across conversations), and the trigger's sender
         (`person`, across conversations). No arguments: the module's store everywhere. Each module's stores
         are its own; the core keeps them and never reads them."""
@@ -339,13 +336,13 @@ class Session(Protocol):
         ...
 
     async def aprompt(self, persona: str, place: str = "stable", since: float = 0.0) -> str:
-        """`prompt`, with async parts awaited (added in 1.14): each in turn, for at most a few seconds (one that takes
-        longer is left out, and logged). Render once per turn: a part may cost a lookup. `since` (added in 1.17): when
+        """`prompt`, with async parts awaited: each in turn, for at most a few seconds (one that takes
+        longer is left out, and logged). Render once per turn: a part may cost a lookup. `since`: when
         the thread she is in began, which the part reads as `PartContext.since`."""
         ...
 
     def context(self, persona: str, since: float = 0.0) -> Context | None:
-        """What a module keeps of this conversation for her, if one does (added in 1.17). She reads it in place of the
+        """What a module keeps of this conversation for her, if one does. She reads it in place of the
         engine's own window; it may change between her steps, so an engine asks each time it builds a request."""
 
     def inbox(self) -> list[Request]:

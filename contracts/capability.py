@@ -93,10 +93,10 @@ class ToolContext(Protocol):
     the person who started the run attached (in a group, others may add messages to a run).
     `schedule` delivers a message to this conversation once, later; it survives restarts. Interfaces
     receive it as a notice with code `reminder` (`data`: `scheduled_id`, `sender_id`, `sender_name`).
-    `history` (added in 1.6) reads the calling conversation's history (`recent`, `search`, `summary`), for
+    `history` reads the calling conversation's history (`recent`, `search`, `summary`), for
     capabilities that carry a conversation somewhere else or work from it; capabilities cannot change it.
-    `logbook` (added in 1.15) is the conversation's log, for what a person may want to find later.
-    `persona` (added in 1.14) is the persona whose turn made the call, as the engine said (`Tools.call`), or the
+    `logbook` is the conversation's log, for what a person may want to find later.
+    `persona` is the persona whose turn made the call, as the engine said (`Tools.call`), or the
     run's only persona; "" when nobody in particular (a group run whose engine did not say, a typed command, a
     call carried out once the owner approved it).
     """
@@ -113,8 +113,8 @@ class ToolContext(Protocol):
     models: Models
     workspace: Path
     access: Access  # the caller's effective level: member, admin or creator
-    history: "History"  # added in 1.6: this conversation's history, to read
-    persona: str  # added in 1.14: whose turn made the call ("" for nobody in particular)
+    history: "History"  # this conversation's history, to read
+    persona: str  # whose turn made the call ("" for nobody in particular)
 
     async def progress(self, text: str) -> None: ...
 
@@ -128,12 +128,12 @@ class ToolContext(Protocol):
         """Cancel a pending scheduled message of this conversation. False if there is none."""
 
     def store(self, *, conversation: bool = False, persona: str | None = None, person: bool = False) -> Store:
-        """A key-value store of this capability's module (added in 1.5), scoped by any combination of this
+        """A key-value store of this capability's module, scoped by any combination of this
         `conversation`, one of the run's personas, and the caller (`person`); no arguments: the module's
         store everywhere (the same as `storage`)."""
 
     def memory(self, persona: str) -> Store:
-        """A persona's private store, as `Session.memory` opens it (added in 1.17), for a command that changes what her
+        """A persona's private store, as `Session.memory` opens it, for a command that changes what her
         engine reads. Any persona there is, as a typed command has none of its own."""
 
 
@@ -168,7 +168,7 @@ class Capability:
     * `confirm`: even the owner's own typed command asks for a one-tap confirmation.
     * `describe(arguments)`: one plain line for approval prompts ("Restart navidrome.service").
 
-    `personas` (added in 1.14), when given, are the only personas it is offered to: an engine that says whose turn
+    `personas`, when given, are the only personas it is offered to: an engine that says whose turn
     it is (`Tools.list(persona)`) leaves it out of others', and a call made for another persona is refused. Without
     a persona, a run with any of them is offered it.
     """

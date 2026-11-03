@@ -106,6 +106,6 @@ def setup(context) -> Contributions:
                                                   str(config.get("user_name", "you")))])
 
 
-EXTENSION = Extension("cli", setup, contracts="1", version="1", description="Local stdin/stdout conversation", settings=(
+EXTENSION = Extension("cli", setup, description="Local stdin/stdout conversation", settings=(
     Setting("user_name", "Your name in the local chat", "text", "you"),
 ))

@@ -196,7 +196,7 @@ def setup(context) -> Contributions:
     ])
 
 
-EXTENSION = Extension("host", setup, contracts="1", version="1",
+EXTENSION = Extension("host", setup,
                       description="This computer's screen, files, clipboard and apps, for the creator", settings=(
     Setting("downloads_dir", "Where $savefile puts attachments", "path", "~/Downloads"),
 ))

@@ -1,4 +1,4 @@
-"""Each student's record in the Classroom, published as facts for the pages (contracts 1.9).
+"""Each student's record in the Classroom, published as facts for the pages.
 
     the board's sessions ──► per student: those she worked in (a step in her seat), by how they ended
                              (landed, discarded, open) ──► `chimera.record` {landed, discarded, open, level, ...}

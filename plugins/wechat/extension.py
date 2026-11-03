@@ -73,7 +73,7 @@ def setup(context) -> Contributions:
                          assignments={"wechat:*": {"engine": "momochat", "personas": [PERSONA.name]}})
 
 
-EXTENSION = Extension("wechat", setup, contracts="1", version="1", uses=("momochat",),
+EXTENSION = Extension("wechat", setup, uses=("momochat",),
                       description="WeChat account: native database reads, desktop sends, owner operations", settings=(
     Setting("database_root", "The account's …/xwechat_files/wxid_…/db_storage folder (see docs/WECHAT.md)", "path"),
     Setting("database_keys", "Key file from key_setup (default: in the module's data folder)", "path"),

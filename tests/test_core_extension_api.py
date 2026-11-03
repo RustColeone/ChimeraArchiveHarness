@@ -432,7 +432,7 @@ def setup(context):
                          admission={name + ":*": {"require_mention_in_groups": False}})
 
 
-EXTENSION = Extension("dropin", setup, contracts="1", uses=("probe",))  # its default names the probe engine
+EXTENSION = Extension("dropin", setup, uses=("probe",))  # its default names the probe engine
 '''
 
 # A provider kind of a module's own (contracts.ModelAdapter): answers "<prefix><model>: <last message>".

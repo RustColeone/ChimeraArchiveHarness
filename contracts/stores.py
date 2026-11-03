@@ -21,7 +21,7 @@ class Store(Protocol):
 
 
 class Facts(Protocol):
-    """Small public values a module publishes about a persona (added in 1.9): her mood or level, or, with
+    """Small public values a module publishes about a persona: her mood or level, or, with
     `person`, where she stands with one person (their bond, the name they call her). Interfaces read them with
     `InterfacePort.facts` to show them on a page; nothing else does, so a fact is never a module's private state.
 
@@ -37,7 +37,7 @@ class Facts(Protocol):
 
 
 class Prices(Protocol):
-    """Model prices, as the core keeps them (added in 1.12): a list fetched once a day (Artificial Analysis's, with a
+    """Model prices, as the core keeps them: a list fetched once a day (Artificial Analysis's, with a
     key) under the owner's own figures (core.yml `prices:`). Every ModelResult already carries its price and cost;
     this is for pages and engines that show prices or estimate before a call."""
 

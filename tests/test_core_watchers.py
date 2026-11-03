@@ -42,7 +42,7 @@ def setup(context):
         watchers=[Watcher("keeper", watch, timeout_s=0.5), Watcher("ivy_only", watch, personas=("ivy",))])
 
 
-EXTENSION = Extension("watchmod", setup, contracts="1")
+EXTENSION = Extension("watchmod", setup)
 '''
 
 

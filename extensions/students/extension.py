@@ -161,7 +161,7 @@ def setup(context) -> Contributions:
                          profiles={**profiles(STUDENTS), **dict(config.get("profiles") or {})}, **remembered)
 
 
-EXTENSION = Extension("students", setup, contracts="1", version="2", requires=("package:mneme-llm>=0.4.0",),
+EXTENSION = Extension("students", setup, requires=("package:mneme-llm>=0.4.0",),
                       description="The students: one folder each with her prompt, models and pictures, and her memory "
                                   "of each person (mneme-llm)",
                       settings=tuple(key_setting(*item) for item in KEYS))

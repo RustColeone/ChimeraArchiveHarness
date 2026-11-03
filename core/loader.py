@@ -18,8 +18,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable, Mapping
 
-from contracts import (CONTRACTS_VERSION, Capability, Contributions, Engine, Extension, Interface, Persona, PromptPart,
-                       Watcher)
+from contracts import Capability, Contributions, Engine, Extension, Interface, Persona, PromptPart, Watcher
 from core.defaults import merge
 
 
@@ -87,8 +86,6 @@ def import_extension(path: str | Path) -> tuple[Extension, ModuleType]:
     extension = getattr(module, "EXTENSION", None)
     if not isinstance(extension, Extension):
         raise ExtensionError(f"{entry} must define EXTENSION = contracts.Extension(...)")
-    if str(extension.contracts).split(".")[0] != CONTRACTS_VERSION.split(".")[0]:
-        raise ExtensionError(f"{extension.name} targets contracts {extension.contracts}, core has {CONTRACTS_VERSION}")
     return extension, module
 
 

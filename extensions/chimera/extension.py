@@ -75,7 +75,7 @@ def assemble(context) -> tuple[Contributions, dict]:
     records.publish()
     board.subscribe(records.listen)
     chimera = Chimera(board, registry, trees, config, team)
-    prices = getattr(context, "prices", None)  # the core's price list (contracts 1.12; core.yml `prices:`)
+    prices = getattr(context, "prices", None)  # the core's price list (core.yml `prices:`)
     interfaces = []
     page = None
     if config.get("api", True) is not False:  # the Classroom's interface: its API, and the page unless `web: false`
@@ -109,7 +109,7 @@ def setup(context) -> Contributions:
     return assemble(context)[0]
 
 
-EXTENSION = Extension("chimera", setup, contracts="1", version="2", uses=("students",),
+EXTENSION = Extension("chimera", setup, uses=("students",),
                       description="The students work on your code together: routed, reviewed, tested, landed on your "
                                   "approval",
                       settings=(

@@ -108,12 +108,11 @@ class LoaderTests(unittest.IsolatedAsyncioTestCase):
         cases = {
             "no_entry": None,
             "no_decl": "x = 1\n",
-            "future": "from contracts import Contributions, Extension\nEXTENSION = Extension('future', lambda c: Contributions(), contracts='2')\n",
             "bad_setup": "from contracts import Extension\nEXTENSION = Extension('bad_setup', lambda c: [])\n",
         }
         reasons = {"no_entry": "has no extension.py", "no_decl": "must define EXTENSION",
-                   "future": "targets contracts 2", "bad_setup": "setup must return contracts.Contributions"}
-        skipped_as = {"no_entry": "no_entry", "no_decl": "no_decl", "future": "future", "bad_setup": "bad_setup"}
+                   "bad_setup": "setup must return contracts.Contributions"}
+        skipped_as = {"no_entry": "no_entry", "no_decl": "no_decl", "bad_setup": "bad_setup"}
         for name, body in cases.items():
             directory = self.tmp / "bad" / name
             directory.mkdir(parents=True)

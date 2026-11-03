@@ -383,7 +383,7 @@ def setup(context):
                          providers={"acme": {"kind": "acme", "api_key_env": "ACME_API_KEY"}},
                          profiles={"acme_chat": [{"provider": "acme", "model": "acme-large"}]})
 
-EXTENSION = Extension("acme", setup, contracts="1", settings=(
+EXTENSION = Extension("acme", setup, settings=(
     Setting("acme_api_key", "Acme API key", "secret", env="ACME_API_KEY"),))
 ```
 
@@ -418,7 +418,7 @@ def setup(context) -> Contributions:
                          personas=[Persona("whale", "本鲸", "…", profile="default")],
                          prompt_parts=[...], watchers=[...])
 
-EXTENSION = Extension("my_extension", setup, contracts="1", version="1", description="...",
+EXTENSION = Extension("my_extension", setup, description="...",
                       requires=("students",), uses=("momochat",))   # see Dependencies below
 ```
 

@@ -240,7 +240,7 @@ class Providers:
         return kind in self._kinds and kind not in ADAPTERS and not settings.get("api_key_env")
 
     def profile_ready(self, profile: str) -> bool:
-        """Whether some candidate of `profile` can be called (Models.ready, contracts 1.6)."""
+        """Whether some candidate of `profile` can be called (Models.ready)."""
         return any(self.ready(candidate["provider"]) for candidate in self._profiles.get(profile, ()))
 
     def available(self) -> list[str]:

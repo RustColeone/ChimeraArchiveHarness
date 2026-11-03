@@ -1,4 +1,4 @@
-"""Model prices, so every model answer carries what it cost (contracts 1.12): Artificial Analysis's list, fetched
+"""Model prices, so every model answer carries what it cost: Artificial Analysis's list, fetched
 again once a day old, under the owner's own figures.
 
     the core starts, or a model answers ──► the kept list is over 24 h old (and a key is set)? ──► fetch every page of

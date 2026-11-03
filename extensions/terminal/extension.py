@@ -105,7 +105,7 @@ def setup(context) -> Contributions:
     ])
 
 
-EXTENSION = Extension("terminal", setup, contracts="1", version="1",
+EXTENSION = Extension("terminal", setup,
                       description="A shell on this machine for the creator (Windows and Linux)", settings=(
     Setting("cwd", "Folder new shells start in", "path", "~"),
     Setting("max_wait_s", "Longest wait for a command's output before replying, in seconds", "number", 20),

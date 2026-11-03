@@ -431,7 +431,7 @@ async def hear(book: Book, settings: Settings, exchange, subject: str, said) -> 
     """What was said in a group chat, every student there heard: each classmate keeps the exchange word for word too.
     Returns the classmates who keep it."""
     heard = []
-    for persona in getattr(exchange, "personas", ()):  # (contracts 1.9)
+    for persona in getattr(exchange, "personas", ()):  #
         own = settings.of(persona)
         if persona == exchange.persona.name or not book.keeps(persona) or not (own.learn and own.episodes):
             continue
@@ -445,7 +445,7 @@ def share(book: Book, settings: Settings, exchange, subject: str, notes, facts) 
     one kept of it are kept in each classmate's file as well, as her own (source "heard"). A direct chat stays
     between the two. Returns the classmates who keep them."""
     heard = []
-    for persona in getattr(exchange, "personas", ()):  # (contracts 1.9)
+    for persona in getattr(exchange, "personas", ()):  #
         own = settings.of(persona)
         if persona == exchange.persona.name or not book.keeps(persona) or not (own.learn and own.notes):
             continue
@@ -464,7 +464,7 @@ def make_part(book: Book, settings: Settings, guts: Guts | None = None):
         on it (her first look), her mood's news (until she has replied) and how her classmates seem today; nothing
         for a routine run, or a person she has nothing on."""
         persona, trigger = context.persona, context.trigger
-        engine = getattr(context, "engine", "")  # (contracts 1.9; an older core gives none)
+        engine = getattr(context, "engine", "")  # (an older core gives none)
         if trigger.origin != "person" or not book.keeps(persona.name) or not conversation(engine, settings):
             return ""
         book.met(persona)
@@ -638,7 +638,7 @@ def make_alias(book: Book, facts=None):
 def make_recall(book: Book, settings: Settings, tool: str):
     """Her `search` or `read` through what was said before with the person who wrote, as mneme-llm's tools do it."""
     async def recall(arguments, context) -> ToolResult:
-        persona = getattr(context, "persona", "")  # (contracts 1.14: whose turn called it)
+        persona = getattr(context, "persona", "")  # (whose turn called it)
         if not persona or not book.keeps(persona) or not settings.of(persona).search:
             return ToolResult.fail("Only a student's own turn can look through her memory.", "not_a_student")
         box = book.toolbox(persona, context.run_id)

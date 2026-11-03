@@ -75,4 +75,4 @@ def setup(context):
     ])
 
 
-EXTENSION = Extension("tools", setup, contracts="1")
+EXTENSION = Extension("tools", setup)

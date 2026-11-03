@@ -28,7 +28,7 @@ class Core:
         self._provider_adapters = provider_adapters
         self._tick_seconds, self._clock = tick_seconds, clock
         self.extensions: list[LoadedExtension] = []
-        self.skipped: dict[str, str] = {}  # module → why it is not loaded (contracts 1.10)
+        self.skipped: dict[str, str] = {}  # module → why it is not loaded
         self.set_aside: list[tuple[str, str, str]] = []  # (module or "core", pattern, why): defaults not applied
         self.started = False
         self.exit_code = 0  # 75 asks the supervisor for a restart (core/supervisor.py)

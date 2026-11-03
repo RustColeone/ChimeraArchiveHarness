@@ -48,7 +48,7 @@ def setup(context) -> Contributions:
                                                       float(config.get("attachment_max_mb", 25)), config=config)])
 
 
-EXTENSION = Extension("discord", setup, contracts="1", version="1",
+EXTENSION = Extension("discord", setup,
                       description="Discord DMs and server channels (included)", settings=(
     Setting("token", "The bot's token (Developer Portal → your application → Bot → Reset Token)", "secret",
             env=("DISCORD_BOT_TOKEN", "DISCORD_TOKEN", "TOKEN"), ask=True, check=check_token),

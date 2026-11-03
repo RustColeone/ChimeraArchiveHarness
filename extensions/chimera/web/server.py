@@ -5,7 +5,7 @@ It is an ordinary interface (`classroom`, addresses `classroom:<task>`): what yo
 `port.submit`, and what the club says comes back through `deliver`, as for Discord or the web UI. The rest (each
 task's steps, its diff, the approval it waits for and what can be done now) comes from the module's views
 (views.py), so every frontend shows the same rules instead of deciding them. It publishes the Classroom as a place in
-the core's directory (contracts 1.7) and reads the other places from there, for the mini map.
+the core's directory and reads the other places from there, for the mini map.
 
 Whoever opens it acts as the creator. It answers only private-network clients and refuses other websites
 (Host and Origin checks, as the web UI does), and with a passphrase (the web UI's, WEBUI_PASSPHRASE, by default) it
@@ -230,7 +230,7 @@ class ClassroomUI(Interface):
         return places.lab_place(self.board, self.team, self.link, float(self.config.get("visit_minutes", 30)))
 
     def _publish(self) -> None:
-        """Tell the other interfaces where the Classroom is and who is in it (contracts 1.7), when that changed."""
+        """Tell the other interfaces where the Classroom is and who is in it, when that changed."""
         if self.port is None:
             return
         place = self.presence()
@@ -304,7 +304,7 @@ class ClassroomUI(Interface):
         raise web.HTTPNotFound()
 
     def _pictures(self) -> dict[str, Path]:
-        """The students' own pictures (Persona.pictures, from the core's personas: contracts 1.9), by name key."""
+        """The students' own pictures (Persona.pictures, from the core's personas), by name key."""
         personas = getattr(self.port, "personas", None) if self.port is not None else None
         found: dict[str, Path] = {}
         for view in personas() if callable(personas) else ():
@@ -400,13 +400,13 @@ class ClassroomUI(Interface):
                                   "fingerprint": change.get("fingerprint", ""), "patch": patch, "live": False})
 
     async def _stamina_api(self, request):
-        """Each seat's stamina and everyone's day against the total (the core's, contracts 1.12), for the page's header
+        """Each seat's stamina and everyone's day against the total (the core's), for the page's header
         and the team picker."""
         return web.json_response({"seats": {seat.persona: self._stamina(seat.persona) for seat in self.team.seats.values()},
                                   "total": self._stamina(None)})
 
     async def _logbook_api(self, request):
-        """What was spent each day for the Logbook (everything, chats and sessions: the core's, contracts 1.12)."""
+        """What was spent each day for the Logbook (everything, chats and sessions: the core's)."""
         asking = getattr(self.port, "spending", None) if self.port is not None else None
         return web.json_response({"days": asking(14) if callable(asking) else []})
 
@@ -652,7 +652,7 @@ class ClassroomUI(Interface):
         task = self.board.task(task_id)
         budget = (((task or {}).get("data") or {}).get("team") or {}).get("budget")
         if budget and not text.lstrip().startswith("$"):  # each round of a session with a budget stops and asks there
-            extra = {**extra, "budget_usd": float(budget)}  # (the core's stamina, contracts 1.12)
+            extra = {**extra, "budget_usd": float(budget)}  # (the core's stamina)
         request = Request(id=f"wb-{client_id}", address=Address(self.name, task_id),
                           sender=Sender(self.user_id, self.user_name), text=text, received_at=time.time(),
                           is_direct=True, mentions_me=True, display=self.display, extra=extra)
@@ -753,7 +753,7 @@ class ClassroomUI(Interface):
         return views.task_view(self.board, task, self.name + ":", self._approval_state)
 
     def _approval_state(self, approval_id: str) -> str | None:
-        """What the core says of an approval (contracts 1.7); a card decided or expired elsewhere is closed here too,
+        """What the core says of an approval; a card decided or expired elsewhere is closed here too,
         so every open page stops offering its buttons."""
         asking = getattr(self.port, "approval_status", None)
         return asking(approval_id) if callable(asking) and approval_id else None
@@ -785,12 +785,12 @@ class ClassroomUI(Interface):
         return team
 
     def _seat_models(self) -> list[dict]:
-        """Each seat's first model of each tier, for the price list's status (the core's, contracts 1.12)."""
+        """Each seat's first model of each tier, for the price list's status (the core's)."""
         return [{"seat": seat.persona, "tier": tier, "provider": candidate["provider"], "model": candidate["model"]}
                 for seat in self.team.seats.values() for tier in ("cheap", "strong") for candidate in seat.models(tier)[:1]]
 
     def _ready(self, seat) -> bool | None:
-        """Whether she has a key: the core can tell (contracts 1.7), else what the latest run saw."""
+        """Whether she has a key: the core can tell, else what the latest run saw."""
         asking = getattr(self.port, "models_ready", None)
         if callable(asking):
             try:

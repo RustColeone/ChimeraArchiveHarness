@@ -13,28 +13,7 @@ from contracts.models import (AdapterFactory, AdapterResult, Image, ModelAdapter
 from contracts.stores import Facts, Prices, Store
 from contracts.watchers import Exchange, WatchContext, Watcher
 
-# 1.8: 1.7 plus prompt parts (PromptPart, PartContext, Persona.parts, Contributions.prompt_parts, Session.prompt).
-# 1.9: 1.8 plus watchers (Watcher, Exchange, WatchContext, Contributions.watchers), facts (Facts,
-#      ExtensionContext.facts, InterfacePort.facts), InterfacePort.personas, Persona.aliases, .formerly, .pictures,
-#      and PartContext.engine.
-# 1.10: 1.9 plus declared dependencies (Extension.requires, Extension.uses, ExtensionContext.present).
-# 1.11: 1.10 plus former names of engines and modules (EngineSpec.formerly, Extension.formerly), agents described for
-#       other engines (Persona.description, Persona.profiles, Persona.tier, TIERS, ExtensionContext.personas).
-# 1.12: 1.11 plus model prices (Prices, ModelResult.price and .cost, ExtensionContext.prices, InterfacePort.prices) and
-#       stamina (a run that reaches a persona's daily allowance, or its Request.extra `budget_usd`, waits for the
-#       owner; InterfacePort.stamina, InterfacePort.spending).
-# 1.13: 1.12 plus a persona's own default daily allowance (Persona.allowance).
-# 1.14: 1.13 plus async prompt parts (Session.aprompt renders them), whose persona a tool call is for
-#       (Tools.list and Tools.call take `persona`, ToolContext.persona) and capabilities offered to some personas
-#       only (Capability.personas).
-# 1.15: 1.14 plus the effort "none" (no thinking), Persona.effort, how hard she thinks in a conversation, and
-#       AdapterResult.cost, what the provider says it charged; the log (Session.logbook, ToolContext.logbook,
-#       WatchContext.logbook) in place of Session.diary, which no engine used
-# 1.16: 1.15 plus PartContext.models and PartContext.history, for a prompt part that asks her model before she answers
-# 1.17: 1.16 plus a `context` place for prompt parts (Context, Session.context): a module keeps the conversation for
-#       her; PartContext.since (Session.aprompt takes it), when her thread began; and ToolContext.memory, a persona's
-#       own store, for a command that changes what her engine reads
-CONTRACTS_VERSION = "1.17"
+CONTRACTS_VERSION = "2.0"
 
 __all__ = [
     "AdapterFactory", "AdapterResult", "Image", "ModelAdapter", "NotConfigured",

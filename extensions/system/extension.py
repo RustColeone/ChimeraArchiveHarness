@@ -58,4 +58,4 @@ def setup(context) -> Contributions:
         risk=Risk.READ, command="status")])
 
 
-EXTENSION = Extension("system", setup, contracts="1", version="1", description="Host status")
+EXTENSION = Extension("system", setup, description="Host status")

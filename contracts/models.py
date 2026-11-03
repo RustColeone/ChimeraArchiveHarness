@@ -8,12 +8,12 @@ from typing import Any, Callable, Literal, Mapping, Protocol, Sequence
 
 from contracts.messages import FileRef
 
-Effort = Literal["none", "low", "medium", "high", "max"]  # "max" added in 1.7: providers that have it think longest
+Effort = Literal["none", "low", "medium", "high", "max"]  # "max": providers that have it think longest
 
 
 @dataclass(frozen=True)
 class ToolSpec:
-    """A function the model may call (added in 1.7): `parameters` is the JSON schema of its arguments (an object)."""
+    """A function the model may call: `parameters` is the JSON schema of its arguments (an object)."""
 
     name: str
     description: str
@@ -22,7 +22,7 @@ class ToolSpec:
 
 @dataclass(frozen=True)
 class ToolCall:
-    """One function call in a model's answer (added in 1.7). `arguments` is the parsed JSON object, checked against
+    """One function call in a model's answer. `arguments` is the parsed JSON object, checked against
     the tool's `parameters`; `id` pairs the call with its result in later messages."""
 
     id: str
@@ -34,7 +34,7 @@ class ToolCall:
 class ModelRequest:
     """One language-model call.
 
-    `messages` use roles `system`, `user` and `assistant` with plain-text content. With `tools` (1.7), an
+    `messages` use roles `system`, `user` and `assistant` with plain-text content. With `tools`, an
     `assistant` message may also carry `tool_calls` (a list of {id, name, arguments}, as the result gave them) and
     `replay` (the result's `replay`, sent back as it is), and a `tool` message carries `tool_call_id` and the
     call's result as `content`.
@@ -45,7 +45,7 @@ class ModelRequest:
     Candidates that cannot see images are tried last and are told images were attached instead.
     `persona` names the session persona the call is for, so her `$model` choice applies and her message
     can say which model wrote it; without it, the core uses the run's only persona with this profile.
-    With `tools` (1.7), the model answers in words and calls: the result's `tool_calls` are checked against the
+    With `tools`, the model answers in words and calls: the result's `tool_calls` are checked against the
     tools' `parameters`, and `output_schema` is not used. Candidates are tried in order while they can call tools;
     the first that cannot ends the request with `ModelError("tools_unsupported")`. Tool names may hold dots
     (`web.search`); an adapter maps them to what its API allows and back.
@@ -59,8 +59,8 @@ class ModelRequest:
     max_tokens: int = 1500
     timeout_s: float = 35.0
     images: Sequence[FileRef] = ()
-    persona: str | None = None  # added in 1.3; new fields go last
-    tools: Sequence[ToolSpec] = ()  # added in 1.7
+    persona: str | None = None
+    tools: Sequence[ToolSpec] = ()
 
 
 @dataclass(frozen=True)
@@ -73,17 +73,17 @@ class ModelResult:
     output_tokens: int = 0
     duration_s: float = 0.0
     schema_mode: str = ""
-    # Added in 1.4 (new fields go last): why each candidate tried before this one did not answer, in order
+    # Why each candidate tried before this one did not answer, in order
     # ("deepseek/deepseek-flash: blank answer (not JSON)"); empty when the first one did.
     fallbacks: tuple[str, ...] = ()
-    # Added in 1.7: how many of `input_tokens` the provider read from its prompt cache (billed far cheaper).
+    # How many of `input_tokens` the provider read from its prompt cache (billed far cheaper).
     cached_input_tokens: int = 0
-    # Added in 1.7, for requests with tools: the calls, and what the provider needs back with this answer's
+    # For requests with tools: the calls, and what the provider needs back with this answer's
     # assistant message in later requests (`replay` on that message, as it is: the core gives it back only to the
     # provider that wrote it; DeepSeek's thinking travels this way).
     tool_calls: tuple[ToolCall, ...] = ()
     replay: Mapping[str, Any] | None = None
-    # Added in 1.12: the model's list price when the core knows it (`{input, output, cache_hit, source, ...}`, dollars
+    # The model's list price when the core knows it (`{input, output, cache_hit, source, ...}`, dollars
     # per million tokens), and what this answer cost at it (cache hits at the cache price where one is listed);
     # None when no price is known.
     price: Mapping[str, Any] | None = None
@@ -112,7 +112,7 @@ class Models(Protocol):
 
     def ready(self, profile: str | None = None) -> bool:
         """Whether some candidate of `profile` (default: the run's first persona's) has its provider configured, so
-        a call can be tried (added in 1.6). Engines use it to pick who works before trying; a call can still fail."""
+        a call can be tried. Engines use it to pick who works before trying; a call can still fail."""
 
 
 # ---- adapters: one provider kind's protocol -------------------------------------------------------------------
@@ -138,10 +138,10 @@ class AdapterResult:
     output_tokens: int = 0
     truncated: bool = False
     schema_mode: str = ""
-    cached_input_tokens: int = 0  # (1.7) of input_tokens, read from the provider's prompt cache
-    tool_calls: tuple[ToolCall, ...] = ()  # (1.7) with tools; unparsable arguments stay a string (refused)
-    replay: Mapping[str, Any] | None = None  # (1.7) sent back with this assistant message
-    cost: float | None = None  # (1.15) dollars, when the provider says what it charged (OpenRouter does)
+    cached_input_tokens: int = 0  # of input_tokens, read from the provider's prompt cache
+    tool_calls: tuple[ToolCall, ...] = ()  # with tools; unparsable arguments stay a string (refused)
+    replay: Mapping[str, Any] | None = None  # sent back with this assistant message
+    cost: float | None = None  # dollars, when the provider says what it charged (OpenRouter does)
 
 
 class NotConfigured(RuntimeError):
@@ -158,7 +158,7 @@ class ModelAdapter(Protocol):
     An adapter may also define `async list_models()`, the models its provider offers: IDs, or (ID, release
     date or datetime) pairs so a provider's `models_since` setting can apply.
 
-    One that can call tools sets `supports_tools = True` and takes `tools` (1.7): it offers them as the API's
+    One that can call tools sets `supports_tools = True` and takes `tools`: it offers them as the API's
     functions, returns the calls in `tool_calls`, and translates `tool_calls`/`replay` on assistant messages and
     `tool` messages into the API's own form. The core passes `tools` only when a request has some."""
 

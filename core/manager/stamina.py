@@ -1,5 +1,5 @@
 """Stamina: what each persona may spend each day, the account she spends from, and runs that wait when a limit is
-reached (contracts 1.12).
+reached.
 
     a model answers ──► its cost (the core prices every answer: core/providers/prices.py) ──► today's spend for her
                         (a day starts at midnight in `timezone`), her account's spend, and the run's (usage `cost`)

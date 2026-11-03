@@ -24,14 +24,14 @@ class ExtensionContext(Protocol):
     name: str
     config: Mapping[str, Any]
     data_dir: Path
-    facts: Facts  # added in 1.9: what this module publishes about personas, for interfaces (any time after setup)
-    present: frozenset  # added in 1.10: which of the modules it `uses` are loaded (they were set up before it)
-    prices: Any  # added in 1.12: the core's model prices (contracts.Prices); None when loaded without a core
+    facts: Facts  # what this module publishes about personas, for interfaces (any time after setup)
+    present: frozenset  # which of the modules it `uses` are loaded (they were set up before it)
+    prices: Any  # the core's model prices (contracts.Prices)
 
     def log(self, event: str, **fields: Any) -> None: ...
 
     def personas(self) -> list[dict]:
-        """Added in 1.11: the agents loaded so far (the core's and those of the modules set up before this one, so
+        """the agents loaded so far (the core's and those of the modules set up before this one, so
         every module it requires or uses that is there), as `InterfacePort.personas` describes them, each with the
         `module` that added her, her `description`, `profile`, `profiles` and `models` (`default` and each tier → the
         candidates, `{provider, model}`). Called any time after setup, it lists them all."""
@@ -53,7 +53,7 @@ class Contributions:
     `adapters` adds provider kinds (kind → AdapterFactory) for APIs the built-in kinds do not speak; its
     providers, and core.yml's, may then use `kind: <that kind>`. A kind that already exists is refused.
 
-    `watchers` (added in 1.9) see every persona's delivered messages, whichever engine she spoke in (see Watcher)."""
+    `watchers` see every persona's delivered messages, whichever engine she spoke in (see Watcher)."""
 
     interfaces: Sequence[Interface] = ()
     engines: Sequence[Engine] = ()
@@ -63,7 +63,6 @@ class Contributions:
     assignments: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     admission: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     permissions: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
-    # Added later, so they go last: plugins may pass the fields above positionally.
     providers: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     adapters: Mapping[str, AdapterFactory] = field(default_factory=dict)
     prompt_parts: Sequence[PromptPart] = ()  # parts for every persona, or for those each part names
@@ -106,11 +105,10 @@ class Setting:
 class Extension:
     """Declared as `EXTENSION` in an extension's `extension.py`.
 
-    `setup` receives an ExtensionContext and returns Contributions. `contracts` is the major
-    contracts version the extension was written for. `settings` declares what the module can be set
+    `setup` receives an ExtensionContext and returns Contributions. `settings` declares what the module can be set
     up with (see Setting); it is read without running `setup`.
 
-    `requires` and `uses` (added in 1.10) declare the other modules it builds on, by module name. Without one it
+    `requires` and `uses` declare the other modules it builds on, by module name. Without one it
     `requires`, the module is not loaded (and says why); a Python package is `package:<name>` or
     `package:<name>>=<version>`. Without one it `uses`, it loads, minus what that module would add: its setup is
     told which are there (`ExtensionContext.present`). Every engine and persona its defaults name must belong to the
@@ -119,8 +117,6 @@ class Extension:
 
     name: str
     setup: Callable[[ExtensionContext], Contributions]
-    contracts: str = "1"
-    version: str = "0"
     description: str = ""
     settings: Sequence[Setting] = ()
     requires: Sequence[str] = ()

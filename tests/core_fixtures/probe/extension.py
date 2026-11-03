@@ -130,4 +130,4 @@ def setup(context):
     return Contributions(engines=[ProbeEngine(), ProbeManyEngine()])
 
 
-EXTENSION = Extension("probe", setup, contracts="1")
+EXTENSION = Extension("probe", setup)

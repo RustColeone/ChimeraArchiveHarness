@@ -26,7 +26,7 @@ async def check(token):
         raise ValueError("rejected")
     return "logs in as Tester"
 
-EXTENSION = Extension("{name}", lambda context: Contributions(), contracts="1", description="{name} module", settings=(
+EXTENSION = Extension("{name}", lambda context: Contributions(), description="{name} module", settings=(
     Setting("token", "Its token", "secret", env="SETUPTEST_{upper}_TOKEN", ask=True, check=check),
     Setting("colour", "A colour", "text", "green"),
     Setting("channels", "Channel IDs", "list", []),

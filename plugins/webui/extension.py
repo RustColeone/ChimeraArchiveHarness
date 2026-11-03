@@ -50,7 +50,7 @@ def setup(context) -> Contributions:
                          admission={f"{name}:*": {"enabled": True, "require_mention_in_groups": False}})
 
 
-EXTENSION = Extension("webui", setup, contracts="1", version="2", uses=("momochat", "students"),
+EXTENSION = Extension("webui", setup, uses=("momochat", "students"),
                       description="The web UI on the local network: the Cafe, MomoChat, the Students page and your "
                                   "page, no Discord needed",
                       settings=(

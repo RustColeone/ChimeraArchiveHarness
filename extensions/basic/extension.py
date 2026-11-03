@@ -70,4 +70,4 @@ def setup(context) -> Contributions:
     ])
 
 
-EXTENSION = Extension("basic", setup, contracts="1", version="1", description="Time and notes")
+EXTENSION = Extension("basic", setup, description="Time and notes")

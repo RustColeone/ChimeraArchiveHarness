@@ -137,7 +137,7 @@ class WebUI(Interface):
         self.classmates: list[str] = []
         self.roster: list[dict] = []
         self.ready: dict[str, bool] = {}
-        self.views: dict[str, dict] = {}  # the core's personas (contracts 1.11), by name: description, models, tiers
+        self.views: dict[str, dict] = {}  # the core's personas, by name: description, models, tiers
         self._standing_shown: list[dict] | None = None  # the roster pages were last sent
         self._total_shown = None  # and everyone's day against the total
         self._meet({})
@@ -164,7 +164,7 @@ class WebUI(Interface):
         self._stopping = False
         self._runner: web.AppRunner | None = None
         self.address_shown = ""
-        # The places in the core's directory (contracts 1.7): MomoChat publishes itself, and reads the others (the
+        # The places in the core's directory: MomoChat publishes itself, and reads the others (the
         # Classroom next door, say) for the places bar, who is also there and the invitations. `map: false` (its name
         # from when a mini map drew them) turns it off.
         self.map = config.get("map", True) is not False
@@ -199,7 +199,7 @@ class WebUI(Interface):
             values = facts(item["name"], self.user_id) if callable(facts) else {}
             found.append({**item, **{kind: next((value for key, value in values.items()
                                                  if key.rsplit(".", 1)[-1] == kind), None) for kind in STANDING},
-                          # what she spent today and her account (contracts 1.12), None from a core before it
+                          # what she spent today and her account, None from a core before it
                           "stamina": stamina(item["name"]) if callable(stamina) else None,
                           # her mood faces that are drawn (mood-happy, ...), for her face as she feels now
                           "faces": sorted(kind for kind in self._pictures_of(item["name"]) if kind.startswith("mood-"))})
@@ -247,7 +247,7 @@ class WebUI(Interface):
             await asyncio.sleep(self.places_poll_s)
 
     def stamina_total(self):
-        """Everyone's spending today against the day's total (contracts 1.12), None from a core before it."""
+        """Everyone's spending today against the day's total, None from a core before it."""
         asking = getattr(self.port, "stamina", None) if self.port is not None else None
         return asking() if callable(asking) else None
 

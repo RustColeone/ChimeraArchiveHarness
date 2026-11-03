@@ -234,7 +234,7 @@ def setup(context) -> Contributions:
         timeout_s=1800), *clip_capabilities(keep_dir)])
 
 
-EXTENSION = Extension("media", setup, contracts="1", version="1",
+EXTENSION = Extension("media", setup,
                       description="Video downloads and clips fitted to upload limits", settings=(
     Setting("keep_dir", "Where --keep-file copies go (relative to the module's data folder)", "path", "clips"),
     Setting("cookies_file", "yt-dlp cookies file for sites that need a login (relative to the module's data folder)",

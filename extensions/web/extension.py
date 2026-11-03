@@ -271,7 +271,7 @@ def setup(context) -> Contributions:
     ])
 
 
-EXTENSION = Extension("web", setup, contracts="1", version="1",
+EXTENSION = Extension("web", setup,
                       description="Web search, page reading, images, maps and Wolfram|Alpha", settings=(
     Setting("wolfram_appid", "Wolfram|Alpha AppID for $wolfram (developer.wolframalpha.com)", "secret",
             env="WOLFRAM_APPID"),

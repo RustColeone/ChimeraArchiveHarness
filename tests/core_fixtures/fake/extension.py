@@ -77,4 +77,4 @@ def setup(context):
     return Contributions(interfaces=interfaces)
 
 
-EXTENSION = Extension("fake", setup, contracts="1")
+EXTENSION = Extension("fake", setup)

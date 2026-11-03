@@ -134,7 +134,7 @@ class WhaleChanBot(Interface):
                                 owners=lambda: self._owners, names=lambda user: self.call_them, standing=self._standing)
 
     def _standing(self, user: str) -> dict:
-        """What modules publish about her and this person (contracts 1.9): the companion's plans and mood."""
+        """What modules publish about her and this person: the companion's plans and mood."""
         facts = getattr(self.port, "facts", None) if self.port is not None else None
         return dict(facts(self.persona, str(user))) if callable(facts) else {}
 

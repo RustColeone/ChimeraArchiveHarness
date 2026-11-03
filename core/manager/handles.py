@@ -85,7 +85,7 @@ SUMMARIES = "core:summaries"  # conversation address → its rolling summary (Hi
 
 
 class ReadingHistory:
-    """A capability's view of its conversation's history (contracts 1.6): it reads; only engines write the summary."""
+    """A capability's view of its conversation's history: it reads; only engines write the summary."""
 
     def __init__(self, history: HistoryHandle):
         self._history = history
@@ -114,7 +114,7 @@ def local_time(at: float) -> str:
 
 def module_store(manager: "Manager", module: str, address: Address, sender: Sender, personas: Sequence[str], *,
                  conversation: bool, persona: str | None, person: bool):
-    """A module's store, scoped by any combination of conversation, persona and person (contracts 1.5). The
+    """A module's store, scoped by any combination of conversation, persona and person. The
     module's name comes first, so no module can reach another's; with no scope it is the module's store
     everywhere (the same as ToolContext.storage)."""
     parts: dict[str, str] = {}
