@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from contracts import (Address, Command, Delivery, Display, FileRef, Interface, Operation, Option, Reply, Request,
-                       Risk, Sender, ToolResult, split_text)
+                       Risk, Sender, ToolResult, local_time, split_text)
 
 from .images import mime_for
 from .native import strip_mention
@@ -650,7 +650,7 @@ class WeChatInterface(Interface):
         lines = []
         for item in messages:
             who = "Me" if item.get("outgoing") else (item.get("sender_name") or item.get("sender_id") or "?")
-            stamp = time.strftime("%m-%d %H:%M", time.localtime(item.get("timestamp") or 0))
+            stamp = local_time(item.get("timestamp") or 0, "%m-%d %H:%M")
             lines.append(f"{stamp} {who}: {item.get('text', '')}")
         return ToolResult.ok(f"WeChat · {chat['name']}\n" + ("\n".join(lines) or "(no messages)"))
 

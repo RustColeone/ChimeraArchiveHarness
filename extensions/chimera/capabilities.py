@@ -27,7 +27,7 @@ import time
 from pathlib import Path
 from typing import Any, Mapping
 
-from contracts import Capability, Command, FileRef, Option, Risk, ToolResult
+from contracts import Capability, Command, FileRef, Option, Risk, ToolResult, local_time
 
 from . import views
 from .board import CLOSED
@@ -391,7 +391,7 @@ class Chimera:
                 line += f" · {data['change']['stat']}"
             if data.get("landed"):
                 line += f" · landed as {str(data['landed'].get('commit', ''))[:8]} on {data['landed'].get('branch', '')}"
-            line += f" · {time.strftime('%Y-%m-%d', time.localtime(row['updated']))}"
+            line += f" · {local_time(row['updated'], '%Y-%m-%d')}"
             summary = str(data.get("summary") or data.get("answer") or "").strip()
             if summary:
                 line += "\n  " + " ".join(summary.split())[:400]

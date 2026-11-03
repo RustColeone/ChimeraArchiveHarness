@@ -10,7 +10,7 @@ import signal
 import time
 from pathlib import Path
 
-from contracts import Address, Reply
+from contracts import Address, Reply, local_time
 
 BEAT_S = 5.0
 
@@ -80,7 +80,7 @@ def describe(data: dict, now: float | None = None) -> str:
     if data.get("reason") == "requested":
         who = f" {data['by']}" if data.get("by") else ""
         return f"🔄 Restarted as{who} asked ({took})."
-    when = time.strftime("%H:%M", time.localtime(float(data.get("at") or time.time())))
+    when = local_time(float(data.get("at") or time.time()), "%H:%M")
     again = f" Restart {data['restarts']} in the last 10 minutes." if int(data.get("restarts") or 0) > 1 else ""
     if data.get("reason") == "hang":
         return f"⚠️ Restarted after it stopped responding at {when} ({took}).{again}"

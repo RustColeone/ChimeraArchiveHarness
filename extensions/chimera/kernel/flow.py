@@ -18,7 +18,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from contracts import RunYield
+from contracts import RunYield, local_time
 
 from ..board import CLOSED
 from ..team import Seat
@@ -296,7 +296,7 @@ def notebook_section(board, project: str, task_id: str) -> str:
     lines = []
     for row in rows:
         data = row["data"]
-        line = f"- {time.strftime('%Y-%m-%d', time.localtime(row['updated']))} · {row['title']} · {row['status']}"
+        line = f"- {local_time(row['updated'], '%Y-%m-%d')} · {row['title']} · {row['status']}"
         if (data.get("change") or {}).get("stat"):
             line += f" · {data['change']['stat']}"
         summary = " ".join(str(data.get("summary") or data.get("answer") or "").split())

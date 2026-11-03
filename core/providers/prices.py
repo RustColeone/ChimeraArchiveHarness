@@ -28,6 +28,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from contracts import local_time
 
 SOURCE = "https://artificialanalysis.ai/api/v2/language/models/free"
 KEY_ENVS = ("ARTIFICIAL_ANALYSIS_API_KEY", "AA_API_TOKEN")  # the key's name in .env, either
@@ -149,7 +150,7 @@ class PriceBook:
         return {"input": entry["input"], "output": entry["output"],
                 "cache_hit": float(entry["cache_hit"]) if entry.get("cache_hit") is not None else None,
                 "source": "artificial-analysis", "slug": entry["slug"],
-                "as_of": time.strftime("%Y-%m-%d", time.localtime(float(fetched))) if fetched else ""}
+                "as_of": local_time(float(fetched), "%Y-%m-%d") if fetched else ""}
 
     def match(self, provider: str, model: str) -> dict | None:
         models = self.cache.get("models") or []

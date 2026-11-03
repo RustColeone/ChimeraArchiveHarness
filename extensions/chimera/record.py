@@ -79,8 +79,6 @@ class Records:
         self.summaries = benchmarks(folder)
 
     def publish(self) -> None:
-        if self.facts is None:
-            return
         found = records(self.board)
         # every seat, everyone who ever worked here, and every student in a measured team (a student the team does
         # not seat still has her benchmark runs)

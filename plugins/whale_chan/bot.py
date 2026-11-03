@@ -20,7 +20,7 @@ from pathlib import Path
 import discord
 
 from contracts import (IMPULSE, Address, Capability, Command, Delivery, Display, FileRef, Interface, Option, Reply,
-                       Request, Risk, Sender, ToolResult, split_text)
+                       Request, Risk, Sender, ToolResult, local_time, split_text)
 from contracts.discord_bot import slash
 from contracts.discord_bot.math_render import MathRenderer, fallback_text, split_math
 
@@ -387,7 +387,7 @@ class WhaleChanBot(Interface):
         recent = ledger.person(user).log[-3:]
         if action == "status" and recent:
             lines.append("Last rolls: " + "; ".join(
-                f"{time.strftime('%H:%M', time.localtime(item['at']))} {'hit' if item['hit'] else 'miss'} "
+                f"{local_time(item['at'], '%H:%M')} {'hit' if item['hit'] else 'miss'} "
                 f"({item['reason']})" for item in recent))
         return "\n".join(lines)[:1900]
 

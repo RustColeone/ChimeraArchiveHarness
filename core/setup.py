@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from contracts import Extension, Setting
+from contracts import Extension, Setting, code_style
 from core.config import CoreConfig
 from core.defaults import ROOT
 from core.loader import ExtensionError, import_extension, local_config
@@ -250,7 +250,7 @@ RESTART = "Restart the bot for this to take effect."
 async def command(setup: Setup, text: str, interface: str, markdown: bool = True) -> str:
     """`$setup`: modules and their settings, as the creator sees them in a chat. Secrets are never shown and
     never accepted here: only the guided setup on the machine (`python -m core setup`) takes them."""
-    code = (lambda value: f"`{value}`") if markdown else str
+    code = code_style(markdown)
     words = text.split()
     if not words:
         lines = ["Modules (all load unless switched off):"]
