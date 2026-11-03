@@ -69,7 +69,7 @@ The first message is `{"type": "hello", "state": {...}}`:
 - `approval`: the approval the task waits for now, or null: `{id, capability, kind, tier, summary, command,
   message}` (`message`: the approval card's message ID), and for the second check `{fingerprint, checklist: [{id,
   label, ticked}], remaining}`. It is never one decided elsewhere (typed, in Discord) or expired with its run (the
-  server asks the core, contracts 1.7 `approval_status`), nor the second check or the final approval of a version
+  server asks the core, `approval_status`), nor the second check or the final approval of a version
   the club is replacing (while it works).
 - `actions`: what can be done now, any of `accept`, `send`, `check`, `approve`, `deny`, `report`, `discard`,
   `forget`.
@@ -111,7 +111,7 @@ Everything else a person can do is a `$command` sent with `send` (and from any o
 `$check [task] [all | 1 2 3]`, `$approve <id>`, `$deny <id>`, `$land [task]`, `$discard <task>`, `$tasks [words]`,
 `$projects`.
 
-## Places (contracts 1.7)
+## Places
 
 The Classroom publishes itself in the core's directory as a place: `{"place": {"name": "Classroom", "icon": "📝",
 "note"}, "people": [{"key", "name", "avatar", "doing", "title", "task"}], "away": [keys], "tickets": [{"key", "by",

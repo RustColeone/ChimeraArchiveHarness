@@ -99,6 +99,6 @@
 # budget: {model_calls: 120, tool_calls: 400, seconds: 3600}   # per run, inside the bot
 
 # ---- cost ----------------------------------------------------------------------------------------------------
-# Prices are the core's (contracts 1.12): core.yml `prices:` (a free key from artificialanalysis.ai in .env as
+# Prices are the core's: core.yml `prices:` (a free key from artificialanalysis.ai in .env as
 # ARTIFICIAL_ANALYSIS_API_KEY, your own figures, aliases; see core.example.yml). Every answer arrives priced, so a
 # later list never changes what a past step cost, and the page shows each seat's price and where it came from.

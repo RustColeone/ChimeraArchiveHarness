@@ -14,8 +14,7 @@ several options and for `context.schedule`, the core's durable timer.
 | Capability | `reminders.cancel` | write | member | `$unremind <id>` | Required `id` |
 
 No interfaces, engines, personas, profiles or declared settings. Although `create` and `cancel` are
-writes, the core's built-in permissions make both `auto` for everyone (`BASIC_FEATURES` in
-`core/defaults.py`): a reminder only affects the conversation it was set in, so nobody waits for the
+writes, the module's own permission rules make both `auto` for everyone: a reminder only affects the conversation it was set in, so nobody waits for the
 owner. Where a conversation's write tier is `always-ask` (as in `whale_chan`'s), that rule does not
 apply and members' reminders ask too.
 

@@ -95,6 +95,17 @@ bot as a web page on your local network.
   setup, how it is built, its tests and what to copy from it.
 * [plugins/README.md](plugins/README.md): external modules, settings and secrets.
 
+## Moving data from an older build
+
+`tools/migrate.py` brings a data folder from before the 2026-11 clean-up to what the code reads now, once, by hand, with
+the bot stopped: `venv/bin/python tools/migrate.py data/core` says what it would do, and `--apply` does it. It copies
+each file it changes to `<file>.before-migrate` first, and running it twice changes nothing. It makes every student's
+memory file current, moves when each thread began to the tank's `core:threads`, cleans runtime assignments (it names the
+ones whose `allow` and `deny` you should carry over to `permissions:`), drops the old notes from the log, finishes any
+data still under an old persona, engine or module name, brings `webui.db` up to its schema, removes `names.json`, and
+gives the Classroom's folder and board their names of now. In core.yml, `personas:` is `agents:` now, and engines and
+personas go by their names of now.
+
 ## Staying up
 
 `python -m core` runs the bot under a small supervisor: the bot is its child process, sharing the same

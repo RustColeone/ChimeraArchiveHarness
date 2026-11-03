@@ -89,7 +89,7 @@
 #     - {provider: openai, model: gpt-6-luna}
 
 # Agents: a persona with her models and nothing else (no memory of anyone; a student is the students module's
-# agent with her memory). `personas:` is this section's name before 2026-10-27, still read.
+# agent with her memory).
 # agents:
 #   helper:          # an agent of your own, in one entry
 #     display_name: Helper

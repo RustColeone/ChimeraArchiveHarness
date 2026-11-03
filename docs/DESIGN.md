@@ -63,8 +63,8 @@ mneme-llm.
 
 | Engine | Product name | Job | Declares | Status |
 | --- | --- | --- | --- | --- |
-| `momochat` | **MomoChat** | The general assistant: conversations, direct and group chats, tools, commands. Speakers can pass each other tasks through a tool (`ask_classmate`: "search this for me", "draw this with image-2.5-Sunburst", "write this prompt"): the classmate answers after, and the asker finishes with it. With a student it is the companion experience; with an agent, a plain assistant | nothing (it takes whoever its assignment names) | **Built** (2026-10-27): the assistant, Whale-chan's chat engine and the room in one turn loop; their names are its former names |
-| `chimera` | **Chimera**, shown as the Classroom | The heavy-work harness, used for real coding: routes, review, tests, two approvals. Where the students work together | `uses=("students",)`: its seats are the students, on their tiers; `team:` adds seats of its own | **Built** (2026-10-27): the workbench renamed; its seats come from the students |
+| `momochat` | **MomoChat** | The general assistant: conversations, direct and group chats, tools, commands. Speakers can pass each other tasks through a tool (`ask_classmate`: "search this for me", "draw this with image-2.5-Sunburst", "write this prompt"): the classmate answers after, and the asker finishes with it. A student has her memory here; an agent is a plain assistant | nothing (it takes whoever its assignment names) | **Built** |
+| `chimera` | **Chimera**, shown as the Classroom | The heavy-work harness, used for real coding: routes, review, tests, two approvals. Where the students work together | `uses=("students",)`: its seats are the students, on their tiers; `team:` adds seats of its own | **Built** |
 | `terminal` | none | The creator's shell on the bot's machine. No model, not a student harness | nothing | Built, stays |
 
 Rules for engines:
@@ -83,8 +83,7 @@ Rules for engines:
 
 ## Personality and memory
 
-Decided 2026-10-30. A student is kept in separate parts, so that a long friendship fits a fixed context and a companion
-can outlive any one model. The guide "A student's personality" on the architecture page explains it with a diagram.
+A student is kept in separate parts, so that a long friendship fits a fixed context and she can outlive any one model. The guide "A student's personality" on the architecture page explains it with a diagram.
 
 | Part | What it is | Size | Where |
 | --- | --- | --- | --- |
@@ -95,22 +94,21 @@ can outlive any one model. The guide "A student's personality" on the architectu
 
 1. **Memory stays outside the prompt.** Each message brings up only what bears on it. What has faded leaves the context and
    can still be searched. So the prompt stays the same size however long the conversation runs.
-2. **Personality has four parts:** reactions (a local decision model: how things move her), habits (how she talks,
-   measured from her replies), ways of thinking (how to keep them is open: a local detector for the moment and her own
+2. **Personality has four parts:** reactions (her gut: a tiny network of her own, shaped by her own decisions, with a
+   balance that moves by itself between it and her head), habits (how she talks, measured from her replies), ways of thinking (how to keep them is open: a local detector for the moment and her own
    replies from such moments, rather than written summaries), and her best replies (kept word for word).
-3. **Luna is the trainer, not the plan.** GPT-6 Luna's Decisions API judges each exchange and the local model learns
-   from it. That is pre-training: a baseline is what anyone would feel, so it is not yet hers. The local model replaces
-   Luna completely in the end, by turning her off or by taking over question by question once it is good enough.
+3. **Her own model judges.** After each exchange it answers how this moved her and whether anything is worth keeping;
+   her gut learns from her own private note, written after she has answered. Lessons are forms and feelings, never
+   messages, and closeness weighs them.
 4. **You make her yours.** Assisted training comes mostly from what you say: corrections, playing along. A 👍 or 👎 is one
-   more way to say it where a platform has reactions; nobody rates every reply. Your lessons outweigh Luna's.
+   more way to say it where a platform has reactions; nobody rates every reply. Strangers teach nothing.
 5. **She learns from your mood.** Catching it is a moment, her mood moving toward yours, more the closer you are. Learning
-   from it is lasting, a lesson for the local model. How far she mirrors is for whoever deploys her to decide.
+   from it is lasting, a lesson for her gut. How far she mirrors is for whoever deploys her to decide.
 6. **The test is the transplant.** Remove her memory, replace her model, and from personality alone you should get a very
-   similar companion. The same messages go to the original and the transplant, and you judge.
+   similar student. The same messages go to the original and the transplant, and you judge.
 
-Built: memory, Luna and the local model learning from it, voice clips marked with 👍 / 👎. The rest of 2 to 6 is planned.
-Measured 2026-10-30: the local model as it stands (hashed words) barely beats the commonest answer and cannot hold a
-taught reaction, so it needs replacing before it can replace Luna.
+Built: memory (the surface, deep memory, her look and search), her gut and its sides, voice clips marked with 👍 / 👎. The
+rest of 2 to 6 is planned.
 
 ## Interfaces and products
 
@@ -126,7 +124,7 @@ taught reaction, so it needs replacing before it can replace Luna.
 
 ## Declared dependencies
 
-**Decided (Q1 to Q4 of the review). Status: built** (contracts 1.10); the details are in the module guide,
+**Status: built**; the details are in the module guide,
 [EXTENSIONS.md](core/EXTENSIONS.md#dependencies).
 
 - Every module declares, in its `Extension(...)`, the modules it `requires` (it is not loaded without them) and
@@ -138,31 +136,13 @@ taught reaction, so it needs replacing before it can replace Luna.
 - A default a module suggests that names a missing `uses` is set aside with a warning. core.yml's own lines naming
   something missing stay fatal: the owner wrote them.
 
-The chain today: `students` requires `package:mneme-llm>=0.2`; `whale_chan` requires `students` and `momochat`;
+The chain today: `students` requires `package:mneme-llm>=0.4.0`; `whale_chan` requires `students` and `momochat`;
 `webui` uses `momochat` and `students`; `chimera` uses `students`; `wechat` uses `momochat`.
-
-## Former names
-
-**Status: built** (contracts 1.11, [EXTENSIONS.md](core/EXTENSIONS.md#former-names)). A rename keeps what was under
-the old name: `EngineSpec.formerly` (assignments naming the old engine reach it, its open runs carry on) and
-`Extension.formerly` (a module takes over the data folder, settings, stores and facts of a name it had, or of a
-module it took in; declarations naming the old name are given it). `Persona.formerly` did this for students since
-1.9.
 
 ## The minimum core
 
-**Status: built** (contracts 1.10). The core starts with no module at all. With one interface, the typed `$` commands
+**Status: built.** The core starts with no module at all. With one interface, the typed `$` commands
 work (they never reach an engine): `$help`, `$runs`, `$approve`, `$deny`, `$cancel`, `$model`, `$memory`, `$tools`,
-`$setup`, `$admin restart`, and `$call core.*`. The core's own default assignments (`*` and `routine:*`: MomoChat
-with the core's `assistant` agent) apply only while their engine is loaded. A plain message with no engine gets one
-line in the owner's direct chat, and silence elsewhere.
-
-## Names
-
-| Old | New | Status |
-| --- | --- | --- |
-| engines `assistant`, `chat`, `room`; modules `assistant`, `room` | engine and module `momochat` | **Built.** The old names are its former names: a core.yml line saying `engine: room` keeps working, with a warning |
-| module and engine `workbench`; interface `workbench` | module and engine `chimera`; interface `classroom` | **Built.** Its data folder moves on the first start; the board keeps its file (`workbench.db`); its tasks are readdressed |
-| module `companion` | part of `students` (`memory.py`) | **Built.** Its data folder, settings and facts are the students module's (`students.alias`, `students.bond`, ...) |
-| core.yml `personas:` | core.yml `agents:` | **Built.** `personas:` is still read, merged under `agents:`; an agent may give her `models:` in the same entry |
-| "the Classroom" | stays the page's name | |
+`$setup`, `$admin restart`, and `$call core.*`. What answers where nothing else is assigned (`*` and `routine:*`: the
+core's `assistant` agent) is MomoChat's to suggest. A plain message with no engine gets one line in the owner's direct
+chat, and silence elsewhere.

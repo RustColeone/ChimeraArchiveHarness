@@ -1,16 +1,18 @@
-"""A student's memory: what she keeps of each person, in mneme-llm (one file per student). It was the companion module
-until 2026-10-27; a student is an agent with this memory, so it is part of what the students module adds.
+"""A student's memory: what she keeps of each person, in mneme-llm (one file per student). A student is an agent with this
+memory, so it is part of what the students module adds.
 
 Every engine that places prompt parts (MomoChat) tells her, each turn, who the person is to her, what they call her,
-her notes for the message, what was said before that bears on it (word for word: her first look, with mneme-llm 0.3),
-her mood's news and how her classmates seem today. After each of her messages a watcher lets her learn from it: the exchange kept word for word,
-how it left her feeling, what is worth remembering, and a day of contact for her closeness with the person. Two
-tools let her search everything said before with the person, and read an exchange with its neighbours, when the
-first look does not have it. What was said in a group chat, every student there heard: the exchange and the notes
-one keeps of it go into each classmate's file too; a direct chat stays between the two. A person with several accounts (`people:`, or linked with `$link`) is one person to every
-student. Pages see where she stands with you as facts (bond, alias, mood, plans, what she calls you, your accounts).
-`$alias` names a student your way, `$callme` says what the students call you, `$link` joins another account of yours,
-`$bond` shows where each stands with you. Agents (personas that are not students) keep nothing.
+her notes for the message, what was said before that bears on it (word for word: her look), her mood's news and how
+her classmates seem today; and in a chat with her alone it reads what she keeps of the person (her surface) in place of
+its own window. After each of her messages a watcher lets her learn from it: the exchange kept word for word, how it
+left her feeling, what is worth remembering, and a day of contact for her closeness with the person. Two tools let her
+search everything said before with the person, and read an exchange with its neighbours, when her look does not have
+it. What was said in a group chat, every student there heard: the exchange and the notes one keeps of it go into each
+classmate's file too; a direct chat stays between the two. A person with several accounts (`people:`, or linked with
+`$link`) is one person to every student. Pages see where she stands with you as facts (bond, alias, mood, plans, what
+she calls you, your accounts). `$alias` names a student your way, `$callme` says what the students call you, `$link`
+joins another account of yours, `$bond` shows where each stands with you, `$first` the first prompt she keeps of you,
+and `$new` starts over deeper than `/new`. Agents (personas that are not students) keep nothing.
 """
 
 from __future__ import annotations
@@ -76,8 +78,8 @@ class Settings:
         self.language = str(config.get("language") or "")
         self.call_owner = str(config.get("call_owner") or "")  # what her memory calls the owner (else their name)
         self.memory_language = str(config.get("memory_language") or "") or None  # notes also glossed in it
-        # What was said, word for word: each exchange kept (`episodes`), a first look of `said` characters of it for
-        # each message (0: none), found by meaning as well as words with `embed` (OpenAI embeddings, OPENAI_API_KEY), and
+        # What was said, word for word: each exchange kept (`episodes`), a look of `said` characters of it for each
+        # message (0: none), found by meaning as well as words with `embed` (OpenAI embeddings, OPENAI_API_KEY), and
         # `search`: a search comes with it, and her tools to look through the rest.
         self.episodes = flag(config.get("episodes"), True)
         self.said = number(config.get("said"), 6000, 0, 50_000)
@@ -420,7 +422,7 @@ def share(book: Book, settings: Settings, exchange, subject: str, notes, facts) 
 def make_part(book: Book, settings: Settings, guts: Guts | None = None):
     async def text(context) -> str:
         """Who the person is to her, what they call her, her notes for this message, what was said before that bears
-        on it (her first look), her mood's news (until she has replied) and how her classmates seem today; nothing
+        on it (her look), her mood's news (until she has replied) and how her classmates seem today; nothing
         for a routine run, or a person she has nothing on."""
         persona, trigger = context.persona, context.trigger
         if trigger.origin != "person" or not book.keeps(persona.name) or not conversation(context.engine, settings):

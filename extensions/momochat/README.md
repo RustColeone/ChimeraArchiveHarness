@@ -1,21 +1,15 @@
 # `momochat`: the conversation harness
 
-MomoChat is the general assistant: conversations, direct chats and group chats, tools and commands. Talking with a
-student here is the companion experience (she has her memory of you wherever she speaks); talking with an agent is a
-plain assistant. Chimera ([`extensions/chimera`](../chimera)) is the heavy-work harness: a request bigger than a
+MomoChat is the general assistant: conversations, direct chats and group chats, tools and commands. A student here
+has her memory of you wherever she speaks; an agent is a plain assistant. Chimera ([`extensions/chimera`](../chimera)) is the heavy-work harness: a request bigger than a
 conversation goes there (`chimera.invite`). See [docs/DESIGN.md](../../docs/DESIGN.md) for how the two divide the work.
-
-Until 2026-10-27 this was three engines: the assistant (one persona, tools, questions), the room (group chats) and
-Whale-chan's chat engine (a personal AI chat client). Their names, `assistant`, `room` and `chat`, are this engine's
-former names, and the assistant's and the room's module names this module's, so nothing written for them needs
-changing ([Former names](#former-names), below).
 
 ## What it adds
 
 | Kind | Name | Details |
 | --- | --- | --- |
-| Engine | `momochat` | Persona mode `many` (one or several). Formerly `assistant`, `chat`, `room` |
-| Declares | `formerly=("assistant", "room")` | Their settings and stores are this module's (contracts 1.11) |
+| Engine | `momochat` | Persona mode `many` (one or several) |
+| Default assignments | `*`, `routine:*` | The core's own agent, `assistant`, wherever nothing else is assigned; core.yml wins |
 | Settings | `max_steps`, `history_limit`, `effort`, `style`, `chime_in`, `compact`, `tool_calls` | Offered by `python -m core setup`; the rest are in [`config.example.yml`](config.example.yml) |
 
 It adds no interfaces, personas, profiles or capabilities. The core's default assignments (`*`, `routine:*`) give it
@@ -67,10 +61,11 @@ conversation's rolling summary (rewritten by one `compact_profile` call once `co
 out; `core.search_history` finds their words), with `$commands` and their answers left out. A module may keep the
 conversation for her instead (a `context` prompt part: a student's surface, with one person): then she reads what it
 gives, and of the thread only what came after it, and the module compacts it. Then the turn's context:
-the time, her turn parts (a student's memory of the person, from the students module: her notes and her first look
-at what was said before), other requests in progress, what was said in this run before her, and why she speaks if
+the time, her turn parts (a student's memory of the person, from the students module: her notes and her look at what
+was said before), other requests in progress, what was said in this run before her, and why she speaks if
 nobody asked her. Then the message and her turn so far. Her prompt parts are rendered once at the start of her turn
-(`session.aprompt`, contracts 1.14: a part may look something up), and kept for its every step. The tools she is
+(`session.aprompt`: a part may look something up), and kept for its every step; what a module keeps of the conversation
+is read once for a run (`session.context`), and the conversation once a step. The tools she is
 offered are the ones for her turn (`tools.list(persona)`), and her calls say it is hers (a student's search through
 her memory).
 Images attached to the run's messages, sent shortly before (`history_image_minutes`, 30) or found by tools are shown
@@ -83,7 +78,8 @@ the answer posted. `full`: a personal AI chat client: the same, with complete an
 
 **Threads.** `/new` (or `/reset`, `/clear`) starts a fresh thread in that conversation (`new_chat_text` answers):
 earlier messages stay in history but are no longer read, and the summary of before is set aside. `/new <student>` does
-it for her alone. Going deeper is for the creator: `$new deep` and `$new gut`, from the students module.
+it for her alone, and `/new` with any other word is a message. The core keeps when each thread began
+(`session.start_over`, `session.thread_since`). Going deeper is for the creator: `$new`, from the students module.
 
 **Her own impulse.** A request an interface marks `extra.speak_up` (Whale-chan's bot speaking up; its text starts
 `⟨speak-up⟩ `, which history shows as her own impulse) is her own wish to message someone: one step from the motive,
@@ -136,22 +132,6 @@ assignments:
 ```
 
 A busy group chat makes many model calls: give its assignment a larger `budget`.
-
-## Former names
-
-| Was | Is now |
-| --- | --- |
-| engine `assistant` (one persona), module `assistant` | `momochat` with one persona, `style: brief` |
-| engine `room` (group chats on a work board), module `room` | `momochat` with several personas. The work board's `jobs` are hand-offs now (`ask_classmate`), one at a time; `work_note` is gone |
-| engine `chat` (Whale-chan's plugin) | `momochat` with `style: chat`, her old settings as her assignment's options |
-| `diary` (in all three) | nothing: a student's memory is the students module's |
-
-core.yml lines saying `engine: room` (or `assistant`, `chat`) reach MomoChat, and the audit log says
-`engine_renamed_in_config` until you rename them; runtime assignments are rewritten; open runs of the old engines
-carry on here (`engine_runs_moved`). A run another engine saved is answered afresh, from its message. The room's and
-the assistant's `config.yml` (`extensions/room/config.yml`, `extensions/assistant/config.yml`) and `extension_config`
-are read as this module's (`module_settings_moved` until you move them); the room's `providers:` and `profiles:`
-belong to the students module (`settings_moved`).
 
 ## How it works
 

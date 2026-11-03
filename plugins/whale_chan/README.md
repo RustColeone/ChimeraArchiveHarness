@@ -8,11 +8,7 @@ the [students module's](../../extensions/students/README.md), the same wherever 
 itself is [MomoChat's](../../extensions/momochat/README.md): the bot is a frontend of it, and the module brings an
 interface, her voice and the defaults that make it work as soon as it is dropped in. The user-level description
 and the four setup steps are in [plugins/README.md](../README.md) (section "The example: `whale_chan`"); this page is
-the developer companion. Study it as the project's complete plugin.
-
-Until 2026-10-27 the module had an engine of its own, `chat`. That engine is MomoChat now, in its `full` style:
-`chat` is MomoChat's former name, so a core.yml that still says `engine: chat` reaches it, and her old engine
-settings here are her chats' MomoChat options.
+the developer guide. Study it as the project's complete plugin.
 
 ## What it adds
 
@@ -24,16 +20,14 @@ settings here are her chats' MomoChat options.
 | Permissions | `whale_chan:*` | `tiers: {write: always-ask, critical: always-ask}` |
 | Setting | `token` | `secret`, env `DISCORD_BOT_TOKEN_WHALE_CHAN`, checked by logging in to Discord |
 | Setting | `persona` | `text`, default `deepseek`: the student her bot speaks as |
-| Declares | `requires=("students", "momochat")` | Her bot is a student's, on MomoChat: without either the core leaves this module out and says why (contracts 1.10) |
+| Declares | `requires=("students", "momochat")` | Her bot is a student's, on MomoChat: without either the core leaves this module out and says why |
 | Capability | `whale_chan.speak` | `prepare`: a short text spoken aloud as a voice message ([`voice.py`](voice.py)), for her model to call ("say goodnight to me"); off with `voice: {enabled: false}` |
 
 She is nothing of her own here: no engine, no persona, no model profile, no memory. Her prompt (`whale.md`,
 `prompt.md` and the shared parts), her display name, the alias 鲸酱 and her models are in
-`extensions/students/deepseek/`; the persona was called `whale_chan` before (and the live site's DM persona
-`whale`), and both names are her `formerly`, so a core.yml that still says `whale_chan` reaches her, and what was
-kept under it is hers. Her memory and mood are the students module's, as every student's are: one mneme-llm file,
-`deepseek.db`, whether you talk with her here, in a Discord DM of the main bot or in a group chat; with
-`platforms: {whale_chan: discord}` in the students' settings, one Discord user is one person on both bots. The
+`extensions/students/deepseek/`. Her memory and mood are the students module's, as every student's are: one mneme-llm file,
+`deepseek.db`, whether you talk with her here, in a Discord DM of the main bot or in a group chat; the module declares
+`platforms={"whale_chan": "discord"}`, so one Discord user is one person on both bots. The
 assignment, admission and permissions are suggestions: core.yml and runtime edits win, setting by setting. Without
 a token only her voice capability loads (the log says `no_token`).
 
@@ -140,8 +134,6 @@ modules:
 | [`speakup.py`](speakup.py) | Speaking up: the dice rules, motives and the ledger of who spoke when |
 | [`voice.py`](voice.py) | `whale_chan.speak` and the OpenAI speech backend, which the bot also uses for her answers |
 | [`voice_piper.py`](voice_piper.py) | Optional local Piper backend, loaded only with `voice: {backend: piper}` |
-| [`slash.py`](slash.py) | Translating the core's `Command` catalog to Discord application commands and back; pending interactions |
-| [`math_render.py`](math_render.py) | Inline math to Unicode, display math to PNG with Matplotlib |
 | [`config.example.yml`](config.example.yml) | Documented settings to copy |
 | `.gitignore` | Keeps `config.yml` out of git when the folder is its own repository |
 
@@ -256,7 +248,7 @@ and her own folder.
   ([docs/DESIGN.md](../../docs/DESIGN.md)).
 * **An interface that only translates**: platform facts in `Request` ([`bot.py`](bot.py)),
   owners from the platform ([`bot.py`](bot.py)), readiness ([`bot.py`](bot.py)), the
-  command catalog as native commands ([`bot.py`](bot.py), [`slash.py`](slash.py)) and
+  command catalog as native commands ([`bot.py`](bot.py), `contracts.discord_bot.slash`) and
   transport state in the bottle.
 * **Keep blocking work off the event loop**: math is rendered with `asyncio.to_thread`
   ([`bot.py`](bot.py)).

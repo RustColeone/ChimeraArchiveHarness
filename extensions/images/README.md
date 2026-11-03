@@ -67,11 +67,11 @@ capability and the setting; [`config.example.yml`](config.example.yml) documents
    inline image parts become files and text parts the note.
 4. `_write` saves each image with `tempfile.mkstemp` in `tool.workspace` (`openai-*.png`,
    `gemini-*.png`, …). The result carries them as `FileRef`s with a MIME type from the suffix, and
-   `data={"provider", "model"}`; there are no `sources`.
+   `data={"provider", "model"}`.
 
 Clients are created on first use per provider and cached (`_client`). A missing key raises
 `LookupError`, which becomes `not_configured`; any other exception becomes `generation_failed` with
-`retryable=True` and the exception's type and message, cut to 800 characters. There is no fallback
+the exception's type and message, cut to 800 characters. There is no fallback
 between providers: if the one asked for (or the default) is not configured or fails, the call fails.
 
 Safety: it creates local files only, hence `prepare`; the services receive the prompt and any

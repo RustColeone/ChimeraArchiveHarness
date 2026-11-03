@@ -121,7 +121,7 @@ quietly). The kinds:
 The first backend that finds something answers (`backend` in the data). The ones before it that failed
 or found nothing are listed in `skipped`, and the summary starts with them, for example
 `(Searched with DeepSeek; Google: 429 Too Many Requests)`, so a switch is never silent. If every
-backend fails, the result is `unavailable` with `retryable=True`, and the summary names each one's
+backend fails, the result is `unavailable`, and the summary names each one's
 error ("SearXNG: refused; DuckDuckGo: ratelimited").
 
 **Adding a search API** is one method on `Searcher`, `_<kind>(query, limit, settings)`, plus its name in
@@ -137,7 +137,7 @@ not followed by `requests`; each `Location` is validated the same way, up to 3 h
 streamed and stopped at the size limit. HTML goes through the standard library's `HTMLParser`, which
 drops `script`, `style`, `noscript`, `svg` and `template` and collects the title and absolute
 `http(s)` links. PDFs go through `pypdf`, page by page until the character limit. A `PageUnavailable`
-fails as `unavailable`; a network error fails as `unavailable` with `retryable=True`.
+fails as `unavailable`; a network error fails as `unavailable`.
 
 **Image search** (`images.locate_image`): DuckDuckGo images (`safesearch="moderate"`), then for each
 candidate a download through the same `validated_url` checks per hop (`images.download`), then
@@ -150,8 +150,8 @@ upload limit. The first candidate that works is sent; the summary names its titl
 
 **Wolfram|Alpha** (`wolfram.query`): `GET https://api.wolframalpha.com/v2/query` with
 `format=plaintext&output=json`, keeping the first subpod's text of each pod. HTTP 401/403, or an error
-message mentioning the AppID, raise `WolframRejected` (`not_configured`, not retryable); a query it
-cannot interpret fails as `not_understood`; anything else is `unavailable` and retryable.
+message mentioning the AppID, raise `WolframRejected` (`not_configured`); a query it
+cannot interpret fails as `not_understood`; anything else is `unavailable`.
 
 Results:
 
@@ -214,7 +214,7 @@ venv/bin/python -m unittest tests.test_core_web tests.test_core_web_extras
 
 * **A fallback chain that reports every failure**, and why it switched: try each backend, collect `"<name>: <error>"`, raise
   one exception with all of them (`extension.py:128-148`), and turn it into
-  `ToolResult.fail(..., "unavailable", retryable=True)` at the edge (`extension.py:162-164`).
+  `ToolResult.fail(..., "unavailable")` at the edge (`extension.py:162-164`).
 * **Optional services that degrade.** A missing key skips a backend (search) or fails clearly with
   `not_configured` (maps, Wolfram) instead of raising (`extension.py:212-213`, `extension.py:231`).
 * **Lazy, cached clients** created on first use, so the module loads without the key or package
@@ -227,8 +227,7 @@ venv/bin/python -m unittest tests.test_core_web tests.test_core_web_extras
 * **Keep secrets out of messages** by replacing them before raising (`wolfram.py:45-55`), and declare
   them as `secret` settings (`extension.py:272-273`).
 * **Distinct error codes** (`unavailable`, `not_configured`, `not_understood`, `no_result`,
-  `invalid_arguments`) so an engine can tell the person what to fix, and `retryable=True` only for
-  transient failures.
+  `invalid_arguments`) so an engine can tell the person what to fix.
 
 Pitfalls:
 

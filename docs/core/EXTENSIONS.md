@@ -21,8 +21,8 @@ build:
 | [`basic`](../../extensions/basic/README.md), [`system`](../../extensions/system/README.md), [`reminders`](../../extensions/reminders/README.md) | Capabilities | The smallest capabilities: declaring one, risk tiers, a `$command`, a store, scheduling |
 | [`images`](../../extensions/images/README.md), [`web`](../../extensions/web/README.md), [`media`](../../extensions/media/README.md) | Capabilities | Outside services with keys, fallbacks, files and sources in results, long work with progress |
 | [`host`](../../extensions/host/README.md), [`terminal`](../../extensions/terminal/README.md) | Capabilities (terminal also an engine) | Sensitive actions: owner-only, private data, secret paths, approvals and confirmations |
-| [`momochat`](../../extensions/momochat/README.md) | Engine | The reference engine: one turn loop for every speaker (tools as function calls or JSON, questions, approvals, resuming after a restart), group chats, hand-offs, a rolling summary, former names |
-| [`students`](../../extensions/students/README.md) | Agents, prompt part, watcher, capabilities | Characters as data (one folder each, prompts in plain files, pictures, other names, tiers, a rename that keeps her data), shipping model profiles and a provider, and their memory without importing any engine: a computed `turn` part, a watcher that learns from every conversation engine, facts the pages show, typed-only commands, a required package, a module taken in (`formerly`) |
+| [`momochat`](../../extensions/momochat/README.md) | Engine | The reference engine: one turn loop for every speaker (tools as function calls or JSON, questions, approvals, resuming after a restart), group chats, hand-offs, a rolling summary |
+| [`students`](../../extensions/students/README.md) | Agents, prompt part, watcher, capabilities | Characters as data (one folder each, prompts in plain files, pictures, other names, tiers), shipping model profiles and a provider, and their memory without importing any engine: a computed `turn` part, a watcher that learns from every conversation engine, facts the pages show, typed-only commands, a required package |
 | [`chimera`](../../extensions/chimera/README.md) | Engine, capabilities, interface | A durable engine written as plain sequential code (replay with a journal), approvals as workflow steps, an engine and its page sharing a store, seats built from other modules' agents (`context.personas()`), and running a module on its own |
 | [`cli`](../../extensions/cli/README.md) | Interface | The smallest interface |
 | [`discord`](../../extensions/discord/README.md) | Interface | A full platform interface: commands, buttons, files, approvals |
@@ -90,7 +90,7 @@ routine output routed to a conversation) is only delivered to admitted conversat
 assignments:
   "*":
     engine: momochat
-    personas: [assistant]          # or persona: assistant (the core's own agent)
+    personas: [assistant]          # the core's own agent
     budget: {model_calls: 24, tool_calls: 24, seconds: 900}
     trusted: false                 # routines only: may use owner-only capabilities
     lane: conversation             # or sender
@@ -129,8 +129,7 @@ here; runtime assignments saved with them keep their `allow`/`deny` as that patt
 ### Agents, students and model profiles
 
 An **agent** is a persona (`contracts.Persona`: who speaks, her prompt, names and pictures) with her model profile.
-That is all an agent is: she keeps no memory of anyone. core.yml defines its own under `agents:` (`personas:` before
-2026-10-27, still read and merged under it), and any module may add some in `Contributions.personas`; a configured
+That is all an agent is: she keeps no memory of anyone. core.yml defines its own under `agents:`, and any module may add some in `Contributions.personas`; a configured
 agent of the same name wins. A **student** is a special agent the students module defines
 ([`extensions/students`](../../extensions/students)): she always has her memory of each person (her mneme-llm file),
 whichever engine she speaks in, so that module requires mneme-llm. Engines take either by name.
@@ -163,11 +162,7 @@ the next candidate; each retry is `provider_retry` in the audit log. Refusals su
 `inline_history: true` (on for DeepSeek) sends a JSON request's earlier turns written into one message,
 because DeepSeek's JSON mode often answers blank after an assistant turn; a blank JSON-mode answer is
 asked once more. `schema_mode` says how an OpenAI-compatible provider is held to the requested JSON: `native`
-(a `json_schema` response format), `json_object` (JSON mode, the schema written into the prompt) or
-`strict_tool` (the answer as the arguments of one strict tool call: every property required, an object without
-properties sent as a JSON string and decoded back, limits checked only here; DeepSeek offers it on
-`base_url: "https://api.deepseek.com/beta"`, and its thinking mode needs `tool_choice: auto`, so a reply that
-comes as text is read as text). A request with `tools` (`ToolSpec`s) gets the model's own function calls instead of JSON:
+(a `json_schema` response format) or `json_object` (JSON mode, the schema written into the prompt). A request with `tools` (`ToolSpec`s) gets the model's own function calls instead of JSON:
 `ModelResult.tool_calls`, each checked against its tool's `parameters` (a call to an unknown tool, or with
 arguments that do not match, is invalid output, like JSON that does not match), and `replay`, which goes back as it is on
 that answer's assistant message in later requests (`tool_calls` and `replay` on assistant messages, `tool`
@@ -182,22 +177,13 @@ a later candidate answer in its place, so the engine can ask that step in its JS
 no provider for its own sake and does not count against the run's `model_calls`. An extension may ship default
 personas in `Contributions.personas`; a configured persona with the same name wins.
 
-A persona may also carry (contracts 1.9):
+A persona may also carry:
 
 * `aliases`: other names people call her by. A group chat counts "Luna, …" as calling GPT, and the students'
   `$alias luna Lulu` finds her by it.
-* `formerly`: persona names she had before. On every start, a former name no persona has now is read as hers:
-  core.yml's assignments and `personas: <old name>: parts:` apply to her (the audit says
-  `persona_renamed_in_config`; rename them there when convenient), and what the core keeps under the old name
-  moves to hers once (`persona_data_moved`, with counts): her memory, every module's stores scoped by her, her lines
-  in the log, `$model` choices, runtime assignments, facts, the runs she is in, and her name on what she said. What she
-  already has under the new name wins. A module that keeps its own data by persona name (the web UI's chats, say)
-  does the same from `InterfacePort.personas()`. Let open runs finish before renaming someone.
 * `pictures`: kind → image file (`avatar`, square; `card`, 3:4; any kind a page knows). Interfaces get them, as
   absolute paths, from `InterfacePort.personas()` and serve them themselves; a picture dropped in an interface's
   own folder may override one.
-
-And since contracts 1.11:
 
 * `description`: one line on who she is ("GPT, the white-haired dragon girl and calm, dependable student-council
   president"), for engines that write their own prompts around her instead of placing `prompt` (Chimera's work
@@ -207,21 +193,21 @@ And since contracts 1.11:
   `persona.tier("strong")` is that profile, else her `own`, else `profile`. Chimera seats a student on her `own`
   tier for cheap work and her `strong` tier for strong work.
 
-And since contracts 1.15, `effort`: how hard she thinks in a conversation (`none`: no thinking phase, she answers at
-once; empty: the engine's setting; a session's own `effort` comes first). Since contracts 1.13, `allowance`: her own
-default daily allowance in dollars (0: no daily limit; None: the
+* `effort`: how hard she thinks in a conversation (`none`: no thinking phase, she answers at once; empty: the engine's
+  setting; a session's own `effort` comes first).
+* `allowance`: her own default daily allowance in dollars (0: no daily limit; None: the
 core's $0.50), a student's `allowance:` in her student.yml or an agent's in core.yml. The owner's settings come
 first (core.yml `stamina:`, `$stamina`, the pages). The students' are 10 × Artificial Analysis's cost per task of
 their strongest model at medium effort, as listed on 2026-10-28.
 
-A module sees the agents loaded before it with `context.personas()` (contracts 1.11): the core's and those of every
+A module sees the agents loaded before it with `context.personas()`: the core's and those of every
 module set up earlier (every module it requires or uses that is there), as `InterfacePort.personas()` describes them,
 plus each one's `module`, `description`, `profile`, `profiles` and `models` (`default` and each tier → the
 candidates, core.yml's profiles winning). Chimera builds its seats from it. Called after setup, it lists every agent.
 
 ### Prices and stamina
 
-Since contracts 1.12 the core prices every model answer: `ModelResult.price` (dollars per million input and output
+The core prices every model answer: `ModelResult.price` (dollars per million input and output
 tokens, and cache hits where listed, with where the figure came from) and `ModelResult.cost` (this answer's dollars,
 cache hits at their price), None when no price is known (never a guess). The prices are core.yml's `prices:` over
 Artificial Analysis's free list (core/providers/prices.py); a module reads them with `context.prices`
@@ -253,7 +239,7 @@ place for it. Each persona has its own, set in core.yml or by its module; changi
 or of the part's file, not a command.
 
 ```yaml
-agents:                           # (`personas:` before 2026-10-27, still read)
+agents:
   assistant:                      # the built-in agent: its prompt stays, the parts are added
     parts:
       - {name: personality, file: personas/assistant.md}       # relative to core.yml's folder
@@ -284,21 +270,23 @@ agents:                           # (`personas:` before 2026-10-27, still read)
 A module gives its own personas parts (`Persona(..., parts=(...))`), and may add parts for others with
 `Contributions.prompt_parts`: `PromptPart(name, text, place="stable", order=100, personas=())`, for every
 persona, or for those in `personas`. Two modules may not add parts of the same name (the second fails to
-load). A part's `text` may be a function of a `PartContext` (`persona`, `address`, `trigger`, `owner`, since 1.16 `models`
-and `history`, for a part that asks her model before she answers, counted in the run's usage but not its budget, since 1.9
-`engine`, the engine placing it, and since 1.17 `since`, when the thread began, as the engine told `session.aprompt`), called each time the part is used, so it should be quick. Since contracts 1.14 it
-may be async, for a part that looks something up (the students' memory waits on an embedding): `session.aprompt`
-awaits each in turn, for at most 8 seconds (one that takes longer is left out and audited), and
-`session.prompt` leaves it out. A persona's own part shadows a module's part
+load). A part's `text` may be a function of a `PartContext` (`persona`, `address`, `trigger`, `owner`, `models` and
+`history`, for a part that asks her model before she answers, counted in the run's usage but not its budget, `engine`,
+the engine placing it, `since`, when the thread began, and `personas`, all who take part), called each time the part is
+used, so it should be quick. It may be async, for a part that looks something up (the students' memory waits on an
+embedding): `session.aprompt` awaits each in turn, for at most 8 seconds (one that takes longer is left out and audited).
+A part at the place `context` is a function that answers at once with a `Context` (`messages`, `upto`), or None: an
+engine reads it with `session.context(persona)`, once a turn, in place of its own window and summary, and of its thread
+only what came after `upto`. So a module that keeps a conversation (a student's surface) decides how much of it she
+reads, and compacts it. A persona's own part shadows a module's part
 of the same name. A part that raises or returns something other than text is left out and audited
 (`prompt_part_problem`, with the module that added it), once until it renders again; it never fails the run.
-Engines get the rendered parts with `session.prompt(persona, place)`, or `await session.aprompt(persona, place)`
-to have the async ones too; MomoChat renders both places once at the start of each turn (whatever its steps) and
-places them as above. An engine that never calls either ignores parts.
+Engines get the rendered parts with `await session.aprompt(persona, place)`; MomoChat renders both places once at the
+start of each turn (whatever its steps) and places them as above. An engine that never calls it ignores parts.
 
 ### Watchers
 
-A module that learns from what is said (memory, mood, closeness: the students' memory) adds watchers (contracts 1.9):
+A module that learns from what is said (memory, mood, closeness: the students' memory) adds watchers:
 
 ```python
 from contracts import Contributions, Watcher
@@ -338,11 +326,11 @@ def setup(context):
 ### Facts
 
 A fact is a small public value a module publishes about a persona, or about a persona and one person: her mood
-or level, a person's bond with her, the name they call her (contracts 1.9). Pages show them; nothing else reads
+or level, a person's bond with her, the name they call her. Pages show them; nothing else reads
 them, so a fact is never a module's private state (that goes in its stores).
 
 * A module writes with `context.facts` (from `setup`, kept for later) or a watcher's `context.facts`:
-  `facts.set(persona, key, value, person=None)`, `facts.get(...)`, `facts.delete(...)`; `set(..., None)` deletes.
+  `facts.set(persona, key, value, person=None)`; `set(..., None)` deletes.
   A key is lowercase letters, digits and `_`; a value is JSON, at most 4 KB once encoded. `person` is
   `(interface, sender id)`, as `Exchange.person` gives it. A module writes only its own keys.
 * An interface reads with `port.facts(persona, sender_id=None)`: `{"<module>.<key>": value}` for the persona,
@@ -412,8 +400,8 @@ from contracts import Contributions, Extension, Persona
 
 def setup(context) -> Contributions:
     # context.name, context.config (local config.yml, overridden by core.yml), context.data_dir (private dir),
-    # context.facts (what it publishes for pages, contracts 1.9), context.present (which modules it uses are
-    # loaded, contracts 1.10), context.log(event, **fields)
+    # context.facts (what it publishes for pages), context.present (which modules it uses are loaded),
+    # context.platforms (which interfaces reach another platform's people), context.log(event, **fields)
     return Contributions(interfaces=[...], engines=[...], capabilities=[...],
                          personas=[Persona("whale", "本鲸", "…", profile="default")],
                          prompt_parts=[...], watchers=[...])
@@ -425,7 +413,13 @@ EXTENSION = Extension("my_extension", setup, description="...",
 * `name`: lowercase letters, digits and `_`; unique across loaded extensions.
 * `setup` may be `async`. It runs once at startup; start network loops in `Interface.start`, not here.
   Objects created in `setup` may be shared by your interface, engines and capabilities.
-* `contracts="1"` is the contracts major version you target; a mismatch refuses to load.
+* `Contributions.secrets`: file patterns in the module's data folder that models may never read (keys it keeps there).
+* `Extension.platforms`: its interfaces that reach another platform's people (`{"whale_chan": "discord"}`), read before
+  any module is set up and told to every module as `context.platforms`, so one that keeps people apart by platform names
+  no plugin.
+* What every module may share is in `contracts`: `flag`, `number`, `local_time`, `fact`, `place_key`, `split_text`,
+  `chinese`, `is_command`, `impulse` (`contracts/shared.py`), and `contracts.discord_bot` for a Discord bot. No module
+  imports another.
 * **Loading:** every folder with an `extension.py` in `extensions/` (built-in) and `plugins/`
   (external) loads at startup, built-in ones first; drop a folder into `plugins/` and restart. Folders
   in `plugins/` and every `config.yml` are git-ignored (except the tracked `whale_chan` example and
@@ -483,7 +477,7 @@ was left out (see below), though the core itself would run.
 
 ### Dependencies
 
-Since contracts 1.10 every module declares, in its `Extension(...)`, the other modules it builds on, by module name
+Every module declares, in its `Extension(...)`, the other modules it builds on, by module name
 (the `name` in their `EXTENSION`):
 
 | Field | Meaning | Without it |
@@ -518,17 +512,6 @@ EXTENSION = Extension("students", setup, requires=("package:mneme-llm>=0.2",))  
   interface, and a plain message in the owner's own direct chat gets one line saying nothing answers there.
 
 The architecture page shows each module's declarations beside its description.
-
-### Former names
-
-Renaming an engine or a module keeps what was under the old name (contracts 1.11):
-
-| Field | What the core does |
-| --- | --- |
-| `EngineSpec(..., formerly=("room", "assistant"))` | An assignment naming an old name (in core.yml, set at run time, or a module's default) is read as the engine (`engine_renamed_in_config` for core.yml's, until you rename them there; runtime ones are rewritten), and its open runs carry on in it (`engine_runs_moved`), given the state the old engine saved: an engine that cannot read it should end the run quietly. |
-| `Extension(..., formerly=("companion",))` | Its data folder under an old name becomes its own when it has none yet (`module_data_moved`; with data in both, the old one is left and `module_data_kept` says so). Settings written for an old name, `config.yml` in a folder of that name beside its own and `extension_config.<old>` in core.yml, are read under its own, which win (`module_settings_moved` until you move them). Its stores and facts move to it (`module_renamed`). A module declaring an old name in `requires` or `uses` is given this one, and its `context.present` names it as it was declared. |
-
-A module may take in another one this way, as the students module took in the companion.
 
 ## Interfaces
 
@@ -568,12 +551,12 @@ needs) and [`extensions/discord`](../../extensions/discord/interface.py) (a full
 | `bottle` | Your private persistent store (below). |
 | `commands()` | The command catalog (`Command` declarations: built-ins, capability and operation commands) for a native command menu or your own help. Translate a menu selection into its `$` text with `command.render(values)` and submit that as the request's text. |
 | `log(event, **fields)` | Audit log entry (no message text, please). |
-| `models_ready(profile) -> bool` | (contracts 1.7) Whether some candidate of a model profile can be called (its provider has a key), so a page can show who can answer before anyone asks. Engines and capabilities have `models.ready(profile)`. |
-| `publish(link=None, status=None)` | (contracts 1.7) Tell the other interfaces where people reach you (`link`, an http(s) URL) and a small public status (a JSON object, at most 16 KB), so they can link to you and show what happens here. Each call replaces what it names. A status that describes a place follows `contracts.PLACE_STATUS`: `{"place": {"name", "icon", "note"}, "people": [{"key", "name", "avatar", "doing", "title"}], "away": [keys of people from elsewhere who are here now], "tickets": [{"key", "by", "title", "link"}]}`; any interface can then show any other place (the web UI's places bar and members panel read the Classroom this way, and the Classroom reads MomoChat). A key is the name lowercased with only its letters and digits kept, in any script ("Flash-chan" → "flashchan"); an empty key matches nobody. The status must be plain JSON (no NaN or Infinity) and a place's lists must have that shape, else `ValueError`. Kept in memory while the core runs; publish again at start. |
-| `directory()` | (contracts 1.7) What every interface has published: name → `{"link", "status", "ready"}` (copies). |
-| `approval_status(approval_id) -> str \| None` | (contracts 1.7) `pending`, `approved`, `denied` or `expired` for an approval asked in one of your conversations (None for any other). A pending one whose run is no longer open counts as expired. Ask it before offering an approval card's buttons: a card may have been decided elsewhere (typed, in another interface) or have expired with its run. |
-| `personas()` | (contracts 1.9) Every persona, in the order modules gave them: `name`, `display_name`, `aliases`, `formerly`, `pictures` (kind → absolute image path) and `ready` (some candidate of her profile can be called). A page shows the students from this rather than keeping its own list. |
-| `facts(persona, sender_id=None)` | (contracts 1.9) What modules publish about a persona, and about her and one of your people (see [Facts](#facts)). |
+| `models_ready(profile) -> bool` | Whether some candidate of a model profile can be called (its provider has a key), so a page can show who can answer before anyone asks. Engines and capabilities have `models.ready(profile)`. |
+| `publish(link=None, status=None)` | Tell the other interfaces where people reach you (`link`, an http(s) URL) and a small public status (a JSON object, at most 16 KB), so they can link to you and show what happens here. Each call replaces what it names. A status that describes a place follows `contracts.PLACE_STATUS`: `{"place": {"name", "icon", "note"}, "people": [{"key", "name", "avatar", "doing", "title"}], "away": [keys of people from elsewhere who are here now], "tickets": [{"key", "by", "title", "link"}]}`; any interface can then show any other place (the web UI's places bar and members panel read the Classroom this way, and the Classroom reads MomoChat). A key is the name lowercased with only its letters and digits kept, in any script ("Flash-chan" → "flashchan"); an empty key matches nobody. The status must be plain JSON (no NaN or Infinity) and a place's lists must have that shape, else `ValueError`. Kept in memory while the core runs; publish again at start. |
+| `directory()` | What every interface has published: name → `{"link", "status", "ready"}` (copies). |
+| `approval_status(approval_id) -> str \| None` | `pending`, `approved`, `denied` or `expired` for an approval asked in one of your conversations (None for any other). A pending one whose run is no longer open counts as expired. Ask it before offering an approval card's buttons: a card may have been decided elsewhere (typed, in another interface) or have expired with its run. |
+| `personas()` | Every persona, in the order modules gave them: `name`, `display_name`, `aliases`, `pictures` (kind → absolute image path) and `ready` (some candidate of her profile can be called). A page shows the students from this rather than keeping its own list. |
+| `facts(persona, sender_id=None)` | What modules publish about a persona, and about her and one of your people (see [Facts](#facts)). |
 
 All port methods act only on your own interface's addresses (except `directory`, which only reads); anything else
 raises `ValueError`.
@@ -718,14 +701,15 @@ Command("remind", "Set a one-time reminder here",
   `$clip -u … -s 1:05`. Without one, values are joined with spaces. The text is what reaches your
   handler in `command_argument`, whichever way the command was typed.
 * `examples`, `admin_help` (extra help for admins and the creator), `access` (`member`, `admin` or
-  `creator`: the lowest level that may run it; `owner_only` capabilities are `creator`), and
-  `message_action` (a label for running the command on an existing message where platforms support it).
+  `creator`: the lowest level that may run it), `message_action` (a label for running the command on an existing message
+  where platforms support it), and `menu=False` (left out of native command menus and the page's suggestions: it is
+  typed as `$name`, and `/name` stays a message).
 
 ### Operations
 
 `operate(operation, arguments, context)` receives the same `ToolContext` as a capability: who asked
 (`address`, `sender`), `run_id`, a `workspace` and `progress`. `operations` are platform-specific actions (login QR, account status, list chats, playing music). Each becomes
-a capability named `<interface name>.<operation>`, owner-only unless `owner_only=False`; a public
+a capability named `<interface name>.<operation>`, the creator's unless `access` says otherwise; a public
 operation must only act on the calling conversation (`context.address`); if your extension also declares a
 capability with that exact name, loading fails. `risk` and the attributes (`private`, `subject`,
 `subject_kind`, `never_auto`, `grantable`, `confirm`) work as for capabilities; `command`/`command_argument`
@@ -751,7 +735,6 @@ Capability("music.find_tracks", "Search the library by artist or title.", find_t
 | `name` | `<extension name>.<action>`; the namespace must be your extension's name. |
 | `description`, `parameters`, `required` | Offered to models; `parameters` are JSON-schema properties. Arguments are validated before your handler runs; extra properties are rejected. |
 | `risk` | The tier. `read`: observes only; may run again. `prepare`: creates local artifacts (downloads, renders); runs once per run. `write`: changes something reversible inside the bot (reminders, notes, routines); asks by default. `critical`: affects the machine, other people or permissions (shell, saving files, services, sending as the owner, policy); asks by default and is never made automatic by a tier setting or a pattern. Writes and critical actions run once per run. Declare honestly; the permissions depend on it. |
-| `owner_only` | Only owners (or trusted routines) may use it (same as `access="creator"`). |
 | `private` | Shows the owner's private data: offered only in conversations private to the owner; that run's output never follows a route elsewhere, and it asks before any critical action. |
 | `subject`, `subject_kind` | The parameter rules and grants match on (`"unit"`, `"chat"`); `subject_kind="path"` matches globs and makes the core refuse secret paths (`.env`, keys) to models. |
 | `escalate` | `escalate(arguments)` may return a higher tier for one call (never lower), e.g. `critical` for `rm`-like options. |
@@ -763,23 +746,23 @@ Capability("music.find_tracks", "Search the library by artist or title.", find_t
 | `internal` | Callable by engines but not shown to models. |
 | `command`, `command_argument` | Also available as `$command <text>`, with the text in that parameter. An owner's `$command` counts as approval of that exact call (except `confirm`, a secret in the arguments, or private data in a shared conversation, which ask to confirm). `command` is a name, or a `Command` declaration (below). |
 | `timeout_s` | Hard limit for one call (default 600). |
-| `personas` | Since 1.14: the only personas it is offered to, for a capability that is someone's own (a student's search through her memory). An engine that says whose turn it is (`tools.list(persona)`, `tools.call(..., persona=)`) leaves it out of others' turns, and a call for another persona is refused; without a persona, a run with any of them is offered it. |
+| `personas` | The only personas it is offered to, for a capability that is someone's own (a student's search through her memory). An engine that says whose turn it is (`tools.list(persona)`, `tools.call(..., persona=)`) leaves it out of others' turns, and a call for another persona is refused; without a persona, a run with any of them is offered it. |
 
-**Access levels.** `access="admin"` or `"creator"` (or `owner_only=True`) limits who may call a
+**Access levels.** `access="admin"` or `"creator"` limits who may call a
 capability at all; `context.access` (`member`, `admin`, `creator`) is the caller's effective level, so
 one capability can also behave differently by level, for example listing only the caller's own items
 for members and every conversation's items for admins. Describe the admin behaviour in the command's
 `admin_help`; `$help` shows it to admins only.
 
-The handler receives validated `arguments` and a `ToolContext`: `address`, `sender`, `origin`,
-`run_id`; `persona` (contracts 1.14: whose turn made the call, as the engine said, or the run's only persona; ""
+The handler receives validated `arguments` and a `ToolContext`: `address`, `sender`,
+`run_id`; `persona` (whose turn made the call, as the engine said, or the run's only persona; ""
 for nobody in particular: a group run whose engine did not say, a typed command, a call carried out once the
 owner approved it); `display` (what the calling conversation can show, e.g. `max_upload_mb` for fitting files);
-`history` (contracts 1.6: the calling conversation's history to read, `recent`, `search` and `summary`, as engines see
+`history` (the calling conversation's history to read, `recent`, `search` and `summary`, as engines see
 it; for capabilities that carry a conversation elsewhere or work from it, such as Chimera's `chimera.invite` to the
-Classroom; a capability cannot change it); `memory(persona)` (contracts 1.17: a persona's own store, as
-`session.memory` opens it, for a command that changes what her engine reads);
-`files` (files people attached to the run's requests; `own_files`: only those of the person who started the run, which is what anything writing them somewhere should use); `storage` (your extension's private store, shared by your capabilities, the same as `store()`; `store(conversation=, persona=, person=)` scopes it, see [Storing data](#storing-data); committed on
+Classroom; a capability cannot change it); `start_over(persona=None, everywhere=False)` (a new thread from now on: in this
+conversation, for everyone or for one persona, or hers in every conversation, for a command that changes what she reads);
+`files` (files people attached to the run's requests; `own_files`: only those of the person who started the run, which is what anything writing them somewhere should use); `store(conversation=, persona=, person=)` (your extension's private store, shared by your capabilities, scoped by any of these, see [Storing data](#storing-data); committed on
 `set`); `models` (model calls through the core, counted in the run's budget); `workspace` (a
 directory for this run's output files); `await progress(text)`; `await schedule(at, text)`
 (a one-time `reminder` notice in the calling conversation at Unix time `at`; returns its ID; raises
@@ -788,9 +771,8 @@ conversation's pending items: `id`, `at`, `text`, `sender_id`, `sender_name`) an
 `await unschedule(id)`. Interfaces render `reminder` notices; `data` has `sender_id`, `sender_name`
 and `at` (to mark late delivery).
 
-Return a `ToolResult`; do not raise for expected failures. `ToolResult.ok(summary, files=…,
-sources=…, data=…)`, `ToolResult.fail(summary, error_code, retryable=False)` (`retryable=True` only for
-transient read failures), `ToolResult.ask(question)` when you need information from the person.
+Return a `ToolResult`; do not raise for expected failures. `ToolResult.ok(summary, files=…, data=…)`,
+`ToolResult.fail(summary, error_code)`, `ToolResult.ask(question)` when you need information from the person.
 Summaries are facts for the engine; keep them short. Exceptions become `failed` results named after
 the exception type.
 
@@ -808,7 +790,7 @@ class MyEngine(Engine):
 ```
 
 A run that is cancelled raises `asyncio.CancelledError` in your `run`. When the core is only stopping (it will
-replay the run on the next start), the error carries `contracts.SHUTDOWN` in its `args` (contracts 1.7): an engine
+replay the run on the next start), the error carries `contracts.SHUTDOWN` in its `args`: an engine
 that keeps state of its own (a task board, say) should leave it as it is then, and record a cancellation only for
 any other one (`$cancel`, a conversation cancelled).
 
@@ -825,16 +807,16 @@ any other one (`$cancel`, a conversation cancelled).
 | `access` | The trigger's sender's effective level: `member`, `admin` or `creator` (see below). |
 | `personas` | Personas of this conversation. |
 | `store(conversation=, persona=, person=)` | Your module's key-value store, scoped by any combination of this conversation, one of these personas (across conversations) and the trigger's sender (across conversations); no arguments: the module's store everywhere. See [Storing data](#storing-data). |
-| `memory(name)` | Older: a persona's store shared by every module running it; prefer `store(persona=name)`. |
-| `prompt(name, place="stable")` | That persona's [prompt parts](#prompt-parts) at `stable` or `turn`, rendered in order and joined ("" when it has none). |
-| `await aprompt(name, place="stable")` | The same with async parts awaited (contracts 1.14). Render once per turn: a part may cost a lookup. |
-| `logbook` | This conversation's [log](#the-log): `write`, `recent`, `find`. `ToolContext.logbook` and `WatchContext.logbook` are the same (contracts 1.15). |
+| `thread_since(persona=None)`, `start_over(persona=None)` | When the thread began, for one persona or the run's; a new one in this conversation from the trigger on, for everyone or for one of them. The core keeps them. |
+| `await aprompt(name, place="stable")` | That persona's [prompt parts](#prompt-parts) at `stable` or `turn`, rendered in order and joined ("" when it has none), async ones awaited. Render once per turn: a part may cost a lookup. |
+| `context(name)` | What a module keeps of this conversation for her (a `Context`), if one does. Read it once a turn: it may be large. |
+| `logbook` | This conversation's [log](#the-log): `recent`. |
 | `history.recent(limit)` | This conversation's history, oldest first: every admitted request and `$command`, messages interfaces `observe`, relayed owner messages, and successfully delivered replies and files (`direction="out"`, `reply_to` = the request they answered). Non-admitted messages, notices, progress and failed or uncertain deliveries are not recorded. Items keep their attachments in `files` (request files, observed files, delivered files). Filter by `sender_id` yourself if needed. |
 | `history.search(text, limit)` | This conversation's messages containing `text` (any case), newest first, at most 100: further back than `recent` reaches (200). |
 | `history.summary()`, `history.summarize(text, upto)` | The conversation's rolling summary (`HistorySummary`: `text`, `upto`, `updated_at`), shared by every engine and persona in it. An engine compacting older history writes it (1 to 8000 characters; secrets are scrubbed and what is stored is kept within 8000) covering messages up to `upto`, a finite time (otherwise `ValueError`); people read and clear it with `$memory`. |
 | `inbox()` | Requests for this run's lane that arrived while this run was thinking; each is returned once. Messages arriving while the run waits on a capability or a file delivery start their own run instead. |
 | `activity()` | Other open runs in this conversation (`Activity`: `run_id`, `status` `working`/`running`/`waiting_input`/`waiting_approval`, `sender_id`, `sender_name`, `request`, `doing`, `since`), so an engine can say "still converting" instead of starting the same work again. |
-| `models.generate(ModelRequest)` | Model calls (default profile: the first persona's). With `output_schema`, `result.data` is parsed and validated JSON. `images` (up to 6 local JPEG/PNG/GIF/WebP files, for example the request's attachments) are shown with the last user message; candidates whose provider has `vision: false` are tried last and told images were attached. `persona` (one of the session's) says whose call it is, so her `$model` choice here applies and her message can say which model wrote it; engines with several personas should set it (without it the core uses the run's only persona with that profile, or none). `result.fallbacks` says why each candidate before the one that answered did not (empty when the first did). `result.cached_input_tokens` (contracts 1.7) is how many of `input_tokens` the provider read from its prompt cache, which it bills far cheaper; `effort` may be `max` (1.7) for providers that think longest at it. Raises `ModelError` (`unavailable`, `invalid_output`, `budget_exceeded`, `not_configured`). `models.ready(profile)` (contracts 1.6) says whether some candidate of a profile has its provider configured, so an engine can pick who works before trying. |
+| `models.generate(ModelRequest)` | Model calls (default profile: the first persona's). With `output_schema`, `result.data` is parsed and validated JSON. `images` (up to 6 local JPEG/PNG/GIF/WebP files, for example the request's attachments) are shown with the last user message; candidates whose provider has `vision: false` are tried last and told images were attached. `persona` (one of the session's) says whose call it is, so her `$model` choice here applies and her message can say which model wrote it; engines with several personas should set it (without it the core uses the run's only persona with that profile, or none). `result.fallbacks` says why each candidate before the one that answered did not (empty when the first did). `result.cached_input_tokens` is how many of `input_tokens` the provider read from its prompt cache, which it bills far cheaper; `effort` may be `max` (1.7) for providers that think longest at it. Raises `ModelError` (`unavailable`, `invalid_output`, `budget_exceeded`, `not_configured`). `models.ready(profile)` says whether some candidate of a profile has its provider configured, so an engine can pick who works before trying. |
 | `tools.list(persona="")`, `await tools.call(name, args, call_id, persona="")` | Capabilities allowed here, and calling them under policy. Never raises for policy; check `result.status` (`success`, `failed`, `needs_input`, `needs_approval`). Since 1.14, `persona` says whose turn it is: a capability for some personas only (`Capability.personas`) is listed for theirs alone and refused for others (`not_offered`), and the capability sees whose turn called it (`ToolContext.persona`). |
 | `await reply(text, quote=None, persona=None, label="")`, `await send_file(file)`, `await progress(text)` | Output; returns the interface's `Delivery` (or a refusal such as `run_closed`, `conversation_disabled`, `too_large`). `persona` (one of the session's) makes the persona's display name the reply's `speaker` and the sender name in history; `label` qualifies it (for example a work note, recorded with kind `note`). |
 
@@ -867,9 +849,8 @@ optional, with the run's last saved `state`, for putting right what still shows 
 ### The built-in `momochat` engine
 
 [`extensions/momochat`](../../extensions/momochat/README.md) is the conversation harness: direct chats, group chats,
-tools and questions, for students and agents alike. It was three engines until 2026-10-27, `assistant`, `chat`
-(Whale-chan's) and `room`; those are its former names (`EngineSpec.formerly`), so assignments naming them reach it.
-The core's own defaults (`*`, `routine:*`) assign it with the core's `assistant` agent. Read its source as the
+tools and questions, for students and agents alike. It suggests itself, with the core's `assistant` agent, for `*` and
+`routine:*`. Read its source as the
 reference engine: state, events, tool calls, approvals, questions, images and resumable work in one place.
 
 * **Who speaks.** One persona: she does. Several (a group chat): those the message calls on ("Luna, …", "@Luna"),
@@ -904,25 +885,20 @@ reference engine: state, events, tool calls, approvals, questions, images and re
 
 ### The log
 
-The log is what happened in a conversation, one line each, kept by the core for every module (contracts 1.15, in place
-of the diary, which only held what a persona noted of someone). A line has when, which module wrote it, a `kind` (one
-short word: `note`, `action`, `landed`, …), its text, and optional `data`, `subject` (the person it is about) and
+The log is what happened in a conversation, one line each, kept by the core. A line has when, which module wrote it, a
+`kind` (one short word: `action`, `command`, …), its text, and optional `data`, `subject` (the person it is about) and
 `persona`.
 
 ```python
-session.logbook.write("landed", "The Sunday fix landed", data={"task": "t-1"})   # also ToolContext and WatchContext
-session.logbook.write("note", "Prefers mornings", person=True, persona="gpt")    # about the person of this run
 session.logbook.recent(8)         # the newest lines of this conversation, oldest of them first; `kind=` narrows it
-session.logbook.find("sunday")    # the newest lines holding words of it
 ```
 
-* **Who writes:** modules, through the handle they already have; a model only through a capability a module offers. The
-  core logs by itself every `write` or `critical` action that ran, so "what did you do?" always has an answer: kind
-  `action` for what a model did, `command` for what someone typed. Lines are never edited: a correction is a new line. Text is scrubbed of secrets and clipped to 500 characters,
-  and a conversation keeps its newest 2,000 lines.
+* **Who writes:** the core, by itself, for every `write` or `critical` action that ran, so "what did you do?" always has
+  an answer: kind `action` for what a model did, `command` for what someone typed. Lines are never edited. Text is
+  scrubbed of secrets and clipped to 500 characters, and a conversation keeps its newest 2,000 lines.
 * **Who reads:** engines, and people with `$log` (a member the lines about them, an admin all of them; `forget <id>` and
-  `clear` remove what they may see). `$memory` shows and removes the `note` lines about you. MomoChat shows the newest
-  few lines of the last day in each turn (`log_lines`), leaving out notes and commands: a typed `$alias` is for one
+  `clear` remove what they may see). MomoChat shows the newest few lines of the last day in each turn (`log_lines`),
+  leaving out commands: a typed `$alias` is for one
   student, not all of them.
 * **Not the audit log.** That stays the core's own record for the owner; models never read it.
 
@@ -989,7 +965,7 @@ ways in:
 
 ```yaml
 assignments:
-  "discord:123456789012345678": {engine: terminal, persona: terminal}
+  "discord:123456789012345678": {engine: terminal, personas: [terminal]}
 admission:
   "discord:123456789012345678": {require_mention_in_groups: false, owner_only: true}
 ```

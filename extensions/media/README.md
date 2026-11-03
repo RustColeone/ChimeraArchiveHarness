@@ -149,12 +149,12 @@ Limits:
 4. The output is measured again; above the budget it is deleted and the call fails with
    `output_budget_exceeded`.
 5. Success returns the file and its origin:
-   `ToolResult.ok(summary, files=(FileRef(path, name, "video/mp4", size),), sources=(url,), data={method,
+   `ToolResult.ok(summary, files=(FileRef(path, name, "video/mp4", size),), data={method,
    duration_s, size_mb, budget_mb})`. The core sends the file; the summary says whether it was copied
    or re-encoded.
 
 **Pending clips** (`clip.py`): `create` inspects each URL and builds a clip dict with the best option's
-settings. The list is saved with `context.storage.set("pending:<address>", …)`, the module's private
+settings. The list is saved with `context.store().set("pending:<address>", …)`, the module's private
 store, so a preview belongs to one conversation and survives a restart. `pick`, `trim`, `fit` and
 `set_quality` change one clip and re-estimate its size; changing between video, GIF and audio starts
 from that kind's best option. `confirm` renders the clips (`process`), sends those within the limit,
@@ -234,7 +234,7 @@ venv/bin/python -m unittest tests.test_core_clip tests.test_core_ported
   `clip.py:195`) and check the real size after rendering (`extension.py:57-61`).
 * **Ask with `ToolResult.ask`** when the request needs a decision, and include the options
   (`extension.py:41-44`, `clip.py:204-213`).
-* **Per-conversation state** in `context.storage` keyed by `context.address` (`clip.py:109-122`), and
+* **Per-conversation state** in `context.store()` keyed by `context.address` (`clip.py:109-122`), and
   re-check it before clearing (`clip.py:371-373`).
 * **Blocking libraries** in `asyncio.to_thread` (`video.py:131-136`, `video.py:165`), subprocesses with
   `asyncio.create_subprocess_exec` (`video.py:211-215`); clean temporary files in `finally`

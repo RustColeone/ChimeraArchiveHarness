@@ -15,7 +15,8 @@ owners and readiness).
 | --- | --- | --- |
 | Interface | `discord` | `DiscordInterface` in [`interface.py`](interface.py). Addresses are `discord:dm:<user id>` for direct messages and `discord:<channel id>` for server channels and threads. Display: Markdown, edits, progress, quotes, files, 2000 characters per message; the upload limit is the server's file size limit (10 MB in DMs). |
 | Engines, personas, providers, adapters, profiles | none | Conversations use whatever engine the core assigns. |
-| Default assignments, admission, permissions | none | The core's built-in defaults apply: group messages need a mention, and `core/defaults.py` (`BASIC_FEATURES`) sets `auto` rules for `discord.music`, `discord.music_control`, `discord.queue_music`, `discord.clock_start` and `discord.clock_stop`, so anyone can use them without asking. |
+| Default assignments, admission | none | The core's built-in defaults apply: group messages need a mention. |
+| Default permissions | `*` | `auto` rules for `discord.music`, `discord.music_control`, `discord.queue_music`, `discord.clock_start` and `discord.clock_stop`, so anyone can use them without asking. |
 
 Operations (each becomes the capability `discord.<name>`; see
 [Operations](../../docs/core/EXTENSIONS.md#operations)):
@@ -97,7 +98,7 @@ math_max_images: 10
 | `math` | `false` sends math as plain text. |
 | `math_max_images` | Display equations rendered as images per reply; further ones are sent as text. |
 
-Further math keys read by [`math_render.py`](math_render.py) but not in the example: `math_width_px`
+Further math keys read by `contracts.discord_bot.math_render` but not in the example: `math_width_px`
 (1440, at least 640), `math_dpi` (180, at least 72), `math_font_size_pt` (20, at least 12) and
 `math_min_height_px` (220, at least 120).
 
@@ -191,11 +192,11 @@ ordinary messages, so a `private` reply is then visible to everyone in the chann
 | --- | --- |
 | [`extension.py`](extension.py) | `EXTENSION`, the declared `Setting`s, `check_token` (HTTP login used by setup), and `setup`, which reads the token from the environment (else a `token:` in its `config.yml`) and builds the interface. |
 | [`interface.py`](interface.py) | `DiscordInterface`: lifecycle, Discord events to `Request`s, rendering and delivery of every `Reply` kind, progress, buttons and reactions, operations. |
-| [`slash.py`](slash.py) | Pure translation: the core's `Command` catalog to application-command JSON (`payload`), an invocation back to option values (`find`, `values`), and `Interactions`, the open interactions by request ID. |
+| `contracts/discord_bot/slash.py` | Pure translation, shared with every Discord bot here: the core's `Command` catalog to application-command JSON (`payload`, leaving out commands with `menu=False`), an invocation back to option values, and pending interactions. |
 | [`status_log.py`](status_log.py) | `StatusLog`: the rolling code-block message for unrequested lines (one per conversation, up to an hour or 1900 characters). |
 | [`music.py`](music.py) | `parse_music_command` (legacy syntax) and `MusicPlayer`: one looping playlist per server, voice connection, yt-dlp and ffmpeg sources. |
 | [`clock.py`](clock.py) | The ASCII study clock and `LiveClocks`, one edited message per conversation. |
-| [`math_render.py`](math_render.py) | `split_math` (text and display formulas in reading order, code untouched), inline math to Unicode, and `MathRenderer` (Matplotlib PNG on a fixed canvas). |
+| `contracts/discord_bot/math_render.py` | `split_math` (text and display formulas in reading order, code untouched), inline math to Unicode, and `MathRenderer` (Matplotlib PNG on a fixed canvas). |
 | [`config.example.yml`](config.example.yml) | Documented settings to copy into `config.yml`. |
 
 **Startup.** `setup(context)` returns `Contributions(interfaces=[DiscordInterface(...)])`; it does no
@@ -311,7 +312,7 @@ venv/bin/python -m unittest tests.test_core_discord tests.test_core_discord_slas
   `mentions_me` from platform metadata and leaves admission to the core; it never replies on its own.
 * **Map the platform's owner** with `port.set_owners` ([`interface.py:223`](interface.py)) so a fresh
   install routes approvals somewhere private without configuration.
-* **Translate native menus into `$` text** ([`slash.py:29`](slash.py), [`interface.py:443`](interface.py)):
+* **Translate native menus into `$` text** (`contracts/discord_bot/slash.py`, [`interface.py`](interface.py)):
   the core only ever sees `Command.render(values)`, so typed and menu commands behave the same.
 * **Keep cheap durable state in the bottle** and prune it yourself (`message_actions` at
   [`interface.py:305`](interface.py), `ACTION_MEMORY = 300`; music at [`music.py:177`](music.py)).
@@ -331,8 +332,8 @@ Pitfalls:
 * Discord's 3-second interaction deadline: defer first, then do the work.
 * A button's custom ID is limited to 100 characters, and the command is cut to fit; keep button
   commands short.
-* Do not import from other modules or the core; copy what you need. `plugins/whale_chan` carries its
-  own copies of `slash.py` and `math_render.py` for that reason.
+* Do not import from other modules or the core: what two modules share lives under `contracts`, as
+  `contracts.discord_bot` does for this one and `plugins/whale_chan`.
 
 See also: [Writing modules](../../docs/core/EXTENSIONS.md) (especially
 [Interfaces](../../docs/core/EXTENSIONS.md#interfaces) and

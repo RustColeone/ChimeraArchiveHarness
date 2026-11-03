@@ -9,7 +9,7 @@ Every `every_min` minutes a local dice roll decides; no model is called unless i
 
 She never speaks in quiet hours (1–8), within `cooldown_min` of her own last message, or again before they
 answered her last one. A hit becomes a message to her engine marked as her own impulse, with a motive:
-something they mentioned coming up (the `plans` the companion module publishes), a feeling she still has (its
+something they mentioned coming up (the `plans` the students module publishes), a feeling she still has (its
 `mood`), or a plain one for the time of day. With `dry_run` (the default) she only writes down what she would have
 done.
 """

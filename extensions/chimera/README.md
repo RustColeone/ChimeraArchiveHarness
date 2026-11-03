@@ -2,7 +2,7 @@
 
 Chimera is the heavy-work harness: where the students work together, used for real coding. MomoChat
 ([`extensions/momochat`](../momochat)) is the conversation harness; a request bigger than a conversation comes here.
-It was the workbench until 2026-10-27 ([The rename](#the-rename), below); the page is still the **Classroom**.
+Its page is the **Classroom**.
 
 The club takes a coding task the way GitHub's HydraFusion does. For each request it picks the simplest workflow
 likely to be enough:
@@ -58,20 +58,6 @@ Add your own projects under 📁 Projects, or in `config.yml` (copy [`config.exa
 Inside the bot (`python -m core`) the module loads like any built-in one: the same page on port 4157, plus Discord
 (see [From Discord](#from-discord-remote)). Turn it off with `modules: {exclude: [chimera]}` in core.yml.
 
-## The rename
-
-The workbench became Chimera on 2026-10-27. What was written for it keeps working (contracts 1.11):
-
-| Was | Is | How the old one is read |
-| --- | --- | --- |
-| module `workbench` | `chimera` | `Extension.formerly`: `data/core/extensions/workbench/` moves to `.../chimera/`, `extension_config.workbench` and `extensions/workbench/config.yml` are read as this module's settings |
-| engine `workbench` | `chimera` | `EngineSpec.formerly`: an assignment saying `engine: workbench` is this engine, and its open runs carry on |
-| interface `workbench` (addresses `workbench:<task>`) | `classroom` (`interface:` changes it) | The board's tasks are readdressed on start; the core's records of old tasks keep their old address |
-| capabilities `workbench.*`, profiles `workbench_<seat>_<tier>` | `chimera.*`, `chimera_<seat>_<tier>` | Not read: core.yml permission rules naming `workbench.*` need renaming |
-| `python -m extensions.workbench`, `club` installed before | `python -m extensions.chimera` | `extensions/workbench/` keeps only those two commands working (it is not a module) |
-| `data/workbench/` | `data/chimera/` | Used while it is the only one |
-| the seats defined here (`DEFAULT_TEAM`) | the students | `team:` entries that name a student change her seat |
-
 ## From a terminal: `club`
 
 The way `codex`, `claude` and `grok` work: run it in a project folder and talk with the club about that folder.
@@ -125,7 +111,7 @@ flowchart LR
         E["engine<br/>kernel/ + workflows/"]
         V["views · places<br/>the rules, in one place"]
         C["chimera.* capabilities<br/>tools · $check · review · land"]
-        BD[("board<br/>workbench.db")]
+        BD[("board<br/>board.db")]
     end
     subgraph CORE["The core · python -m core"]
         G["Gateway"] --- M["Manager<br/>policy · durable runs · approvals"]
@@ -320,7 +306,7 @@ list of seats; the first seat that can answer takes it. Reviewers (judge, critic
 than the drafter when one can answer, otherwise from another seat.
 
 **The seats are the students.** The module declares `uses=("students",)` and reads the agents loaded before it
-(`context.personas()`, contracts 1.11): each student of the students module is a seat, on her `own` tier for cheap
+(`context.personas()`): each student of the students module is a seat, on her `own` tier for cheap
 work (her own models, nobody else's as a fallback) and her `strong` tier for strong work (GPT on GPT-6.1 Sol, Claude
 on Sonnet; the others on their own models), from her model's family, saying who she is with her `description`.
 Nothing about the five is written here. `team:` in this module's config.yml changes a seat key by key (`effort`,
@@ -338,7 +324,7 @@ module (or mneme-llm), the seats are only those of `team:`, and with none the Cl
 | strong (takes over) | Claude, GPT, Gemini, DeepSeek, Grok | strong |
 | critic (critique) | Claude, GPT, Gemini, DeepSeek, Grok | strong |
 
-Seats without a key are left out quietly (the engine asks the core, contracts 1.6). When a role's list runs out,
+Seats without a key are left out quietly (the engine asks the core). When a role's list runs out,
 its sibling role steps in (strong ↔ drafter, judge ↔ critic), then anyone else in the club; a reviewer is never the
 drafter herself (an unreviewed change, marked as such, comes to you instead). If a seat fails mid-task, the next
 one takes over and the club says so. An answer cut off at the length limit is asked again once with twice the room
@@ -425,7 +411,7 @@ sequenceDiagram
 
 | | How |
 | --- | --- |
-| MomoChat → Classroom | `chimera.invite` (offered to the students while the creator talks, wherever they are): her `brief` (what to do, every decision and name from the chat), her `notes` (what she knows about how you like such work, from her diary), her `companions` (students she asks along; one not in the Classroom's team or without a key is named in the result and stays behind), and the chat's latest messages (`bring_messages`, 16), read through the conversation's history (contracts 1.6). It only makes an invitation and returns a link; following it is accepting, and you start the session on the arrival card (or with `club -c`), where you can still edit the brief and who comes. |
+| MomoChat → Classroom | `chimera.invite` (offered to the students while the creator talks, wherever they are): her `brief` (what to do, every decision and name from the chat), her `notes` (what she knows about how you like such work, from her diary), her `companions` (students she asks along; one not in the Classroom's team or without a key is named in the result and stays behind), and the chat's latest messages (`bring_messages`, 16), read through the conversation's history. It only makes an invitation and returns a link; following it is accepting, and you start the session on the arrival card (or with `club -c`), where you can still edit the brief and who comes. |
 | In the Classroom | The student who invited you leads: she greets you and speaks for the club in that session (a Classroom seat stands for a MomoChat persona with `also:`, as Flash-chan does for DeepSeek). Every round's brief carries what came from MomoChat and the project's **notebook** (what the club did there before). |
 | Classroom → MomoChat | **Report back** (on the page, or `club`, once the session is done): a session report (title, outcome, commit, tests, who did it, who was in the Classroom and who was asked along but not there, the summary, a link to the visit) goes into the chat it came from, sent with `core.send_message` as your own command. It joins that chat's history, so the students there know it, and it can go into their diaries like anything said there. |
 | MomoChat → Classroom, later | The **task log** (`chimera.tasks`, `$tasks <words>`; not the Logbook page): the students look up what happened in the Classroom; DeepSeek does before she writes a new brief. |
@@ -451,7 +437,7 @@ get them too, so a review checks the change against the project's rules.
 
 ## Cost
 
-Every model call is logged with its seat, model, tokens and seconds. The prices come from the core (contracts 1.12,
+Every model call is logged with its seat, model, tokens and seconds. The prices come from the core (
 [`core/providers/prices.py`](../../core/providers/prices.py)): every answer arrives priced, for every engine, and
 this module keeps each step's price and shows them. The core's list is **Artificial Analysis**'s free models list,
 under your own figures in core.yml's `prices:`: a free key from artificialanalysis.ai, as `ARTIFICIAL_ANALYSIS_API_KEY` or `AA_API_TOKEN` in
@@ -557,13 +543,12 @@ Security is not the focus yet. What is there:
 
 ## Data it keeps
 
-Under its data folder: `data/chimera/` for the Classroom alone (`data_dir`; the core's own stores in `core/` there;
-`data/workbench/` when only that one exists), `data/core/extensions/chimera/` in the bot. The board's file keeps its
-name, `workbench.db`, so the labs and data folders made before the rename open as they are.
+Under its data folder: `data/chimera/` for the Classroom alone (`data_dir`; the core's own stores in `core/` there),
+`data/core/extensions/chimera/` in the bot.
 
 | Path | Contents |
 | --- | --- |
-| `workbench.db` | Tasks, steps, the page's transcript, projects added in the page |
+| `board.db` | Tasks, steps, the page's transcript, projects added in the page |
 | `outcomes.jsonl` | One line per routing decision and result, for tuning the router |
 | `worktrees/<task>` | Each open task's worktree, and `<task>.base` for the tester's probes (removed when it lands or is discarded) |
 | `patches/<task>.diff` | The last change set of a landed or discarded task |

@@ -121,7 +121,7 @@ class WhaleChanBot(Interface):
                                 owners=lambda: self._owners, names=lambda user: self.call_them, standing=self._standing)
 
     def _standing(self, user: str) -> dict:
-        """What modules publish about her and this person: the companion's plans and mood."""
+        """What modules publish about her and this person: her plans and mood."""
         return dict(self.port.facts(self.persona, str(user)))
 
     async def start(self, port) -> None:

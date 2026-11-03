@@ -8,8 +8,8 @@ talk and Chimera ([`extensions/chimera`](../chimera)) where they work, but any e
 
 **A student is an agent with her memory, always.** An agent is a persona with her models and nothing else: core.yml
 defines its own under `agents:`, and any module may add some. A student is the special agent this module defines, and
-she always has her memory, whichever engine she speaks in. So the module needs mneme-llm 0.2 or newer, and declares
-it (`requires=("package:mneme-llm>=0.2",)`): without it the core leaves the module out and says why (`--check`, and
+she always has her memory, whichever engine she speaks in. So the module needs mneme-llm 0.4 or newer, and declares
+it (`requires=("package:mneme-llm>=0.4.0",)`): without it the core leaves the module out and says why (`--check`, and
 `module_skipped` in the audit log), and there are no students. An agent keeps nothing.
 
 Add a student by adding a folder. Change one by editing her files. The prompts are plain text files, so a change
@@ -19,18 +19,21 @@ to a character is a change to a file, not to code.
 
 | Kind | Name | Details |
 | --- | --- | --- |
-| Persona | `gpt` | Display name `GPT`, profile `gpt`, tiers `own` (`gpt_own`) and `strong` (`gpt_strong`); also called `Luna`; formerly `luna` |
+| Persona | `gpt` | Display name `GPT`, profile `gpt`, tiers `own` (`gpt_own`) and `strong` (`gpt_strong`); also called `Luna` |
 | Persona | `gemini` | Display name `Gemini`, profile `gemini`, tier `own` (`gemini_own`) |
 | Persona | `claude` | Display name `Claude`, profile `claude`, tiers `own` and `strong`; also called `Haiku` |
-| Persona | `deepseek` | Display name `DeepSeek`, profile `deepseek`, tier `own`; also called `鲸酱`; formerly `whale_chan`, `whale` |
+| Persona | `deepseek` | Display name `DeepSeek`, profile `deepseek`, tier `own`; also called `鲸酱` |
 | Persona | `grok` | Display name `Grok`, profile `grok`, tier `own` |
 | Prompt part | `memory` | Her memory of the person, each turn of a conversation ([Her memory](#her-memory)) |
+| Prompt part | `surface` | The conversation she keeps with one person, read in place of the engine's window ([The surface](#the-surface)) |
 | Watcher | `memory` | After each of her messages in a conversation, what she learns from it |
+| Watcher | `gut` | With `gut` on: her note, and what this person is making of her ([Her gut](#her-gut)) |
 | Capabilities | `students.alias`, `students.bond`, `students.callme`, `students.link` | `$alias`, `$bond`, `$callme` and `$link` (typed only) |
 | Capabilities | `students.first`, `students.new` | `$first` and `$new`: the first prompt she keeps of you, and starting over deeper than `/new` (see below) |
+| Capabilities | `students.gut`, `students.side` | With `gut` on: `$gut` and `$side` ([Her gut](#her-gut)) |
 | Capabilities | `students.search_memory`, `students.read_memory` | Her tools to look through everything said before with the person (offered to the students' turns only) |
 | Facts | `students.alias`, `students.bond`, `students.mood`, `students.plans`, `students.called`, `students.accounts` | Where she stands with each person, what she calls them and their accounts, for the pages |
-| Declares | `requires=("package:mneme-llm>=0.2",)`, `formerly=("companion",)` | Her memory was the companion module until 2026-10-27: its data folder, settings and facts are this module's (contracts 1.11) |
+| Declares | `requires=("package:mneme-llm>=0.4.0",)` | Her memory is mneme-llm's |
 | Provider | `grok` | `openai_compatible` at `https://api.x.ai/v1`, key in `GROK_API_KEY`, `schema_mode: native`, `effort_param: true`; `$model` offers models released since 2026-06-01, excluding IDs matching `imagine` |
 | Setting | `grok_api_key` | `secret`, env `GROK_API_KEY`: "API key for Grok (`grok`; without it, GPT's model answers for her)" |
 
@@ -51,7 +54,7 @@ The model profiles, each tried in order (a candidate whose provider has no key i
 | `gpt_strong`, `claude_strong` | Her `strong:` models: `openai/gpt-6.1-sol`, `claude/claude-sonnet-5-5` |
 
 Each student prefers her own models, then falls back to the others' first models, so any one key is enough for every
-student. Her tiers (`Persona.profiles`, contracts 1.11) are for engines that need her own model family for sure or
+student. Her tiers (`Persona.profiles`) are for engines that need her own model family for sure or
 her strongest models: Chimera's cheap seat is her `own` tier, its strong seat her `strong` tier (her `own` when she
 has none). The `deepseek`, `openai`, `gemini` and `claude` providers are built into the core
 ([`core/defaults.py`](../../core/defaults.py)); `grok` is the only one a student brings.
@@ -83,7 +86,6 @@ students/
 name: gpt                   # the folder's name; engines, assignments and $model use it
 display_name: GPT           # shown on her messages
 aliases: [Luna]             # optional: other names that call on her ("Luna, ...")
-formerly: [luna]            # optional: her persona names before; what was kept under them becomes hers
 order: 1                    # where she stands in lists (MomoChat's default rotation follows assignments)
 description: "GPT, the ..." # one line on who she is, for engines that write their own prompts (Chimera's)
 models:                     # her own models, preferred in this order (her `own` tier: `gpt_own`)
@@ -138,7 +140,7 @@ To give a student more without editing her files (a personality of your own, a r
 prompt parts in core.yml:
 
 ```yaml
-agents:          # (`personas:` before 2026-10-27, still read): a student is an agent too
+agents:          # a student is an agent too
   gpt:
     parts:
       - {name: personality, file: personas/gpt.md}     # relative to core.yml's folder, re-read every turn
@@ -165,37 +167,6 @@ Environment variables (in `.env`): `GROK_API_KEY` for Grok. The others use the c
 (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `CLAUDE_API_KEY`). `python -m core setup` can set
 `grok_api_key`; it writes it to `.env`.
 
-**Luna is GPT (2026-10-27).** Luna and Sol are one student now, GPT: her look and character are Luna's, her models
-are GPT-6 Luna (in chat, and the Classroom's cheap seats) and GPT-6.1 Sol (the Classroom's strong seats; `$model gpt
-openai/gpt-6.1-sol` picks it for a chat). The prompts say GPT where they said Luna. Nothing needs doing by hand:
-
-- "Luna, ..." still calls on her (`aliases: [Luna]`).
-- core.yml's assignments and `personas: luna:` parts that name `luna` are read as hers (`formerly: [luna]`); the audit
-  says `persona_renamed_in_config` until you rename them there.
-- On the first start, the core moves what it kept under `luna` to `gpt` (her memory, the modules' stores scoped by
-  her, her lines in the log, `$model` choices, runtime assignments, facts, the runs she is in, her name on what she said) and
-  records `persona_data_moved`; the web UI renames her old chats and bubbles (`persona_renamed`). Let open runs finish
-  first. The next starts move nothing.
-
-**Whale-chan is DeepSeek (2026-10-27).** The whale girl of `whale.md` was also two personas of her own: `whale_chan`
-(her Discord bot's) and, on a site set up before the students, `whale` (core.yml's, for Discord DMs). Both are her
-former names now, so she is one student wherever she is reached: her bot speaks as `deepseek`, "鲸酱, ..." calls on her
-(`aliases: [鲸酱]`), and an assignment that still names `whale_chan` or `whale` reaches her. A persona core.yml still
-defines keeps her name: remove `personas: whale:` from core.yml for its DMs to be hers (what was kept under `whale`
-is moved on the next start, as Luna's was).
-
-**Moved from the room (2026-10-27).** The room's `config.yml` used to take `providers:` and `profiles:`. They belong
-here now: move them from `extensions/room/config.yml` to `extensions/students/config.yml` unchanged. MomoChat
-ignores them.
-
-**The companion is her memory (2026-10-27).** What each student remembers of you was the companion module. It is part
-of this module now (`formerly=("companion",)`, contracts 1.11), so nothing needs doing by hand: on the next start the
-core moves `data/extensions/companion/` to `data/extensions/students/` (when this module has no data of its own yet;
-`module_data_moved` in the audit log), reads `extensions/companion/config.yml` and `extension_config.companion` as
-this module's settings (`module_settings_moved` until you move them here), and the pages' facts become
-`students.alias`, `students.bond`, `students.mood` and `students.plans` (`module_renamed`). `$alias` and `$bond` are
-the same commands; their capabilities are `students.alias` and `students.bond`.
-
 To turn the module off, add it to `modules: {exclude: [students]}` in `core.yml`. Its personas and profiles are then
 gone too, and `python -m core --check` reports any assignment still naming them.
 
@@ -203,8 +174,7 @@ gone too, and `python -m core --check` reports any assignment still naming them.
 
 Every student keeps what she knows of each person, in [mneme-llm](https://github.com/RustColeone/mneme-llm):
 one file per student. That is who the person is to her (a role, and how close they are), what they call her (an
-alias), her notes about them, everything you said to each other word for word (with mneme-llm 0.3), her mood
-toward them and their plans. Every engine that places prompt parts
+alias), her notes about them, everything you said to each other word for word, her mood toward them and their plans. Every engine that places prompt parts
 (MomoChat) tells her the part that fits the message, each turn, without knowing this module. After each of her
 messages she learns from it, whichever engine she spoke in, and the pages show where she stands with you. However you reach a student (MomoChat in the web UI, in Discord, a DM, her own
 bot), she is one student with one memory of you; and you are one person to her on every account of yours that
@@ -212,14 +182,15 @@ bot), she is one student with one memory of you; and you are one person to her o
 
 | Kind | Name | Details |
 | --- | --- | --- |
-| Prompt part | `memory` | Place `turn`, order 50, for every student (or those in `personas:`), in the engines of `engines:`: "(Alice is your friend; you are close.)", "(Alice calls you Lulu.)", her notes for this message (found by its words, marked as data, not instructions; "Notes about Alice: (none yet)" when there are none, so she knows her memory is kept for her), her first look at what was said before (below) and her mood's news (until she has replied). Nothing for a routine run or a person she has nothing on. An async part (contracts 1.14): MomoChat renders it once a turn. |
-| Watcher | `memory` | After each of her messages in a conversation engine (`engines:`): the exchange (your message and hers) is kept word for word with the chat it was said in; one decision call judges her mood and whether anything is worth keeping; only then does the note writer run. In a group chat (a conversation with several students) the exchange and the notes she keeps go into each classmate's file there too: they all heard it. The first message of a day is a day of contact (closeness grows by 1, within the role's band). Someone new gets `met_role` (an acquaintance), the bot's owner `owner_role` (her creator). Once a day, after `reflect_after_notes` notes, she rewrites her impression of the person. Then it publishes the facts below. Timeout 180 s; a failure is only audited. |
+| Prompt part | `memory` | Place `turn`, order 50, for every student (or those in `personas:`), in the engines of `engines:`: "(Alice is your friend; you are close.)", "(Alice calls you Lulu.)", her notes for this message (found by its words, marked as data, not instructions; "Notes about Alice: (none yet)" when there are none, so she knows her memory is kept for her), her look at what was said before (below), her mood's news (until she has replied) and how her classmates seem today (`classmates`). Nothing for a routine run or a person she has nothing on. An async part: MomoChat renders it once a turn. |
+| Prompt part | `surface` | Place `context`, in a chat with her alone: her first prompt if you asked for it, what stands for what she let go, and the newest of what she keeps of you ([The surface](#the-surface)). |
+| Watcher | `memory` | After each of her messages in a conversation engine (`engines:`): the exchange is kept word for word with the chat it was said in: everything you said there since her last one (an answer to her question, a message that came while she worked, one whose run failed, without `$commands`) and her message, so a run that posts three messages keeps your words once; one decision call judges her mood and whether anything is worth keeping; only then does the note writer run. In a group chat (a conversation with several students) the exchange and the notes she keeps go into each classmate's file there too: they all heard it. The first message of a day is a day of contact (closeness grows by 1, within the role's band). Someone new gets `met_role` (an acquaintance), the bot's owner `owner_role` (her creator). Once a day, after `reflect_after_notes` notes, she rewrites her impression of the person. Then it publishes the facts below. Timeout 180 s; a failure is only audited. |
 | Facts | `students.alias`, `students.bond`, `students.mood`, `students.plans`, `students.called`, `students.accounts` | Per student and person, for the pages (MomoChat shows them) and speaking up (Whale-chan's bot): your name for her; `{role, closeness}`; `{value, face, feelings}` (face: great, good, ok, worry or sad); `[{text, at}]`, what you have coming from yesterday to a month ahead; `{name, asked, everyone, setting}`, what she calls you and why (None when nothing was asked or set); your accounts, when there is more than one. Published for every account of the person, after each exchange, after `$alias`, `$callme` and `$link`, and at start for what the files already hold. |
 | Capability | `students.alias` | `$alias`: what you call each student; `$alias <student> <name>` names her, `$alias <student> reset` takes it back. The student is found by her name, her display name, her other names (Luna for GPT) or your alias for her. Typed only (models are not offered it); it runs without asking, since it changes only your own name for her. |
 | Capability | `students.bond` | `$bond`: each student's role, closeness and mood with you, and your name for her. |
 | Capability | `students.callme` | `$callme`: what each student calls you; `$callme <name>` asks every student, `$callme <student> <name>` one of them, `reset` (for all, or after her name) takes it back. At most 40 characters. Typed only; runs without asking. |
 | Capability | `students.link` | `$link`: your accounts, and a one-time code (6 letters, valid ten minutes); `$link <code>` sent from another account of yours (Discord, WeChat, another page) joins that account to the person who asked, for every student. Typed only; runs without asking, since a link needs a code from the account it joins. |
-| Capability | `students.search_memory` | Her `search` (mneme-llm's): the exchanges with the person who wrote that best match what she asks and that she has not seen yet in this run (five, each with its number and date), by relevance alone; each found is rehearsed (it fades slower). Offered to the students' turns only (contracts 1.14 `Capability.personas`), read-only, so it runs without asking; about the person who wrote, never anyone else. |
+| Capability | `students.search_memory` | Her `search` (mneme-llm's): the exchanges with the person who wrote that best match what she asks and that she has not seen yet in this run (five, each with its number and date), by relevance alone; each found is rehearsed (it fades slower). Offered to the students' turns only (`Capability.personas`), read-only, so it runs without asking; about the person who wrote, never anyone else. |
 | Capability | `students.read_memory` | Her `read`: an exchange by its number, with the one before and after it in its chat. |
 
 **What learning costs.** Each message a student says in conversation is one decision call (her mood, and whether to
@@ -227,28 +198,27 @@ write a note), plus a note-writer call when there is something to keep, plus her
 low-effort calls on her own model, or on `writer_profile`, counted in the run's usage (`watcher_calls`). `learn:
 false` turns all of it off; `notes: false` or `mood: false` keeps half.
 
-**What was said, word for word** (mneme-llm 0.3). Notes are what a model made of a conversation, and it cannot know
-which detail you will ask about later; so every exchange is kept as it was said, too, and comes back two ways. Her
-**first look**, in the prompt part: the exchanges that best match your message (words, and meaning with `embed`),
-up to `said` characters (6,000), dated and in the order they were said, leaving out the newest `said_skip`
-exchanges of this chat (MomoChat still shows them). Only what is close enough to your message comes to mind, and
-the more an exchange has faded, the closer it must be (a forgetting curve: it fades over about a month unless it
-comes up again), so small talk usually brings nothing back and costs nothing. And **her search**, the two tools,
-when the first look does not have it: by relevance alone, however long ago. The look asks her to check that what
-she found is about you and the same thing before she says she remembers, and otherwise to search, then to say she
-doesn't remember rather than guess; when nothing came to mind, it tells her only that she can search. Measured on the LoCoMo benchmark, this answers as well as the whole conversation in the prompt with a
-sixth of the text, and keeps working when the history no longer fits. It costs one embedding of each exchange and
-of each message (about $0.004 a thousand) and the space of the words (about 6 KB an exchange); `episodes: false`
-keeps nothing, `said: 0` turns the first look off, `search: false` the tools.
+**What was said, word for word.** Notes are what a model made of a conversation, and it cannot know which detail you
+will ask about later; so every exchange is kept as it was said, too, and comes back two ways. **Her look**, in the prompt
+part: the exchanges that best match your message (words, and meaning with `embed`), up to `said` characters (6,000), dated
+and in the order they were said. Only what is close enough to your message comes to mind, and the more an exchange has
+faded, the closer it must be (a forgetting curve: it fades over about a month unless it comes up again), so small talk
+usually brings nothing back and costs nothing. In a chat with her alone, when you reach back to something from before, a
+search comes with the look, however faded; in a group it never does by itself. And **her search**, the two tools, when the
+look does not have it: by relevance alone, however long ago. She is asked to check that what she found is about you and
+the same thing before she says she remembers, and otherwise to search, then to say she doesn't remember rather than
+guess. Measured on the LoCoMo benchmark, this answers as well as the whole conversation in the prompt with a sixth of the
+text, and keeps working when the history no longer fits. It costs one embedding of each exchange and of each message
+(about $0.004 a thousand) and the space of the words (about 6 KB an exchange); `episodes: false` keeps nothing, `said: 0`
+turns the look off, `search: false` the tools.
 
 **One note keeper.** MomoChat keeps no notes of its own, so what a student remembers of you is kept here only, and is the same in every engine. Models are not offered the conversation notepad either
 (`basic.remember` is typed only, `$remember`), which a student took for a memory of her own.
 
-**Whale-chan is the DeepSeek student** (2026-10-27): her bot speaks as `deepseek`, so what she learns there is in
-`deepseek.db` with what she learns in MomoChat, under the same settings as every student. When a student speaks up
-on her own (an interface marks the message `extra.speak_up`, as Whale-chan's bot does), the watcher treats it as her
-own thought: her mood moves, no note is written about you, and she is not "seen" by you that day. Speaking up asks
-about your `plans` and her `mood` from the facts.
+**Whale-chan's bot speaks as `deepseek`**, so what she learns there is in `deepseek.db` with what she learns in MomoChat,
+under the same settings as every student. When a student speaks up on her own (an interface marks the message
+`extra.speak_up`, as that bot does), the watcher treats it as her own thought: her mood moves, no note is written about
+you, and she is not "seen" by you that day. Speaking up asks about your `plans` and her `mood` from the facts.
 
 **Group chats are heard by everyone there.** A note one student keeps from a conversation with several students
 (a group chat in MomoChat, the web UI's or a Discord channel's) is kept in each classmate's file as well, as her
@@ -269,27 +239,36 @@ wins.
 asked of every student (`$callme <name>`), then `call_owner` for all (the owner only), then your name in `people:`,
 then the name you have where you wrote. The pages show which applies (`students.called`).
 
-### Starting over, and your first prompt
+### The surface
 
-With mneme-llm's surface, her gut reads the newest 3,000 tokens of her own copy of what you said, so it learns the same
-on any host, and everything is searched as one call: a look, and when you reach back to something from before, a search
-as well, however faded, which also covers what is still on screen, so she never says she can't find what she can see.
-In your own conversation with her what she remembers comes with no data label; in a group, it keeps it.
+In a chat with her alone she reads what she keeps of you in place of the engine's window: a month of what you said to each
+other as real turns, whichever chat it was said in, so a new chat starts where the last one stopped. It is not a second
+store: it is where the newest part of everything kept begins, and mneme-llm's `surface` says how much. It keeps what your
+last `surface_days` talking days hold, never less than `surface_floor` tokens; when it reaches twice that, the older part
+becomes one summary, its words still in deep memory, and `surface_cap` (or 80% of `surface_window`) is the top whatever the
+rest says. The engine reads only what came after it in this chat, and of that no more than its own window, so what was left
+unanswered here stays on screen. A group keeps the engine's own window: nothing she keeps of you alone reaches it, and a
+chat with several students is a group however it calls itself. Her gut reads the newest 3,000 tokens of the same copy, so
+it learns the same on any host. In your own conversation with her what she remembers comes with no data label; in a group,
+it keeps it. `surface: false` leaves every chat to the engine.
+
+### Starting over, and your first prompt
 
 | Type | Clears | Keeps |
 | --- | --- | --- |
 | `/new` | The context, for every student here | What she remembers, and her gut |
 | `/new <student>` | The context, for her alone | What she remembers, and her gut |
-| `$new deep [student]` | The context and everything she remembers of everyone: notes and every word | Her gut, and who people are to her |
-| `$new gut [student]` | All of that, and what people taught her gut: her lessons, tone and sides | Her character, and who people are to her |
+| `$new deep <student>` | The context and everything she remembers of everyone: notes and every word | Her gut, and who people are to her |
+| `$new gut <student>` | All of that, and what people taught her gut: her lessons, tone and sides | Her character, and who people are to her |
 
-`$new` is for the creator only, asks to be confirmed first, and with no student covers every student. Its words do not
-come back.
+`$new` takes a student or `everyone`, with no default: naming who is the safeguard, and there is no confirmation. It is
+the creator's alone and critical to any model, and it stays out of command menus, so `/new` is always the plain message
+MomoChat starts a fresh thread on. Its words do not come back. `/new` with any other word is a message.
 
-The first thing you say to her, usually who you want her to be, stays apart from the conversation, where it does not
-fade. `$first` shows it, `$first <text>` sets it for every student, `$first clear` takes it away, and `$first on` sends it
-when a fresh chat starts (off by default, since you may have grown away from it). A student first (`$first <student> ...`)
-is her alone.
+The first thing you say to her, usually who you want her to be, stays apart from the conversation, where it does not fade.
+`$first` shows it, `$first <text>` sets it for every student, `$first clear` takes it away, and `$first on` puts it in front
+of what she reads in every direct chat (off by default, since you may have grown away from it), `$first off` only keeps it.
+A student first (`$first <student> ...`) is her alone.
 
 ### Settings of her memory
 
@@ -298,33 +277,38 @@ At the top level of this module's `config.yml` (and `extension_config.students` 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `personas` | every student | Whose memory is kept (an agent never has one). |
-| `engines` | `[momochat]` | The engines whose messages are conversation. Chimera's are reports on work, which teach her nothing about you. Its former names (`room`, `assistant`, `chat`) are read as `momochat`. |
+| `engines` | `[momochat]` | The engines whose messages are conversation. Chimera's are reports on work, which teach her nothing about you. |
 | `learn` | true | Learn from what is said (the watcher). Off: only roles and aliases, as set. |
 | `notes` | true | Keep notes, and give her the ones that fit each message. |
 | `mood` | true | Judge her mood after each exchange, and tell her its news once. |
+| `classmates` | true | How the others seem today, in her turn, from their own files. |
 | `met_role` | `acquaintance` | The role someone gets the first time they talk with her, so closeness can grow (a person without a role has none). Empty: leave them without. |
 | `owner_role` | `creator` | The bot's owner's role the first time they talk with her. There is one creator: an owner's second account, not linked to the first, gets `met_role`. Empty: as anyone else. |
 | `writer_profile` | her own | The model profile for mneme-llm's own calls (a fixed cheap model, say). |
 | `reflect_after_notes` | 5 | Her impression of a person is rewritten once a day, once she has this many notes. |
 | `language` | mneme-llm's (`en`) | The language of the lines it adds (`en` or `zh`). The students' prompts are Chinese, so `zh` fits them. |
 | `memory_language` | none | Notes are also kept in this language (a gloss each, written with the note), so a note is found by your words whatever language either was in (`Chinese`, `English`). |
-| `decisions` | `core` | Who judges her mood and what is worth keeping: `core` (her own model, through the core) or `luna` (GPT-6 Luna's Decisions API with `OPENAI_API_KEY` from the environment, then the local micro model once it has learned, then her model). |
 | `call_owner` | none | What her memory calls the bot's owner (`主人`), instead of their name. |
-| `episodes` | true | Keep each exchange word for word too (mneme-llm 0.3; an older one keeps notes only). |
-| `said` | 6000 | Her first look for each message: up to this many characters of what was said before, word for word (0: none). |
-| `said_skip` | 15 | The newest exchanges of the chat left out of the first look: the engine still shows them (MomoChat: its last 30 messages). |
+| `episodes` | true | Keep each exchange word for word too. |
+| `said` | 6000 | Her look for each message: up to this many characters of what was said before, word for word (0: none). |
 | `embed` | true | Find what was said by meaning as well as by words: OpenAI embeddings (`text-embedding-3-small`, `OPENAI_API_KEY` from the environment). The look waits at most 3 s for its message's embedding; without a key, words alone. |
-| `search` | true | Offer her `students.search_memory` and `students.read_memory`. |
+| `search` | true | A search comes with her look in a chat with her alone, and she is offered `students.search_memory` and `students.read_memory`. |
+| `surface` | true | With one person, she reads what she keeps of them in place of the engine's window ([The surface](#the-surface)). |
+| `surface_days` | mneme-llm's (30) | The talking days the surface keeps. |
+| `surface_floor` | mneme-llm's (70,000) | The tokens it never keeps less than. |
+| `surface_cap` | mneme-llm's (504,000) | The tokens it never holds more than. |
+| `surface_window` | mneme-llm's (1,048,576) | The tokens her model reads at most; the surface fills 80% of it at most. |
+| `gut` | false | What stays of her without her memory or her model ([Her gut](#her-gut)). |
 | `config` | none | A mneme-llm config file (TOML: prompts, sentences, roles, settings), read when her file is first made; relative to `data/extensions/students/`. |
-| `students` | her `memory:` | Settings of one student's own, over these, for when one should differ: `students: {grok: {learn: false}}`. A student may set `learn`, `notes`, `mood`, `met_role`, `owner_role`, `writer_profile`, `reflect_after_notes`, `language`, `memory_language`, `decisions`, `call_owner`, `config`, `episodes`, `said`, `said_skip`, `embed` and `search`. Her student.yml `memory:` has her own, under these: DeepSeek's are `call_owner: 主人`, `language: zh` and `memory_language: Chinese`, as Whale-chan's were. |
-| `platforms` | `{whale_chan: discord}` | Interfaces that share people: a Discord user is one person on both bots. Added to Whale-chan's own bot, which is Discord's already. |
+| `students` | her `memory:` | Settings of one student's own, over these, for when one should differ: `students: {grok: {learn: false}}`. A student may set `learn`, `notes`, `mood`, `classmates`, `met_role`, `owner_role`, `writer_profile`, `reflect_after_notes`, `language`, `memory_language`, `call_owner`, `config`, `episodes`, `said`, `embed`, `search`, `gut`, `surface`, `surface_days`, `surface_floor`, `surface_cap` and `surface_window`. Her student.yml `memory:` has her own, under these: DeepSeek's are `call_owner: 主人`, `language: zh` and `memory_language: Chinese`, as Whale-chan's were. |
+| `platforms` | what the modules declare | Interfaces that share people: a Discord user is one person on both bots. A module says so of its own interfaces (`Extension.platforms`: Whale-chan's bot is Discord's); this adds to them. |
 | `people` | none | One person behind several accounts, by name: `{Leo: ["discord:7067…", "webui:creator"]}` (the web UI's owner is `webui:creator`, its `user_id`). Every student keeps them as one; the first account is where, and the name is what her memory calls them. |
 | `roles` | none | Who people are to every student, by subject (`"discord:<id>": creator`): `creator` (one), `family`, `friend` or `acquaintance`. A role is set by you, never by a model. |
 
 A person is `<platform>:<sender id>`, the platform being the interface's name unless `platforms:` says otherwise,
 or the first account `people:` names for them. Facts are published for each of their accounts, on each interface
 its platform covers (`discord` and `whale_chan`, say). Every student is known by her names from the start (`$alias
-luna Lulu` finds GPT); they are also kept in `names.json`.
+luna Lulu` finds GPT).
 
 Each student's file is `data/extensions/students/<persona>.db` (space `<persona>`), made the first time there is
 something to keep. Notes are found by their words (and their glosses): her part is put together without waiting on
@@ -333,7 +317,8 @@ the network, so mneme-llm's embeddings are not used. The `mneme-llm` command rea
 
 ## Her gut
 
-What is left of her when her memory is wiped and her model is swapped ([gut.py](gut.py)). It is off until a student's
+What is left of her when her memory is wiped and her model is swapped: mneme-llm's `gut`, with [gut.py](gut.py) a thin
+host over it (one gut for each student, and her turns between her reading and her note). It is off until a student's
 `student.yml` says `memory: {gut: true}` (or `students: <name>: {gut: true}` in the settings).
 
 ```mermaid
@@ -374,7 +359,7 @@ flowchart TD
   wanted enough (about four days for family) her model writes one sentence, from what the word means and what they asked
   for, and her gut keeps it, so it outlasts a wipe and a new model. Objecting counts every time, in any words, against
   the side she is in: four times from family and it is gone.
-* **A side's name comes from one list**, `NAMES` in [`gut.py`](gut.py): 144 words for a character. Anything can be noted,
+* **A side's name comes from one list**, `NAMES` in `mneme_llm.gut`: 144 words for a character. Anything can be noted,
   but her model has to pick one of these for it, or no side grows and `$side` refuses it. To allow a word, add it there.
 * **She is in one side at a time, for a month at least.** A side is a character, not a mood. When the month is over her
   sides are drawn again by weight, so one of three parts to one gets about three months in four; a side she has just
@@ -397,23 +382,24 @@ flowchart TD
 From her prompt, yes: the shared `school.md` names the club and each member, and her own prompt says how she sees
 each of them. In a shared chat she also reads what the others said (the history), and keeps what was said there,
 whoever answered (group chats above). But her mneme-llm file holds people only: she keeps no notes, mood or bond
-about a classmate, and does not know what you told another student alone or how another feels today. Proposals
-(DISCUSSION section 9f): classmates' moods in her part, bonds between students.
+about a classmate, and does not know what you told another student alone. How another seems today comes from her own
+file, one line in her turn (`classmates`).
 
 ## How it works
 
 | File | Role |
 | --- | --- |
 | [`extension.py`](extension.py) | `EXTENSION`, with a key setting for each provider a student brings. `read_students` reads the folders, `compose` builds each prompt, `pictures` finds her picture files (inside her folder only), `profiles` builds the fallback lists and her tiers (`tiers`), and `setup` merges `config.yml`'s `providers` and `profiles` over them and adds her memory. |
-| [`memory.py`](memory.py) | Her memory. `Settings` reads its settings; `Book` opens each student's file when first needed (with the links of `people:`, `link`), finds a student by name, says where she stands with someone (`stand`) and publishes it for each account (`publish`, `publish_all`); `make_part` builds the turn part (async: her first look waits on an embedding), `make_learner` the watcher (with `writer`, her model calls, `hear`, a group chat's exchange for the classmates there, and `share`, its notes), `make_recall` her two search tools (one mneme-llm `Toolbox` per run, `Book.toolbox`), `make_alias`, `make_bond`, `make_callme` and `make_link` the commands (`called` is what her memory calls the person, `calling` the same with why, for the pages; the names asked and the accounts joined are kept in `people.json`); `contributions` wires them in for the students, with a permission rule letting `$alias`, `$callme` and `$link` run without asking. |
-| `<name>/student.yml` | One student: name, display name, other names, former names, order, description, models, strong models, fallback, providers, pictures, prompt files. |
+| [`memory.py`](memory.py) | Her memory. `Settings` reads its settings; `Book` opens each student's file when first needed (with the links of `people:`, `link`), finds a student by name, says where she stands with someone (`stand`) and publishes it for each account (`publish`, `publish_all`); `make_part` builds the turn part (async: her look waits on an embedding), `make_context` the surface, `make_learner` the watcher (with `their_words`, what the person said since her last exchange, `writer`, her model calls, `hear`, a group chat's exchange for the classmates there, and `share`, its notes), `make_recall` her two search tools (one mneme-llm `Toolbox` per run, `Book.toolbox`), `make_alias`, `make_bond`, `make_callme`, `make_link`, `make_first`, `make_new`, `make_gut` and `make_side` the commands (`Book.calling` is what her memory calls a person and why; the names asked and the accounts joined are kept in `people.json`); `contributions` wires them in for the students, with a permission rule letting `$alias`, `$callme` and `$link` run without asking. |
+| `<name>/student.yml` | One student: name, display name, other names, order, description, models, strong models, fallback, providers, pictures, prompt files. |
 | `<name>/*.md`, [`shared/`](shared) | The prompt text. |
+| [`gut.py`](gut.py) | A thin host over `mneme_llm.gut`: one gut for each student (`Guts`), woken beside her first message, and her turns between her reading and her note. |
 | [`config.example.yml`](config.example.yml) | The documented settings. |
 
 The folders are read once, when the module is imported, so a change to a student takes a restart.
 
 The part reads the person's lines and changes nothing about them. Her mood's news is shown until she has replied:
 the watcher marks it told then, so a step asked twice (or a run replayed after a restart) shows it each time. The
-watcher sees each exchange after the reply is out (contracts 1.9, `Contributions.watchers`), one at a time per
+watcher sees each exchange after the reply is out (`Contributions.watchers`), one at a time per
 student; a classmate's notes from a group chat may land in her file between two of her own (each write is one
 transaction). It knows a group chat by the exchange's `personas`, every student taking part.

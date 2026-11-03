@@ -60,7 +60,7 @@ without checking that it exists. Expected failures are returned with `ToolResult
 error_code)`, never raised. `data=` carries machine-readable output (`iso` and `timestamp` for `now`,
 the notes for `notes`) next to the human-readable summary.
 
-`remember` and `notes` use `context.storage`, the module's private key-value store. The store belongs to
+`remember` and `notes` use `context.store()`, the module's private key-value store. The store belongs to
 the module, not to a conversation, so the handlers key it by conversation themselves: `notes:<address>`
 (`context.address`). The older shared list stays under `notes` and is read only for the creator
 (`context.access`).
@@ -100,9 +100,9 @@ venv/bin/python -m unittest tests.test_core_runtime tests.test_core_routines tes
   when you need several options (see [`reminders`](../reminders/README.md)).
 * Give a parameter a `description` (`timezone`, line 44): models read it, and native command menus
   use it as the option's help.
-* Read and write state with `context.storage.get` / `set` ([`extension.py:36-39`](extension.py)) and
+* Read and write state with `context.store().get` / `set` ([`extension.py:36-39`](extension.py)) and
   bound its size yourself (`notes[-200:]`).
-* Pitfall: `context.storage` is one store per module. If data belongs to a person or a conversation,
+* Pitfall: `context.store()` is one store per module. If data belongs to a person or a conversation,
   key it by `context.address` or `context.sender.id`, and filter on read.
 * Pitfall: declare the tier honestly. A capability that changes anything is at least `write`.
 

@@ -7,7 +7,7 @@ and Grok by default, with Markdown and LaTeX, files both ways, live "typing" lin
 buttons, and a per-chat model menu. Whoever opens the page acts as the bot's creator.
 
 The user-level tour is in [plugins/README.md, "The web UI"](../README.md#the-web-ui). This README is
-the developer companion: it is the project's example of an interface plugin, so read it when you want
+the developer guide: it is the project's example of an interface plugin, so read it when you want
 to connect the core to a new platform, especially one you host yourself.
 
 ## What it adds
@@ -18,17 +18,15 @@ to connect the core to a new platform, especially one you host yourself.
 | Default assignment | `webui:*` | `{engine: momochat, personas: [gpt, gemini, claude, deepseek, grok], budget: {model_calls: 40, tool_calls: 24, seconds: 900}, options: {history_limit: 40, compact: true, chime_in: true}}`. `personas` and `assignment` in the config change it; core.yml wins over both. |
 | Runtime assignments | `webui:<chat>` | One per chat started with some of the classmates (not all), set with `core.set_assignment` and removed with the chat (below). |
 | Default admission | `webui:*` | `{enabled: true, require_mention_in_groups: false}` |
-| Declares | `uses=("momochat", "students")` | Its chats need both (contracts 1.10). Without either the page still opens, greyed: its default assignment is left out, the composer is off and a note says why, and MomoChat's tab is greyed in every page's places bar (its view and place say `off`, "not loaded"). |
+| Declares | `uses=("momochat", "students")` | Its chats need both. Without either the page still opens, greyed: its default assignment is left out, the composer is off and a note says why, and MomoChat's tab is greyed in every page's places bar (its view and place say `off`, "not loaded"). |
 | Owner report | `port.set_owners(["creator"], control=webui:classroom, fallback=True)` | Used only when core.yml lists no `webui` owners; the default chat (`classroom`) becomes the control route only when no other interface offers one ([ARCHITECTURE.md, Owners and control](../../docs/core/ARCHITECTURE.md#owners-and-control)). |
 
 It contributes no engines, capabilities, personas, profiles or permissions. The five personas come from
 [`extensions/students`](../../extensions/students), and the `momochat` engine from [`extensions/momochat`](../../extensions/momochat).
-It reads them from the core (contracts 1.9): their display names and pictures from `port.personas()`, and where each
+It reads them from the core: their display names and pictures from `port.personas()`, and where each
 stands with you from `port.facts()` (the `alias`, `bond` and `mood` any module publishes; the students' memory does),
 polled every `places_poll_s` seconds while a page is open and sent as a `roster` event when it changes. Your page
-reads the students' `called` and `accounts` facts too, and every page the day's stamina from `port.stamina()`. A persona
-named by a former name of hers (`formerly`) is read as her, and at start her old chats and bubbles are renamed to
-her (`persona_renamed` in the audit log).
+reads the students' `called` and `accounts` facts too, and every page the day's stamina from `port.stamina()`.
 
 Declared settings (editable with `python -m core setup` and `$setup`):
 
@@ -59,7 +57,7 @@ It loads by default. To change anything, copy [`config.example.yml`](config.exam
 | `classmates` | the personas' own display names | Names of your own for those personas, in the same order (one the core does not know is the persona's name, capitalised). They should match the personas' display names: the page finds a classmate's model row by exact display name and a speaker by prefix. |
 | `assignment` | | Merged over the default assignment (top-level keys replace, so `budget` replaces the whole budget; `options` are merged key by key over the web UI's). |
 | `max_upload_mb` | 50 | Largest upload and largest file the core sends here; also sizes the server's request limit. |
-| `map` | true | The places in the core's directory (contracts 1.7): the places other interfaces publish, such as the Classroom, read every `places_poll_s` (5) seconds while a page is open, for the places bar, who is also in the Classroom (a student is in every place at once) and the invitations classmates hold for you; MomoChat publishes itself too (its link and the students). (The name is from when a mini map drew them.) `false` turns it off. |
+| `map` | true | The places in the core's directory: the places other interfaces publish, such as the Classroom, read every `places_poll_s` (5) seconds while a page is open, for the places bar, who is also in the Classroom (a student is in every place at once) and the invitations classmates hold for you; MomoChat publishes itself too (its link and the students). (The name is from when a mini map drew them.) `false` turns it off. |
 
 A link to a chat (`http://<page>/#<chat>`, as the Classroom's "open MomoChat" makes) opens that chat.
 

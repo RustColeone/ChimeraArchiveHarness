@@ -67,7 +67,7 @@ modules are never imported. For a terminal conversation, assign the engine and a
 
 ```yaml
 assignments:
-  "discord:123456789012345678": {engine: terminal, persona: terminal}
+  "discord:123456789012345678": {engine: terminal, personas: [terminal]}
 admission:
   "discord:123456789012345678": {require_mention_in_groups: false, owner_only: true}
 ```

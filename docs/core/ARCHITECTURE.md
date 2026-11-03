@@ -98,7 +98,7 @@ sequenceDiagram
     E-->>M: RunYield (done / waiting_input / waiting_approval)
 ```
 
-A watcher (contracts 1.9) sees each message a persona said, after it was delivered and recorded, whichever engine
+A watcher sees each message a persona said, after it was delivered and recorded, whichever engine
 she spoke in. It runs as a side task of the Manager: one persona's exchanges reach one watcher in order, within its
 timeout, and a failure is only audited. Its model calls go through `Manager.generate(..., watcher=True)`: added to
 the run's usage, outside its budget, and never taken as the persona's answer (`_answered`).
@@ -136,8 +136,11 @@ conversation and what runs there without asking are [permissions](#permissions),
 assignments.
 
 * **Budgets** cap model calls, tool calls and active seconds per run; exceeding them fails the run.
-* **The log.** What happened in a conversation, one line each: modules write through `logbook` (sessions, tool calls,
-  watchers), and the core logs each write or critical action that ran. Engines read it, and people with `$log`.
+* **The log.** What happened in a conversation, one line each: the core logs each write or critical action that ran.
+  Engines read it (`session.logbook`), and people with `$log`.
+* **Threads.** When each conversation's thread began is the core's (`core:threads`, `core/manager/threads.py`): an engine
+  starts one over with `Session.start_over`, a command with `ToolContext.start_over`, and everyone reads
+  `Session.thread_since` and `PartContext.since`.
 * **Unattended runs.** Routines fire through the gateway as `origin="routine"` requests in
   `routine:<name>`; their assignment and routes decide where results go, permissions what they may use
   (by default only `basic.*`). `trusted` routines act at the creator's level. Approvals still go to the
@@ -263,7 +266,7 @@ flowchart TB
   pattern, nothing the model wrote), covers that capability and subject in that conversation only,
   expires after 30 days and is listed and revoked with `$permissions`.
 * **Stamina.** A run at a spending limit (her day's allowance, everyone's total for the day, or the run's own `budget_usd`) waits with a
-  `core.stamina` card before its next model call (core/manager/stamina.py, contracts 1.12): approved, the limit grows
+  `core.stamina` card before its next model call (core/manager/stamina.py): approved, the limit grows
   by `step` and the run resumes; denied, it stops with the reason. The core prices every answer itself
   (core/providers/prices.py), so the limits hold for every engine.
 * **Typed commands.** The owner's own `$command` (typed, not forwarded, not a routine a model set up) is
@@ -317,15 +320,13 @@ Besides `submit`, an interface's port can `notify` the owner (a `Reply(kind="eve
 owner's platform reply to it is relayed back to the origin conversation), `observe` activity into
 history (idempotent per message ID), `cancel` / `cancel_all` open runs, `set_ready` (transitions notify
 the owner; deliveries are refused while not ready), `check` a reply right before committing it, and read
-`policy` for its conversations. `submit` returns a `SubmitResult` with the admission reason. Since contracts 1.7
-an interface can also ask whether a model profile can answer (`models_ready`), whether an approval is still
+`policy` for its conversations. `submit` returns a `SubmitResult` with the admission reason. An interface can also ask whether a model profile can answer (`models_ready`), whether an approval is still
 pending (`approval_status`), and `publish` its link and a small public status (a place on the club's map, say)
 that the other interfaces read from the `directory`: modules learn about each other through the core this way,
-never by calling each other. Since 1.9 an interface lists the personas (`personas`: names, aliases, pictures,
+never by calling each other. An interface lists the personas (`personas`: names, aliases, pictures,
 readiness) and reads `facts`, the small public values modules publish about a persona and one of its own people
 (kept in the tank's `core:facts` by `core/manager/facts.py`), so a page shows a bond or a mood without knowing which
-module keeps it. A persona's `formerly` names are adopted at start (`core/manager/renames.py`): core.yml's old
-names are read as hers and the tank's data under them is moved once (`Tank.rename_persona`). When the core stops, it cancels runs with `contracts.SHUTDOWN`, so an engine can tell a
+module keeps it. When the core stops, it cancels runs with `contracts.SHUTDOWN`, so an engine can tell a
 stop (the run resumes) from a cancel.
 
 Revocation is immediate: a rule that stops admitting a conversation, or an assignment that is disabled
@@ -391,7 +392,8 @@ to the unit to keep a core that keeps crashing down until it is fixed.
 | [`core/manager/policy.py`](../../core/manager/policy.py) | Assignments, budgets, owners and the permissions model (`use`, tiers, rules, layers) |
 | [`core/manager/secrets.py`](../../core/manager/secrets.py) | Secret values, formats and paths; scrubbing (S1-S3) |
 | [`core/manager/handles.py`](../../core/manager/handles.py) | Session, tools, models, capability and watcher context handles |
-| [`core/manager/facts.py`](../../core/manager/facts.py), [`core/manager/renames.py`](../../core/manager/renames.py) | Facts modules publish for pages; a renamed persona's former names adopted at start |
+| [`core/manager/facts.py`](../../core/manager/facts.py) | Facts modules publish for pages |
+| [`core/manager/threads.py`](../../core/manager/threads.py) | When each thread began: a conversation's, one persona's in it, hers everywhere |
 | [`core/manager/stamina.py`](../../core/manager/stamina.py) | Stamina: each persona's day against her allowance, everyone's against the day's total, accounts, runs that wait at a limit, `$stamina` |
 | [`core/manager/core_capabilities.py`](../../core/manager/core_capabilities.py) | `core.*` capabilities and interface operations |
 | [`core/providers/`](../../core/providers) | Profiles, fallback, OpenAI-compatible / Gemini / Anthropic adapters; model prices ([`prices.py`](../../core/providers/prices.py): core.yml `prices:` over Artificial Analysis's list) |

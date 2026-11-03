@@ -46,7 +46,7 @@ DECISION = re.compile(r"^\$(approve|deny)\s+([0-9a-f]{4,12})(\s+always)?\s*$", r
 MODEL_PURPOSES = ("overview", "choose")
 QUIET_PREFIX = "web-quiet-"  # the request IDs of the page's own commands
 # What pages show of where a student stands with you: the facts any module publishes under these names
-# (contracts.Facts; the companion's `companion.alias`, say), the first of each found.
+# (contracts.Facts; the students' `students.alias`, say), the first of each found.
 STANDING = ("alias", "bond", "mood")
 # What the Students page shows of her work: the facts any module publishes under these names (Chimera's
 # `chimera.record`, her sessions and level, and `chimera.benchmark`, her measured runs), the first of each found.
