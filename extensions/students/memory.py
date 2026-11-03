@@ -22,8 +22,8 @@ import secrets
 import time
 from pathlib import Path
 
-from contracts import (Capability, Command, Context, ModelRequest, Option, PromptPart, Risk, ToolResult, Watcher, flag,
-                       impulse, impulse_line, number)
+from contracts import (IMPULSE, Capability, Command, Context, ModelRequest, Option, PromptPart, Risk, ToolResult,
+                       Watcher, flag, impulse, impulse_line, is_command, number)
 
 import mneme_llm
 from mneme_llm.gut import GROWS
@@ -47,6 +47,8 @@ DEEPER = ("deep", "gut")  # what `$new` clears: what she remembers; and what peo
 EVERYONE = "everyone"
 STARTER = "gut-starter.json.gz"  # in her folder: the lessons she is born with (tools/gut_starter.py)
 TOOLBOXES = 64  # the newest runs' search tools kept (each remembers what its searches showed)
+REACH = 200  # messages of a conversation read for what a person said
+UNANSWERED = 20  # the most of their messages one of hers answers
 
 
 def conversation(engine: str, settings: "Settings") -> bool:
@@ -148,6 +150,10 @@ class Book:
 
     def keeps(self, persona: str) -> bool:
         return persona in self.personas
+
+    def has(self, persona: str) -> bool:
+        """Whether she has a file yet."""
+        return (self.folder / f"{persona}.db").exists()
 
     def shown(self, persona: str) -> str:
         return self.names.get(persona, {}).get("display_name") or persona
@@ -357,7 +363,7 @@ def classmates_line(book: "Book", persona: str, subject: str, language: str) -> 
     anything lately. Her file alone is hers to change: this only reads theirs, and never makes one."""
     now, seen = time.time(), []
     for name in book.known():
-        if name == persona or not (book.folder / f"{name}.db").exists():
+        if name == persona or not book.has(name):
             continue
         state = book.open(name).mood.state(subject)
         if state.updated_at is not None and now - state.updated_at <= RECENT:
@@ -387,7 +393,8 @@ async def hear(book: Book, settings: Settings, exchange, subject: str, said) -> 
         own = settings.of(persona)
         if persona == exchange.persona.name or not book.keeps(persona) or not (own.learn and own.episodes):
             continue
-        await book.open(persona, create=True).episodes.akeep(subject, said, conversation=where(exchange.address))
+        await book.open(persona, create=True).episodes.akeep(subject, said, conversation=where(exchange.address),
+                                                             at=exchange.at)
         heard.append(persona)
     return heard
 
@@ -423,7 +430,7 @@ def make_part(book: Book, settings: Settings, guts: Guts | None = None):
         person = called(book, persona.name, subject, context.owner, trigger.sender)
         turn = guts.begin(context, subject) if guts is not None and own.gut and not impulse(trigger) else None
         memory = book.open(persona.name)
-        started_over(memory, subject, context.since)
+        started_over(memory, subject, context)
 
         async def with_gut(kept: str) -> str:
             """What she keeps of them, and the line from her gut, which reads it first."""
@@ -440,10 +447,11 @@ def make_part(book: Book, settings: Settings, guts: Guts | None = None):
         who = "\n".join(line for line in (memory.relations.line(subject, person),
                                           memory.aliases.line(subject, person)) if line)
         query = impulse(trigger) or trigger.text  # (speaking up, her notes for what moves her)
+        alone = direct(context)
         notes, said = await asyncio.gather(  # (each waits on the same query's embedding)
             memory.memory.acontext(subject, query, user_name=person) if own.notes else _nothing(""),
-            memory.alook(subject, query, user_name=person, budget=own.said, search=own.search, own=trigger.is_direct,
-                         found=mneme_llm.SEARCHED if trigger.is_direct else 0) if own.said else _nothing(""))
+            memory.alook(subject, query, user_name=person, budget=own.said, search=own.search, own=alone,
+                         found=mneme_llm.SEARCHED if alone else 0) if own.said else _nothing(""))
         notes = (notes or no_notes(person, own.language)) if own.notes else ""
         # Her mood's news is told once: marked by the watcher once she has replied, so a step asked twice (or a run
         # replayed) shows it each time; without the watcher, at once.
@@ -453,9 +461,14 @@ def make_part(book: Book, settings: Settings, guts: Guts | None = None):
     return text
 
 
-def started_over(memory, subject: str, since: float) -> None:
-    """Her copy of the conversation starts over with the chat (a `/new`)."""
-    if memory is not None and since > memory.surface.began(subject):
+def direct(context) -> bool:
+    """A chat with her alone, whoever asks (a `PartContext`, an `Exchange`): a web page's group chat is direct too."""
+    return context.trigger.is_direct and len(context.personas) == 1
+
+
+def started_over(memory, subject: str, context) -> None:
+    """Her copy of the conversation starts over with a chat with her alone (a `/new`). A group's does not touch it."""
+    if memory is not None and direct(context) and context.since > memory.surface.began(subject):
         memory.surface.clear(subject)
 
 
@@ -466,15 +479,16 @@ def make_context(book: Book, settings: Settings):
         where the last one stopped, and the engine reads only what came after it. A group is the engine's own."""
         persona, trigger = part.persona, part.trigger
         own = settings.of(persona.name)
-        if not (trigger.is_direct and trigger.origin == "person" and own.surface and own.learn and own.episodes
+        if not (direct(part) and trigger.origin == "person" and own.surface and own.learn and own.episodes
                 and book.keeps(persona.name) and conversation(part.engine, settings)):
             return None
         memory = book.open(persona.name)
         if memory is None:
             return None
         subject = book.subject(part.address.interface, trigger.sender.id)
-        started_over(memory, subject, part.since)
-        view = memory.surface.read(subject, user_name=called(book, persona.name, subject, part.owner, trigger.sender))
+        started_over(memory, subject, part)
+        view = memory.surface.read(subject, user_name=called(book, persona.name, subject, part.owner, trigger.sender),
+                                   here=where(part.address))
         return Context(tuple(view.messages), view.upto) if view.messages else None
     return context
 
@@ -501,13 +515,25 @@ def first_role(memory, subject: str, own: Settings, owner: bool) -> None:
             continue
 
 
+def their_words(exchange, history, after: float) -> list[str]:
+    """What the sender said here since `after`, up to her message: the answer to a question, a message that came while
+    she worked, one whose run failed. Their `$commands` and what she said on her own stay out of it."""
+    trigger = exchange.trigger
+    return [item.text for item in history.recent(REACH)
+            if item.direction == "in" and item.sender_id == trigger.sender.id and item.at > after
+            and (item.at <= exchange.at or item.message_id == trigger.id)
+            and not is_command(item.text) and not item.text.startswith(IMPULSE)][-UNANSWERED:]
+
+
 def make_learner(book: Book, settings: Settings):
     async def learn(exchange, context) -> None:
         """After each of her messages: the exchange kept word for word, how it left her feeling and what is worth
         keeping (one decision call, and a note writer only when something is), a day of contact for her closeness,
-        and once a day her impression. The exchange and the notes from a group chat go to her classmates there too
-        (`hear`, `share`). A message she started herself (speaking up) moves her mood only: notes and what was said
-        come from what people tell her."""
+        and once a day her impression. An exchange is what the person said since her last one here (`their_words`), so
+        none of it is lost and a run posting three messages keeps it once; a message that answers nothing new is kept
+        as hers alone. The exchange and the notes from a group chat go to her classmates there too (`hear`, `share`). A
+        message she started herself (speaking up) moves her mood only: notes and what was said come from what people
+        tell her."""
         persona, trigger = exchange.persona, exchange.trigger
         if trigger.origin != "person" or not conversation(exchange.engine, settings) or not book.keeps(persona.name):
             return
@@ -522,13 +548,20 @@ def make_learner(book: Book, settings: Settings):
             first_role(memory, subject, own, exchange.owner)
         complete = writer(context.models, own.writer_profile)
         memory.mood.news(subject, mark=True)  # she has replied: what moved her before was told
-        said = [(f"({persona.display_name}'s own thought)", motive) if motive else (person, trigger.text),
-                (persona.display_name, exchange.text)]
         keep = own.episodes and not motive
         place = {"conversation": where(exchange.address), "at": exchange.at}
-        if own.episodes and motive:  # (without it, what they answer next answers nothing she reads)
-            memory.episodes.keep(subject, [("", impulse_line(motive)), said[1]], **place)
-        if own.mood or own.notes:
+        hers = (persona.display_name, exchange.text)
+        if motive:
+            said = [(f"({persona.display_name}'s own thought)", motive), hers]
+            if own.episodes:  # (without it, what they answer next answers nothing she reads)
+                memory.episodes.keep(subject, [("", impulse_line(motive)), hers], **place)
+        else:
+            words = [trigger.text]
+            if keep:
+                last = memory.surface.read(subject, here=where(exchange.address)).upto
+                words = their_words(exchange, context.history, max(last, exchange.since))
+            said = [*((person, word) for word in words), hers]
+        if (own.mood or own.notes) and (motive or words):
             seen = await memory.aobserve(subject, said, source="speak-up" if motive else "user", user_name=person,
                                          complete=complete, mood=own.mood, capture=own.notes, keep=keep, **place)
             if seen.error:
@@ -539,9 +572,11 @@ def make_learner(book: Book, settings: Settings):
             memory.relations.seen(subject)
             if keep:
                 await memory.episodes.akeep(subject, said, **place)
+                memory.surface.noticed(subject, said)
         if keep:
             await hear(book, settings, exchange, subject, said)
-            await memory.surface.alet_go(subject, user_name=person, complete=complete)
+            if own.surface:
+                await memory.surface.alet_go(subject, user_name=person, complete=complete)
         if own.notes and not motive:
             updated = memory.memory.profile_updated_at(subject)
             if (updated is None or time.time() - updated >= DAY) and \
@@ -684,13 +719,13 @@ def make_first(book: Book):
         if first is None:
             return f"{name}: nothing kept yet"
         return (f"{name}: {first.text}\n  ({'you set this' if first.by_command else 'the first thing you said'}; "
-                f"{'she reads it first in every chat' if first.send else 'only kept'})")
+                f"{'she reads it first in every direct chat' if first.send else 'only kept'})")
 
     async def first(arguments, context) -> ToolResult:
         """`$first` shows the first prompt each student keeps of you, `$first <text>` sets it for every student, `$first
-        on` puts it in front of everything she reads, so a new chat is {first prompt} + {what she keeps of you} + {your
-        message}, `$first off` only keeps it, and `$first clear` takes it away. A student first (`$first <student> ...`)
-        is her alone."""
+        on` puts it in front of everything she reads in every direct chat, so a new one is {first prompt} + {what she
+        keeps of you} + {your message}, `$first off` only keeps it, and `$first clear` takes it away. A student first
+        (`$first <student> ...`) is her alone."""
         subject = book.subject(context.address.interface, context.sender.id)
         text = str(arguments.get("text") or "").strip()
         word, _, rest = text.partition(" ")
@@ -702,25 +737,23 @@ def make_first(book: Book):
             return ToolResult.ok("No students yet.")
         if not text:
             return ToolResult.ok("\n".join(shown(item, subject) for item in personas))
-        memories = {item: book.open(item, create=True) for item in personas}
-        shown_as = book.shown(persona) if persona else "every student"
-        if text.casefold() in ("on", "off"):
-            sent = [memory.surface.send_first(subject, text.casefold() == "on") for memory in memories.values()]
-            if not any(sent):
+        shown_as, word = book.shown(persona) if persona else "every student", text.casefold()
+        if word in ("on", "off", "clear"):
+            kept = [book.open(item) for item in personas if book.has(item)]  # (asking makes no file)
+            if word == "clear":
+                taken = [memory.surface.drop_first(subject) for memory in kept]
+                return ToolResult.ok(f"Taken away, for {shown_as}." if any(taken) else f"Nothing is kept, for {shown_as}.")
+            if not any([memory.surface.send_first(subject, word == "on") for memory in kept]):
                 return ToolResult.fail("There is no first prompt yet: set one with `$first <text>`.", "no_first")
-            return ToolResult.ok(f"She reads it first in every chat, for {shown_as}." if text.casefold() == "on"
+            return ToolResult.ok(f"She reads it first in every direct chat, for {shown_as}." if word == "on"
                                  else f"It is only kept now, for {shown_as}.")
-        if text.casefold() == "clear":
-            for memory in memories.values():
-                memory.surface.drop_first(subject)
-            return ToolResult.ok(f"Taken away, for {shown_as}.")
-        for memory in memories.values():
-            memory.surface.set_first(subject, text)
-        return ToolResult.ok(f"Kept, for {shown_as}. `$first on` has her read it first in every chat.")
+        for item in personas:
+            book.open(item, create=True).surface.set_first(subject, text)
+        return ToolResult.ok(f"Kept, for {shown_as}. `$first on` has her read it first in every direct chat.")
     return first
 
 
-def make_new(book: Book, settings: Settings, guts: "Guts | None"):
+def make_new(book: Book, settings: Settings, guts: "Guts | None", facts):
     async def new(arguments, context) -> ToolResult:
         """`$new deep <student>` clears what she remembers of everyone, for good; `$new gut <student>` clears what people
         taught her gut as well, and she is as she was born. `everyone` in place of a student is every student. Naming
@@ -733,16 +766,14 @@ def make_new(book: Book, settings: Settings, guts: "Guts | None"):
                                                                                      context.sender.id))
         if persona is None and words[1] != EVERYONE:
             return ToolResult.fail(f"No student called {words[1]!r} here. Name one, or say `everyone`.", "unknown_student")
-        now, kept, lessons = time.time(), 0, 0
+        kept, lessons = 0, 0
         for name in [persona] if persona else book.known():
             memory = book.open(name)
             if memory is not None:
                 for someone in memory.everyone():
                     kept += memory.wipe(someone)
-            try:
-                context.memory(name).set("thread_since", now)  # (her context goes with it, in every chat)
-            except ValueError:  # (a student no longer here keeps a file, and has no context)
-                pass
+                    book.publish(facts, name, someone)  # (what she had coming with them is gone from the pages too)
+            context.start_over(name, everywhere=True)  # (her context goes with it, in every chat)
             if words[0] == "gut" and guts is not None and settings.of(name).gut:
                 lessons += await asyncio.to_thread((await guts.woken(name)).wipe)
         shown = book.shown(persona) if persona else "Every student"
@@ -849,7 +880,7 @@ def contributions(context, students: dict[str, dict]) -> dict:
                        {"text": {"type": "string", "description": "<text>, on, off, clear, a student first, or nothing"}},
                        risk=Risk.WRITE, internal=True, command="first", command_argument="text"),
             Capability("students.new", "Start over deeper than /new, for one student or everyone: what they remember, "
-                       "for good.", make_new(book, settings, guts),
+                       "for good.", make_new(book, settings, guts, facts),
                        {"text": {"type": "string", "description": "deep or gut, then a student or everyone"}},
                        risk=Risk.CRITICAL, access="creator", internal=True, command_argument="text",
                        command=Command("new", "Start over deeper than /new, for one student or everyone",

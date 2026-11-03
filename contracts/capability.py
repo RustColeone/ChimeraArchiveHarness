@@ -16,7 +16,7 @@ from contracts.shared import persona_names
 from contracts.stores import Store
 
 if TYPE_CHECKING:
-    from contracts.engine import History, Logbook
+    from contracts.engine import History
 
 ResultStatus = Literal["success", "failed", "needs_input", "needs_approval"]
 NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
@@ -125,9 +125,9 @@ class ToolContext(Protocol):
         `conversation`, one of the run's personas, and the caller (`person`); no arguments: the module's
         store everywhere."""
 
-    def memory(self, persona: str) -> Store:
-        """A persona's private store, as `Session.memory` opens it, for a command that changes what her
-        engine reads. Any persona there is, as a typed command has none of its own."""
+    def start_over(self, persona: str | None = None, everywhere: bool = False) -> None:
+        """A new thread from now on: in this conversation, for everyone or for `persona`; with `everywhere`, hers in
+        every conversation. Any persona there is, as a typed command has none of its own."""
 
 
 Handler = Callable[[Mapping[str, Any], ToolContext], Awaitable[ToolResult]]

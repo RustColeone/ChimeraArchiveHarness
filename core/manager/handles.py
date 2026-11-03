@@ -5,12 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
+import dataclasses
 import json
 import math
 import time
 
-from contracts import (Activity, Address, Context, Delivery, Display, Event, FileRef, HistoryItem, HistorySummary, ModelRequest,
-                        ModelResult, PART_PLACES, PartContext, Persona, Request, Sender, ToolResult)
+from contracts import (Activity, Address, Context, Delivery, Display, Event, FileRef, HistoryItem, HistorySummary,
+                       ModelRequest, ModelResult, PART_PLACES, PartContext, Persona, Request, Sender, ToolResult)
 from core.manager.logbook import LogbookHandle
 from core.serialize import request_from_dict
 from core.storage.tank import RunRecord
@@ -153,31 +154,38 @@ class SessionHandle:
                             [item.name for item in self.personas], conversation=conversation, persona=persona,
                             person=person)
 
-    def memory(self, persona: str) -> Any:
-        if persona not in {item.name for item in self.personas}:
-            raise ValueError("A session can only open memory for its own personas")
-        return self._manager.tank.store("persona:" + persona)
+    def thread_since(self, persona: str | None = None) -> float:
+        return self._manager.threads.since(str(self.address), [persona] if persona else
+                                           [item.name for item in self.personas])
+
+    def start_over(self, persona: str | None = None) -> None:
+        if persona is not None and persona not in {item.name for item in self.personas}:
+            raise ValueError("A session can only start a thread over for its own personas")
+        self._manager.threads.start(self.trigger.received_at, str(self.address), persona or "")
 
     @property
     def logbook(self) -> LogbookHandle:
         return LogbookHandle(self._manager, str(self.address))
 
-    async def aprompt(self, persona: str, place: str = "stable", since: float = 0.0) -> str:
-        match, context = self._part_context(persona, place, since)
+    async def aprompt(self, persona: str, place: str = "stable") -> str:
+        if place == "context":
+            raise ValueError("The context place gives a Context: read it with Session.context")
+        match, context = self._part_context(persona, place)
         return await self._manager.arender_prompt(match, place, context)
 
-    def context(self, persona: str, since: float = 0.0) -> Context | None:
-        match, context = self._part_context(persona, "context", since)
+    def context(self, persona: str) -> Context | None:
+        match, context = self._part_context(persona, "context")
         return self._manager.context_of(match, context)
 
-    def _part_context(self, persona: str, place: str, since: float = 0.0):
+    def _part_context(self, persona: str, place: str):
         match = next((item for item in self.personas if item.name == persona), None)
         if match is None:
             raise ValueError("A session can only render the prompt of its own personas")
         if place not in PART_PLACES:
             raise ValueError(f"place is one of {', '.join(PART_PLACES)}")
         return match, PartContext(match, self.address, self.trigger, self.owner, self._engine,
-                                  WatcherModels(self._manager, self.run_id, match.profile), self.history, since)
+                                  WatcherModels(self._manager, self.run_id, match), self.history,
+                                  self.thread_since(persona), tuple(item.name for item in self.personas))
 
     def inbox(self) -> list[Request]:
         return self._manager.take_inbox(self.run_id)
@@ -242,10 +250,12 @@ class ToolContextHandle:
         return module_store(self._manager, self._extension, self.address, self.sender, self._personas,
                             conversation=conversation, persona=persona, person=person)
 
-    def memory(self, persona: str) -> Any:
-        if persona not in self._manager.personas:
+    def start_over(self, persona: str | None = None, everywhere: bool = False) -> None:
+        if persona is not None and persona not in self._manager.personas:
             raise ValueError(f"No persona named {persona!r}")
-        return self._manager.tank.store("persona:" + persona)
+        if everywhere and persona is None:
+            raise ValueError("Starting over everywhere is one persona's")
+        self._manager.threads.start(time.time(), "" if everywhere else str(self.address), persona or "")
 
     async def schedule(self, at: float, text: str) -> str:
         return self._manager.gateway.schedule(self.address, at, text, self.sender)
@@ -258,11 +268,16 @@ class ToolContextHandle:
 
 
 class WatcherModels(ModelsHandle):
-    """A watcher's models: counted in the run's usage, not against its budget (the run may be over)."""
+    """A watcher's models, or a prompt part's, for one persona: counted in the run's usage and on her day, not against
+    the run's budget (the run may be over)."""
+
+    def __init__(self, manager: "Manager", run_id: str, persona: Persona):
+        super().__init__(manager, run_id, persona.profile)
+        self._persona = persona.name
 
     async def generate(self, request: ModelRequest) -> ModelResult:
-        return await self._manager.generate(self._run_id, request, request.profile or self._default_profile,
-                                            watcher=True)
+        return await self._manager.generate(self._run_id, dataclasses.replace(request, persona=self._persona),
+                                            request.profile or self._default_profile, watcher=True)
 
 
 class WatchContextHandle:
@@ -270,7 +285,7 @@ class WatchContextHandle:
 
     def __init__(self, manager: "Manager", module: str, exchange):
         self._manager, self._module, self._exchange = manager, module, exchange
-        self.models = WatcherModels(manager, exchange.run_id, exchange.persona.profile)
+        self.models = WatcherModels(manager, exchange.run_id, exchange.persona)
         self.history = ReadingHistory(HistoryHandle(manager, exchange.address))
         self.facts = manager.facts.handle(module)
 

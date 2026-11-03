@@ -1,6 +1,8 @@
-"""Prompt parts: core.yml's `personas: <name>: parts:`, modules' parts, their rendering and where engines put them."""
+"""Prompt parts: core.yml's `agents: <name>: parts:`, modules' parts, their rendering and where engines put them."""
 
 import asyncio
+import contextlib
+import gc
 import tempfile
 import textwrap
 import time
@@ -9,11 +11,11 @@ import warnings
 from pathlib import Path
 from unittest import mock
 
-from contracts import Address, Engine, EngineSpec, PartContext, Persona, PromptPart, Request, RunYield, Sender
+from contracts import Address, Context, Engine, EngineSpec, PartContext, Persona, PromptPart, Request, RunYield, Sender
 from core.config import ConfigError, CoreConfig
 from core.manager.secrets import Secrets
 from core import prompts as prompts_module
-from core.prompts import PLACE_LIMIT, FileText, arender, parts_for, with_parts
+from core.prompts import PLACE_LIMIT, FileText, arender, conversation_of, parts_for, parts_from_config, with_parts
 from tests.core_support import ROOT, FakeAdapter, iface, make_config, settle, start_core, turn_context
 from tests.test_momochat import NAMES, Script
 from tests.test_momochat import turn as room_turn
@@ -132,6 +134,26 @@ class ContractTests(unittest.TestCase):
                 Persona("p", "Pat", "x", parts=parts)
 
 
+class ContextPartTests(unittest.TestCase):
+    def test_a_context_part_is_a_function_and_core_yml_cannot_give_one(self):
+        with self.assertRaisesRegex(ValueError, "function returning a Context"):
+            PromptPart("surface", "words", place="context")
+        with self.assertRaisesRegex(ValueError, "place: context"):
+            parts_from_config("p", [{"file": "a.md", "place": "context"}], Path)
+
+    def test_an_async_context_part_is_refused_and_leaves_no_coroutine_waiting(self):
+        async def late(part):
+            return Context(({"role": "user", "content": "late"},), 1.0)
+        problems = []
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            found = conversation_of([PromptPart("late", late, place="context")], context(),
+                                    lambda part, kind, detail: problems.append(kind))
+            gc.collect()
+        self.assertIsNone(found)
+        self.assertEqual(problems, ["failed"])
+
+
 class RenderTests(Temporary):
     def render(self, parts, place="stable", owner=False):
         problems = []
@@ -242,6 +264,9 @@ class PartsProbe(Engine):
             refused = False
         except ValueError:
             refused = True
+        with contextlib.suppress(ValueError):
+            await session.aprompt(persona, "context")
+            refused = False
         self.seen.append((await session.aprompt(persona), await session.aprompt(persona, "turn"), refused))
         return RunYield.DONE
 
@@ -392,6 +417,21 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([(event["part"], event["source"]) for event in events], [("flaky", "test")] * 2)
         self.assertIn("on one", events[0]["problem"])
         self.assertIn("on four", events[1]["problem"])
+
+    async def test_what_a_context_part_gives_is_scrubbed_and_a_part_that_recovers_is_forgotten(self):
+        core, adapter = await self.core([])
+        calls = []
+
+        def surface(part):
+            calls.append(1)
+            if len(calls) == 1:
+                raise RuntimeError("not yet")
+            return Context(({"role": "user", "content": "the key is sk-abcdefghijklmnopqrstuvwxyz"},), 1.0)
+        core.manager.register_prompt_part(PromptPart("surface", surface, place="context"), "test")
+        await self.say(core, "one", "two", "three")
+        self.assertEqual(len(calls), 3)  # (once for each run)
+        self.assertIn("[secret api key]", adapter.calls[-1]["messages"][1]["content"])
+        self.assertNotIn(("p", "surface", "context", "failed"), core.manager._part_problems)
 
     async def test_secrets_are_scrubbed_from_parts(self):
         core, adapter = await self.core([{"text": "The key is sk-test-0123456789abcdef0123."}])

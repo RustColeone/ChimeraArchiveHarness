@@ -54,11 +54,11 @@ class Context:
 
 @dataclass(frozen=True)
 class PartContext:
-    """What a computed prompt part may look at: the persona it is written for, the run's address and trigger,
-    the engine placing it, so a part can keep to some engines, and `models` and
-    `history`, for a part that asks her model something or reads the conversation before she answers. Its model calls
-    are counted in the run's usage but not against its budget, as a watcher's are. `since` is when the
-    thread she is in began, as the engine says (`Session.aprompt`): 0 when it never was started over."""
+    """What a computed prompt part may look at: the persona it is written for, the run's address and trigger, the
+    engine placing it, so a part can keep to some engines, and `models` and `history`, for a part that asks her model
+    something or reads the conversation before she answers. Its model calls are counted in the run's usage but not
+    against its budget, as a watcher's are. `since` is when the thread she is in began (0: it never was started over),
+    and `personas` are all who take part in the conversation, her own name included."""
 
     persona: "Persona"
     address: Address
@@ -68,6 +68,7 @@ class PartContext:
     models: Any = None  # a `Models` (None outside a run)
     history: Any = None  # a `History` (None outside a run)
     since: float = 0.0
+    personas: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -78,10 +79,9 @@ class PromptPart:
     part that looks something up), and engines render it with `Session.aprompt`. `place` says where an
     engine puts it: `stable` in the system prompt (the same every turn, so the provider's prompt cache keeps
     serving it), `turn` in the turn's context after the history (it may change every turn), `context`
-    in place of the history: its function returns a `Context`, or None to leave it to the engine (`Session.context`
-    gives the first). Parts come in `order`
-    (lower first). A module's part is for the personas it names (`personas`), or for every persona when it names
-    none; a persona's own parts are its own. Engines get them rendered with `Session.prompt`."""
+    in place of the history: its function returns a `Context` at once, or None to leave it to the engine
+    (`Session.context` gives the first). Parts come in `order` (lower first). A module's part is for the personas it
+    names (`personas`), or for every persona when it names none; a persona's own parts are its own."""
 
     name: str
     text: Union[str, Callable[[PartContext], Union[str, Awaitable[str]]]]
@@ -96,6 +96,8 @@ class PromptPart:
             raise ValueError(f"prompt part {self.name!r}: place is one of {', '.join(PART_PLACES)}")
         if not isinstance(self.text, str) and not callable(self.text):
             raise ValueError(f"prompt part {self.name!r}: text is a string or a function of a PartContext")
+        if self.place == "context" and isinstance(self.text, str):
+            raise ValueError(f"prompt part {self.name!r}: a context part is a function returning a Context")
         if isinstance(self.order, bool) or not isinstance(self.order, int):
             raise ValueError(f"prompt part {self.name!r}: order is a whole number")
         object.__setattr__(self, "personas", persona_names(self.personas, f"prompt part {self.name!r}"))
@@ -311,21 +313,23 @@ class Session(Protocol):
         (`person`, across conversations). No arguments: the module's store everywhere. Each module's stores
         are its own; the core keeps them and never reads them."""
 
-    def memory(self, persona: str) -> Store:
-        """The persona's private key-value store, shared by all its conversations (older: prefer
-        `store(persona=...)`, which is the module's own)."""
+    def thread_since(self, persona: str | None = None) -> float:
+        """When the thread began for one of the run's personas, or (none named) for them all: the latest start that
+        holds them, 0 when it never was started over."""
 
-    async def aprompt(self, persona: str, place: str = "stable", since: float = 0.0) -> str:
+    def start_over(self, persona: str | None = None) -> None:
+        """A new thread in this conversation from the trigger on, for everyone or for one of the run's personas."""
+
+    async def aprompt(self, persona: str, place: str = "stable") -> str:
         """The prompt parts for one of the run's personas at `place` ("stable" or "turn"), rendered in order and
         joined ("" when there are none): its own parts and the modules' parts for it. Async parts are awaited, each in
         turn, for at most a few seconds. A part that fails or takes longer is left out (and logged); none can fail the
-        run. Render once per turn: a part may cost a lookup. `since`: when the thread she is in began, which the part
-        reads as `PartContext.since`."""
+        run. Render once per turn: a part may cost a lookup."""
         ...
 
-    def context(self, persona: str, since: float = 0.0) -> Context | None:
-        """What a module keeps of this conversation for her, if one does. She reads it in place of the
-        engine's own window; it may change between her steps, so an engine asks each time it builds a request."""
+    def context(self, persona: str) -> Context | None:
+        """What a module keeps of this conversation for her, if one does. She reads it in place of the engine's own
+        window. Read it once a turn: it may be large, and it costs a look through what is kept."""
 
     def inbox(self) -> list[Request]:
         """Requests for this run's lane that arrived while this run was thinking. Each is returned once.

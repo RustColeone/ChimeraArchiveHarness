@@ -6,7 +6,8 @@ import time
 import unittest
 from pathlib import Path
 
-from contracts import Address, Request, Sender
+from contracts import Address, ModelRequest, Request, Sender
+from core.manager.handles import WatcherModels
 from tests.core_support import FakeAdapter, iface, settle, start_core
 
 # Every fake answer is 10 tokens in and 5 out: at $1,000 a million tokens, each costs $0.015.
@@ -24,8 +25,8 @@ class StaminaTests(unittest.IsolatedAsyncioTestCase):
             await self.core.stop()
         self._tmp.cleanup()
 
-    async def start(self, stamina):
-        self.core = await start_core(self.tmp, {"prices": PRICES, "stamina": stamina},
+    async def start(self, stamina, **overrides):
+        self.core = await start_core(self.tmp, {"prices": PRICES, "stamina": stamina, **overrides},
                                      adapter=FakeAdapter(handler=lambda messages, schema: "ok"))
         self.chat = iface(self.core, "chat")
         return self.core
@@ -38,6 +39,50 @@ class StaminaTests(unittest.IsolatedAsyncioTestCase):
     def run_of(self, text):
         statuses = ("running", "waiting_input", "waiting_approval", "done", "failed", "cancelled")
         return next(run for run in self.core.manager.tank.runs(statuses, limit=50) if run.trigger["text"] == text)
+
+    async def test_with_nobody_to_ask_a_run_at_her_limit_ends_and_says_why(self):
+        await self.start({"allowance": 0.01}, control=None, owners={})
+        await self.chat.say("spend 2")
+        await settle(self.core)
+        run = self.run_of("spend 2")
+        self.assertEqual(run.status, "failed")
+        self.assertIn("No owner approval route", run.error)
+
+    async def test_a_command_that_asks_a_model_at_her_limit_waits_with_its_card(self):
+        await self.start({"allowance": 0.01})
+        await self.chat.say("spend 1", sender="boss", name="Boss")
+        await settle(self.core)
+        await self.chat.say("$think", sender="boss", name="Boss")
+        await settle(self.core)
+        self.assertEqual(self.run_of("$think").status, "waiting_approval")
+        self.assertIsNotNone(self.card())
+        self.assertEqual(self.chat.notices("waiting_approval")[-1].data["approval_id"],
+                         self.card().data["approval_id"])
+
+    async def test_an_approved_action_that_reaches_her_limit_is_reported_and_the_run_waits(self):
+        await self.start({"allowance": 0.01})
+        owner = iface(self.core, "owner")
+        await self.chat.say('tool tools.think {}')
+        await settle(self.core)
+        asked = owner.notices("approval_request")[-1].data["approval_id"]
+        await self.chat.say("spend 1", conversation="other", sender="boss", name="Boss")
+        await settle(self.core)
+        await self.chat.say(f"$approve {asked}", sender="boss", name="Boss")
+        await settle(self.core)
+        run = self.run_of('tool tools.think {}')
+        self.assertEqual(run.status, "waiting_approval")
+        outcome = self.core.tank.events(run.id, ("tool_result",))[-1].data["result"]
+        self.assertEqual(outcome["error_code"], "stamina")
+
+    async def test_a_watchers_cost_is_on_her_day(self):
+        await self.start({})
+        await self.chat.say("spend 1")
+        await settle(self.core)
+        stamina = self.core.manager.stamina
+        before = stamina.spent_today("p")
+        models = WatcherModels(self.core.manager, self.run_of("spend 1").id, self.core.manager.personas["p"])
+        await models.generate(ModelRequest([{"role": "user", "content": "how did that go?"}]))
+        self.assertAlmostEqual(stamina.spent_today("p"), before + 0.015)
 
     async def test_a_run_at_her_daily_allowance_waits_and_carries_on_when_you_let_her(self):
         await self.start({"allowance": 0.02, "step": 0.03})

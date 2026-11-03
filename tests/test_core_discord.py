@@ -494,7 +494,7 @@ class DefaultConfigurationTests(unittest.TestCase):
         self.assertEqual(str(config.control), "discord:dm:77")
 
     def test_modules_are_excluded_by_name_or_path_and_added_by_path(self):
-        from core.config import ConfigError, CoreConfig
+        from core.config import CoreConfig
         with tempfile.TemporaryDirectory() as directory:
             extra = Path(directory) / "elsewhere" / "mine"
             extra.mkdir(parents=True)

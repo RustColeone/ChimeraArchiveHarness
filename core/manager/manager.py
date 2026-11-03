@@ -19,9 +19,10 @@ from typing import Any, Mapping, Protocol
 
 import jsonschema
 
-from contracts import (LEVELS, SHUTDOWN, TIERS, Action, Address, Capability, Command, Context, Delivery, Display, Engine,
-                       Exchange, FileRef, ModelError, ModelRequest, ModelResult, Operation, Option, PartContext, Persona,
-                       PromptPart, Reply, Request, Risk, RunYield, Sender, ToolResult, Watcher, code_style, local_time)
+from contracts import (LEVELS, SHUTDOWN, TIERS, Action, Address, Capability, Command, Context, Delivery, Display,
+                       Engine, Exchange, FileRef, ModelError, ModelRequest, ModelResult, Operation, Option, PartContext,
+                       Persona, PromptPart, Reply, Request, Risk, RunYield, Sender, ToolResult, Watcher, code_style,
+                       local_time)
 from core.audit import Audit
 from core.manager.core_capabilities import core_capabilities
 from core.manager.facts import FactsDesk
@@ -32,6 +33,7 @@ from core.manager.routines import Caller, RoutineDesk
 from core.manager.policy import Assignment, Owners, Permissions, most_specific
 from core.manager.secrets import Secrets
 from core.manager.stamina import Paused, Stamina, money
+from core.manager.threads import Threads
 from core.prompts import FileText, arender, conversation_of, parts_for, with_parts
 from core.providers.registry import Providers
 from core.serialize import request_from_dict, request_to_dict
@@ -141,6 +143,7 @@ class Manager:
         self.watchers: list[tuple[Watcher, str]] = []  # (watcher, its module), in the order modules gave them
         self._watching: dict[tuple[str, str], asyncio.Lock] = defaultdict(asyncio.Lock)  # (watcher, persona)
         self.facts = FactsDesk(tank)
+        self.threads = Threads(tank)  # when each conversation's, and each persona's, thread began
         # What each persona may spend a day, her account, and runs that wait at a limit (core/manager/stamina.py).
         self.stamina = Stamina(tank, stamina, providers, lambda: self.personas)
         self._part_origin: dict[int, str] = {}  # id(part) → the module that contributed it
@@ -241,9 +244,12 @@ class Manager:
         return done(await arender(parts, context, place, report))
 
     def context_of(self, persona: Persona, context: PartContext) -> Context | None:
-        """Session.context: what a module keeps of this conversation for her."""
-        parts, report, _ = self._rendering(persona, "context")
-        return conversation_of(parts, context, report)
+        """Session.context: what a module keeps of this conversation for her, secrets scrubbed."""
+        parts, report, done = self._rendering(persona, "context")
+        found = conversation_of(parts, context, report)
+        done("")
+        return None if found is None else Context(tuple({**message, "content": self.secrets.scrub(message["content"])}
+                                                        for message in found.messages), found.upto)
 
     def _rendering(self, persona: Persona, place: str):
         """The parts to render, how a problem is reported, and what finishes the text (scrubbed, and the problems
@@ -609,7 +615,7 @@ class Manager:
         engine = self.engines.get(record.engine)
         failure: tuple[str, str] | None = None
         outcome: Any = None
-        started_events = len(self.tank.events(run_id))
+        started_events = self.tank.event_count(run_id)
         if engine is None:
             failure = ("engine_missing", f"Engine {record.engine!r} is not registered")
         elif self._time_left(run_id) <= 0:
@@ -667,8 +673,8 @@ class Manager:
                 self.tank.update_run(run_id, status="waiting_input")
             else:
                 self.tank.update_run(run_id, status="done")
-            self.audit.record("run_yielded", run=run_id, status=self.tank.run(run_id).status)
             final = self.tank.run(run_id).status
+            self.audit.record("run_yielded", run=run_id, status=final)
             if final in ("done", "failed"):
                 leftover = self.take_inbox(run_id)
                 if leftover:
@@ -757,8 +763,7 @@ class Manager:
 
     def take_inbox(self, run_id: str) -> list[Request]:
         record = self.tank.run(run_id)
-        events = self.tank.events(run_id, ("inbox",), after=record.inbox_cursor - 1 if record.inbox_cursor else -1)
-        events = [event for event in events if event.index >= record.inbox_cursor]
+        events = self.tank.events(run_id, ("inbox",), after=record.inbox_cursor - 1)
         if not events:
             return []
         self.tank.update_run(run_id, inbox_cursor=events[-1].index + 1)
@@ -825,16 +830,17 @@ class Manager:
             return True
         return self.control is not None and request.address == self.control
 
-    def _refusal(self, record: RunRecord, capability: Capability | None, name: str,
-                 typed: bool = False) -> ToolResult | None:
+    def _refusal(self, record: RunRecord, capability: Capability | None, name: str, typed: bool = False,
+                 caller: tuple[Request, str] | None = None) -> ToolResult | None:
         """Access: may this caller, in this conversation, use the capability at all? The owner's own typed
-        command is not held to the conversation's `use` list or `private` (it asks to confirm instead)."""
+        command is not held to the conversation's `use` list or `private` (it asks to confirm instead). `caller`: the
+        run's trigger and the caller's level, for whoever asks this many times."""
         if capability is None:
             return ToolResult.fail(f"No capability named {name!r} exists", "unknown_tool")
-        trigger = request_from_dict(record.trigger)
+        trigger, level = caller or (request_from_dict(record.trigger), self.caller_access(record))
         if not typed and not self.permissions.allows(Address.parse(record.address), capability.name):
             return ToolResult.fail(f"{capability.name} is not allowed in this conversation", "not_allowed")
-        if LEVELS[self.caller_access(record)] < LEVELS[capability.access]:
+        if LEVELS[level] < LEVELS[capability.access]:
             who = "the owner" if capability.access == "creator" else "admins"
             return ToolResult.fail(f"{capability.name} is available only to {who}", "owner_only")
         missing = set(capability.needs) - trigger.display.features()
@@ -848,9 +854,10 @@ class Manager:
 
     def tool_schemas(self, run_id: str, persona: str = "") -> list[dict[str, Any]]:
         record = self.tank.run(run_id)
+        caller = request_from_dict(record.trigger), self.caller_access(record)
         return [capability.schema() for capability in sorted(self.capabilities.values(), key=lambda c: c.name)
                 if not capability.internal and capability.offered_to(persona, record.personas)
-                and self._refusal(record, capability, capability.name) is None]
+                and self._refusal(record, capability, capability.name, caller=caller) is None]
 
     async def call_tool(self, run_id: str, name: str, arguments: dict, call_id: str | None = None, *,
                         approved: bool = False, key: str | None = None, typed: bool = False,
@@ -1123,16 +1130,14 @@ class Manager:
         stop = self.stamina.check(record, persona, budget)
         if stop is None:
             return
-        capability = self.capabilities.get(STAMINA)
         # One card per stop: the same stop asked again (nothing spent since) finds its card; a later one, after more
         # was spent, gets its own (a keyed action runs once).
         key = (f"stamina:daily:{stop['persona']}:{stop['day']}:{stop['spent']}" if stop["kind"] == "daily"
                else f"stamina:total:{stop['day']}:{stop['spent']}" if stop["kind"] == "total"
                else f"stamina:session:{record.id}:{stop['limit']}:{stop['spent']}")
-        result = await self._request_approval(record, capability, stop, key) if capability else None
-        if result is None or result.status != "needs_approval":
-            raise ModelError("budget_exceeded", "This run reached a spending limit and nobody can approve more"
-                             if result is None else result.text)
+        result = await self._request_approval(record, self.capabilities[STAMINA], stop, key)
+        if result.status != "needs_approval":
+            raise ModelError("budget_exceeded", result.summary)
         self.audit.record("stamina_paused", run=record.id, kind=stop["kind"], persona=stop["persona"],
                           spent=stop["spent"], limit=stop["limit"])
         raise Paused(str(result.data.get("approval_id") or ""))
@@ -1169,6 +1174,8 @@ class Manager:
             if asyncio.current_task().cancelling():
                 raise  # the core is stopping, not the run being cancelled
             reason, code = "The run was cancelled while it was carried out", "cancelled"
+        except Paused:  # (its card is out: the run goes on waiting, for that one now)
+            reason, code = "It reached a spending limit while it was carried out", "stamina"
         finally:
             carrying = self._carrying.get(record.id, set())
             carrying.discard(work)
@@ -1324,7 +1331,8 @@ class Manager:
             if persona and not label and source == "run":
                 self._tell_watchers(Exchange(trigger.address, self.personas[persona], text, trigger, run_id,
                                              record.engine, time.time(),
-                                             record.origin != "routine" and self.is_owner(trigger), tuple(names)))
+                                             record.origin != "routine" and self.is_owner(trigger), tuple(names),
+                                             self.threads.since(record.address, [persona])))
         return delivery
 
     # ---- watchers -----------------------------------------------------------------------------------
@@ -1792,6 +1800,8 @@ class Manager:
             # An explicit $command from the owner is the owner's approval of that exact action (some still
             # ask to confirm: a `confirm` capability, a secret, private data in a shared conversation).
             result = await self.call_tool(record.id, capability.name, arguments, typed=owner)
+        except Paused as paused:  # a model call of its own, at a spending limit: its card is out
+            result = ToolResult("needs_approval", "Waiting for the owner.", data={"approval_id": paused.approval_id})
         finally:
             self._tasks.pop(record.id, None)
         if result.status == "needs_approval":

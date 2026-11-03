@@ -188,7 +188,8 @@ class Core:
         answers where nothing else does (`*`, `routine:*`); all else in its defaults is its own interfaces'."""
         contributions = loaded.contributions
         own = {interface.name for interface in contributions.interfaces}
-        for pattern in [*(item for item in contributions.assignments if item not in FALLBACKS), *contributions.admission]:
+        suggested = [pattern for pattern in contributions.assignments if pattern not in FALLBACKS]
+        for pattern in [*suggested, *contributions.admission]:
             if pattern.split(":", 1)[0] not in own or ":" not in pattern:
                 raise ConfigError(f"defaults may only cover its own interfaces, not {pattern!r}")
         for kind, factory in contributions.adapters.items():
@@ -254,7 +255,7 @@ class Core:
                  if setting.kind == "secret" for variable in setting.env}
         names.update(self.providers.key_variables())  # configured and contributed providers alike
         paths = [str(path / "config.yml") for path in self.config.all_modules()]
-        paths += [str(self.config.data_dir / pattern) for pattern in ("*.db", "*.db-wal", "*.db-shm", "extensions/*/*.db*")]
+        paths += [str(self.config.data_dir / pattern) for pattern in ("*.db*", "extensions/*/*.db*")]
         paths += [str(self.config.data_dir / "extensions" / loaded.extension.name / pattern)
                   for loaded in self.extensions for pattern in loaded.contributions.secrets]
         # A relative `secrets:` entry is under the home folder (as it always was) and, since prompt part files are

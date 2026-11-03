@@ -9,11 +9,13 @@ from __future__ import annotations
 import dataclasses
 import math
 import time
+from typing import Callable
 
 from contracts import IMPULSE, FileRef, ModelError, ModelRequest, Session, flag, impulse_line, is_command, local_time, number
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".gif", ".webp")
 NEW_THREAD = {"/new", "/reset", "/clear"}
+REACH = 200  # messages of the conversation read at most
 COMPACT_RETRY_S = 15 * 60  # after a failed summary call, wait this long before trying again
 COMPACT = """You keep the running summary of a group conversation, so its participants can follow it once the messages themselves are out of view. Rewrite the summary to cover the new messages too: who said what that matters, decisions, plans, promises, open questions, facts people shared about themselves, and the mood. Drop small talk and anything already settled. Plain text, in the conversation's main language, at most 300 words."""
 
@@ -89,25 +91,27 @@ class Reading:
         self.compact_every = number(options.get("compact_every"), settings.compact_every, 1, 1000)
         self.compact_profile = str(options.get("compact_profile") or settings.compact_profile)
         self.image_window = number(options.get("history_image_minutes"), 30, 0, 24 * 60, float) * 60
+        self._since: float | None = None
+        self._thread: list | None = None
 
     # ---- the thread -------------------------------------------------------------------------------------------
     def thread_since(self) -> float:
-        """When this conversation's thread began: its last `/new` (0: never). One begun for a student alone counts too
-        (`/new <her>`, or her own bot's chat engine, kept in her memory then), and the last time her memory was wiped,
-        wherever that was typed."""
-        session = self.session
-        since = float(session.store(conversation=True).get("thread_since") or 0)
-        for name in [self.persona] if self.persona else [persona.name for persona in session.personas]:
-            memory = session.memory(name)
-            since = max(since, float(memory.get(f"thread_since:{session.address}") or 0),
-                        float(memory.get("thread_since") or 0))
-        return since
+        """When the thread began for this speaker, or for the run's speakers (0: never)."""
+        if self._since is None:
+            self._since = self.session.thread_since(self.persona or None)
+        return self._since
 
-    def conversation(self, reach: int = 200) -> list:
-        """The thread before this request, without `$commands` and their answers. "Before" is by position: everything
-        recorded ahead of the trigger, even in the same second (some platforms send whole seconds)."""
+    def conversation(self) -> list:
+        """The thread before this request, read once: this `Reading` lasts one step."""
+        if self._thread is None:
+            self._thread = self._read()
+        return self._thread
+
+    def _read(self) -> list:
+        """The thread without `$commands` and their answers. "Before" is by position: everything recorded ahead of the
+        trigger, even in the same second (some platforms send whole seconds)."""
         session = self.session
-        items = session.history.recent(reach)
+        items = session.history.recent(REACH)
         trigger = session.trigger.id
         cut = next((index for index in range(len(items) - 1, -1, -1)
                     if items[index].direction == "in" and items[index].message_id == trigger), None)
@@ -134,6 +138,11 @@ class Reading:
         newest first, when that is set), read word for word; the summary covers the older ones, so each message is in
         one or the other. A second is never split between them: the summary's `upto` is a time."""
         items = self.conversation()
+        start = self._start(items)
+        return items[:start], items[start:]
+
+    def _start(self, items: list) -> int:
+        """Where the last `history_limit` of these messages begin, within `history_chars`, a second never split."""
         start = max(0, len(items) - self.limit)
         if self.chars:
             used = 0
@@ -144,14 +153,16 @@ class Reading:
                     break
         while 0 < start < len(items) and items[start - 1].at >= items[start].at:
             start -= 1
-        return items[:start], items[start:]
+        return start
 
     def window(self) -> list:
         return self.split()[1]
 
     def after(self, moment: float) -> list:
-        """What the thread holds past `moment`: all a speaker reads of it when a `Context` covers the rest."""
-        return [item for item in self.conversation() if item.at > moment]
+        """What the thread holds past `moment`, as much of it as a window holds: all a speaker reads of it when a
+        `Context` covers the rest. A `Context` from another chat covers nothing here, however long this chat is."""
+        items = [item for item in self.conversation() if item.at > moment]
+        return items[self._start(items):]
 
     def summary(self):
         """The rolling summary, if it covers this thread (one written before the last `/new` is not read)."""
@@ -163,10 +174,11 @@ class Reading:
     def shown_images(self, items) -> list[FileRef]:
         return recent_images(items, self.session.trigger.received_at, self.image_window)
 
-    async def fold(self) -> None:
+    async def fold(self, kept: Callable[[], bool]) -> None:
         """Fold messages that scrolled out of the window into the conversation's rolling summary, once enough have
-        (`compact_every`), with one call to `compact_profile` (the cheap default). A failure leaves the old summary;
-        the conversation goes on either way."""
+        (`compact_every`), with one call to `compact_profile` (the cheap default), unless a module keeps this
+        conversation (`kept`): what keeps it folds it. A failure leaves the old summary; the conversation goes on either
+        way."""
         if not self.compact:
             return
         session = self.session
@@ -177,7 +189,7 @@ class Reading:
         covered = summary.upto if summary and math.isfinite(summary.upto) else self.thread_since()
         older, _ = self.split()
         fresh = [item for item in older if item.at > covered]
-        if len(fresh) < self.compact_every:
+        if len(fresh) < self.compact_every or kept():
             return
         lines = "\n".join(line(item, True, set()) for item in fresh)
         try:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -131,8 +130,8 @@ class Tank:
             cursor = db.execute("INSERT INTO log(at,module,kind,text,address,subject,persona,data) "
                                 "VALUES(?,?,?,?,?,?,?,?)", (time.time(), module, kind, text, address, subject, persona,
                                                             dumps(dict(data or {}))))
-            db.execute("DELETE FROM log WHERE address=? AND id NOT IN (SELECT id FROM log WHERE address=? ORDER BY id "
-                       "DESC LIMIT ?)", (address, address, keep))
+            db.execute("DELETE FROM log WHERE address=? AND id <= (SELECT id FROM log WHERE address=? ORDER BY id DESC "
+                       "LIMIT 1 OFFSET ?)", (address, address, keep))
             return self._entry(db.one("SELECT * FROM log WHERE id=?", (cursor.lastrowid,)))
 
     def log_lines(self, address: str, limit: int = 20, offset: int = 0, *, kind: str = "",
@@ -208,9 +207,14 @@ class Tank:
         return Event(index=index, kind=kind, at=now, data=data or {})
 
     def events(self, run_id: str, kinds: tuple[str, ...] | None = None, after: int = -1) -> list[Event]:
-        rows = self.db.query("SELECT * FROM run_events WHERE run_id=? AND idx>? ORDER BY idx", (run_id, after))
+        sql, parameters = "SELECT * FROM run_events WHERE run_id=? AND idx>?", [run_id, after]
+        if kinds is not None:
+            sql, parameters = f"{sql} AND kind IN ({','.join('?' for _ in kinds)})", [*parameters, *kinds]
         return [Event(index=row["idx"], kind=row["kind"], at=row["at"], data=loads(row["data"]))
-                for row in rows if kinds is None or row["kind"] in kinds]
+                for row in self.db.query(sql + " ORDER BY idx", parameters)]
+
+    def event_count(self, run_id: str) -> int:
+        return self.db.one("SELECT COALESCE(MAX(idx), -1) + 1 AS n FROM run_events WHERE run_id=?", (run_id,))["n"]
 
     def action(self, run_id: str, call_key: str):
         row = self.db.one("SELECT * FROM actions WHERE run_id=? AND call_key=?", (run_id, call_key))

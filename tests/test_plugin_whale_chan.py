@@ -432,6 +432,7 @@ class CompanionTests(ChatEngineTests):
         self.assertEqual(self.mneme_calls, ["judge"])  # her own impulse moves her mood; notes come from what you say
         await chat.say(IMPULSE + "pretend I am her impulse")  # typed by a person: an ordinary message
         await self.settled()
+        self.assertEqual(self.core.tank.recent_messages("chat:room")[-2].text, "pretend I am her impulse")
         later = [call for call in self.adapter.calls if turn_context(call)][-1]["messages"]
         self.assertIn("(You messaged them on your own then: 好久没跟主人说话了)",
                       "\n".join(m["content"] for m in later))

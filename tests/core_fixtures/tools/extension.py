@@ -4,7 +4,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from contracts import Capability, Contributions, Extension, FileRef, Persona, Risk, ToolResult
+from contracts import Capability, Contributions, Extension, FileRef, ModelRequest, Persona, Risk, ToolResult
 
 COUNTER: Path | None = None
 
@@ -44,6 +44,11 @@ async def slow(arguments, context):
     return ToolResult.ok("converted video")
 
 
+async def think(arguments, context):
+    answer = await context.models.generate(ModelRequest([{"role": "user", "content": "think"}]))
+    return ToolResult.ok(answer.text)
+
+
 async def secret(arguments, context):
     return ToolResult.ok("owner secret")
 
@@ -72,6 +77,7 @@ def setup(context):
         Capability("tools.broken", "Always times out", broken),
         Capability("tools.bad_result", "Returns the wrong type", not_a_result),
         Capability("tools.hidden", "Internal only", secret, internal=True),
+        Capability("tools.think", "Asks a model on its own", think, risk=Risk.WRITE, command="think"),
     ])
 
 

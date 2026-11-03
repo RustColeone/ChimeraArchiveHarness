@@ -15,7 +15,6 @@ from tests.core_support import ROOT, FakeAdapter, make_config, settle
 from tests.test_core_discord import FakeChannel, FakeClient, FakeUser
 from core.app import Core
 from contracts.discord_bot import slash
-from core.loader import import_extension
 
 ids = itertools.count(9000)
 

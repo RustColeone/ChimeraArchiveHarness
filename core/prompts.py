@@ -59,6 +59,8 @@ def parts_from_config(persona: str, value: Any, resolve: Callable[[str], Path]) 
             raise ValueError(f"{where}: a part takes {', '.join(sorted(PART_KEYS))}")
         if ("text" in item) == ("file" in item):
             raise ValueError(f"{where}: give either `text` or `file`")
+        if item.get("place") == "context":
+            raise ValueError(f"{where}: `place: context` is a module's, whose part is a function")
         if "file" in item:
             if not isinstance(item["file"], str) or not item["file"].strip():
                 raise ValueError(f"{where}: `file` is a path")
@@ -118,11 +120,13 @@ def _text(text) -> str:
 
 def conversation_of(parts: Iterable[PromptPart], context: PartContext,
                     report: Callable[[PromptPart, str, str], None]) -> Context | None:
-    """The first `context` part's `Context`, in order. One that fails is left out and reported `failed`, and the next is
-    asked: the engine's own window is always there to fall back on."""
+    """The first `context` part's `Context`, in order. One that fails, or is async (it must answer at once), is left
+    out and reported `failed`, and the next is asked: the engine's own window is always there to fall back on."""
     for part in _ordered(parts, "context"):
         try:
             found = part.text(context)
+            if inspect.iscoroutine(found):
+                found.close()
             if isinstance(found, Context):
                 return found
             if found is not None:

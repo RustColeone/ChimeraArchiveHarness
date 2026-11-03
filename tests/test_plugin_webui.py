@@ -173,6 +173,7 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((state["user"]["name"], state["default"]), ("Leo", "classroom"))
         self.assertEqual(state["classmates"], ["GPT", "Gemini", "Claude", "DeepSeek", "Grok"])
         self.assertIn("help", [command["name"] for command in state["commands"]])
+        self.assertNotIn("new", [command["name"] for command in state["commands"]])  # (`/new` stays a message)
         await self.say(ws, "echo hello class")
         answer, seen = await self.until(ws, lambda e: e["type"] == "message" and e["item"]["kind"] == "text")
         self.assertEqual(answer["item"]["text"], "hello class")

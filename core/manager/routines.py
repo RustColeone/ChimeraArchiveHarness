@@ -129,5 +129,6 @@ class RoutineDesk:
             routine = self.add(caller, "", " ".join(tokens), chat, via=via)
         except (ValueError, LookupError, PermissionError) as error:
             return str(error)
-        return (f"Routine {routine['id']} added: {schedules.describe(routine)}, first at {local_time(routine['next_at'])}"
+        first = local_time(routine["next_at"])
+        return (f"Routine {routine['id']} added: {schedules.describe(routine)}, first at {first}"
                 + (f" in {routine['address']}" if chat else "") + f". It sends: {routine['text']}")

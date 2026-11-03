@@ -8,7 +8,7 @@ from pathlib import Path
 
 from contracts import Address
 from core.config import ConfigError
-from core.manager.policy import Assignment, Permissions
+from core.manager.policy import Permissions
 from tests.core_support import FIXTURES, extension_module, iface, make_config, settle, start_core
 
 SECRET = "tok-1234567890abcdef"

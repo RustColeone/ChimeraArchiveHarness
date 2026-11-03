@@ -88,7 +88,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
             origin="person", sender=SimpleNamespace(id="alice", name="Alice"),
             text="hello", extra={}, is_direct=True)
         context = SimpleNamespace(persona=persona, since=0.0, trigger=trigger, address=SimpleNamespace(interface="chat",
-                                  conversation="dm"), owner=False, engine="momochat")
+                                  conversation="dm"), owner=False, engine="momochat", personas=("gpt",))
         self.assertIn("Gemini seems in high spirits today", await memory.make_part(book, settings)(context))
         quiet = memory.Settings({"classmates": False}, self.tmp)
         self.assertNotIn("seems", await memory.make_part(book, quiet)(context))

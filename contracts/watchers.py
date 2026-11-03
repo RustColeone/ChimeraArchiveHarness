@@ -27,6 +27,7 @@ class Exchange:
     at: float
     owner: bool = False  # the trigger's sender is an owner of its interface (as Session.owner)
     personas: tuple[str, ...] = ()  # every persona taking part in the conversation (the run's), her own included
+    since: float = 0.0  # when the thread she is in began (0: it never was started over)
 
     @property
     def person(self) -> tuple[str, str]:

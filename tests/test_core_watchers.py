@@ -8,7 +8,6 @@ import unittest
 from pathlib import Path
 
 from contracts import Address, Exchange, Persona, Request, Sender, Watcher
-from core.config import ConfigError
 from tests.core_support import FakeAdapter, iface, make_config, settle, start_core
 
 # A module with a watcher that keeps what it saw, calls a model on "think", and publishes facts.

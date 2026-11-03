@@ -57,7 +57,7 @@ def number(value, default: float, low: float, high: float, kind=int):
 def persona_names(value, owner: str) -> tuple[str, ...]:
     """Persona names as contracts keep them, given one name or a list; anything else is `owner`'s ValueError."""
     value = (value,) if isinstance(value, str) else value
-    if not isinstance(value, (tuple, list, set, frozenset)) or not all(isinstance(name, str) and name for name in value):
+    if not isinstance(value, (tuple, list, set, frozenset)) or not all(isinstance(item, str) and item for item in value):
         raise ValueError(f"{owner}: personas is a list of persona names")
     return tuple(value)
 
@@ -92,7 +92,7 @@ def chinese(text: str) -> bool:
 
 
 def split_text(text: str, limit: int) -> list[str]:
-    """Text in chunks of at most `limit` characters, cut at a blank line, a line or a space where one is near the end."""
+    """Text in chunks of at most `limit` characters, cut at a blank line, a line or a space near the end of each."""
     chunks, remaining = [], text
     while len(remaining) > limit:
         cut = 0

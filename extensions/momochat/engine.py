@@ -18,9 +18,10 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections import OrderedDict
 from typing import Any
 
-from contracts import (Engine, EngineSpec, ModelError, ModelRequest, RunYield, Session, ToolResult, ToolSpec, chinese,
+from contracts import (Context, Engine, EngineSpec, ModelError, ModelRequest, RunYield, Session, ToolResult, ToolSpec, chinese,
                        flag, impulse, local_time, number)
 
 from . import group, steps
@@ -28,6 +29,7 @@ from .history import Reading, add_images, combine_images, images, line, new_thre
 from .steps import ASK, HAND_OFF, PASS
 
 VERSION = 2  # of the state a run saves (runs another engine saved start over: their calls are `c…`, ours `m…`)
+KEPT = 16  # what modules keep of conversations, held in memory for the runs it was read for
 STYLES = ("brief", "full", "chat")
 DAY = 86400
 ANSWER_ONLY = ("full", "chat")  # the styles that post only her answer, her notes while working shown as progress
@@ -73,6 +75,7 @@ class MomoChatEngine(Engine):
 
     def __init__(self, settings: Settings | None = None):
         self.settings = settings or Settings()
+        self._kept: OrderedDict[tuple[str, str], Context | None] = OrderedDict()  # (run, persona) → what is kept for her
 
     # ---- options ------------------------------------------------------------------------------------------------
     def _logged(self, session: Session) -> str:
@@ -108,19 +111,38 @@ class MomoChatEngine(Engine):
         words = new_thread(session.trigger.text)
         if words is None:
             return ""
-        at = session.trigger.received_at
         if not words:
-            session.store(conversation=True).set("thread_since", at)
+            session.start_over()
             return str(session.options.get("new_chat_text") or self.settings.new_chat_text)
         named = next((persona for persona in session.personas
                       if words[0] in (persona.name.lower(), persona.display_name.lower())), None)
         if named is None:
             return ""
-        session.memory(named.name).set(f"thread_since:{session.address}", at)
+        session.start_over(named.name)
         return f"New chat with {named.display_name}."
+
+    def _context(self, session: Session, persona: str) -> Context | None:
+        """What a module keeps of this conversation for her, read once for a run: it is large, and it is no part of the
+        saved state, so a restart reads it again."""
+        key = (session.run_id, persona)
+        if key not in self._kept:
+            while len(self._kept) >= KEPT:
+                self._kept.popitem(last=False)
+            self._kept[key] = session.context(persona)
+        return self._kept[key]
 
     # ---- run ----------------------------------------------------------------------------------------------------
     async def run(self, session: Session) -> RunYield:
+        outcome = None
+        try:
+            outcome = await self._run(session)
+            return outcome
+        finally:
+            if outcome not in (RunYield.WAIT_INPUT, RunYield.WAIT_APPROVAL):
+                for key in [key for key in self._kept if key[0] == session.run_id]:
+                    del self._kept[key]
+
+    async def _run(self, session: Session) -> RunYield:
         state = session.state if (session.state or {}).get("v") == VERSION else None
         if state is None:
             answer = self._new_thread(session)
@@ -133,8 +155,8 @@ class MomoChatEngine(Engine):
         if state.get("done"):
             return RunYield.DONE
         if not state["opened"]:
-            if not any(session.context(persona.name) for persona in session.personas):  # (what keeps it folds it)
-                await Reading(session, self.settings).fold()
+            await Reading(session, self.settings).fold(
+                lambda: any(self._context(session, persona.name) for persona in session.personas))
             add_images(state, session.trigger.files)
             if session.display.quotes and not session.trigger.is_direct:
                 state["quote"] = session.trigger.id
@@ -210,8 +232,7 @@ class MomoChatEngine(Engine):
         thinking = False
         if "parts" not in turn:  # her prompt parts, rendered once a turn: a part may look something up
             async def render() -> None:
-                since = Reading(session, self.settings, turn["persona"]).thread_since()
-                turn["parts"] = {place: await session.aprompt(turn["persona"], place, since) for place in ("stable", "turn")}
+                turn["parts"] = {place: await session.aprompt(turn["persona"], place) for place in ("stable", "turn")}
             # "Thinking…" goes out beside them: a part may ask her model first, and she should not sit silent for it.
             thinking = turn["steps"] == 0 and not turn["pending"] and self._style(session) in ANSWER_ONLY
             await asyncio.gather(render(), *([session.progress("Thinking…")] if thinking else []))
@@ -447,30 +468,32 @@ class MomoChatEngine(Engine):
     def _can_hand_off(self, session: Session, turn: dict) -> bool:
         return self._group(session) and turn["kind"] == "lead" and self._number(session, "max_handoffs", 0, 10) > 0
 
-    def _request(self, session: Session, state: dict, turn: dict, messages, **kwargs) -> ModelRequest:
+    def _request(self, session: Session, state: dict, turn: dict, reading: Reading, messages, **kwargs) -> ModelRequest:
         persona = self._persona(session, turn["persona"])
         return ModelRequest(messages, profile=persona.profile, persona=persona.name,
-                            images=self._images(session, state),
+                            images=combine_images(reading.shown_images(reading.window()), images(state)),
                             effort=str(session.options.get("effort") or persona.effort or self.settings.effort),
                             max_tokens=self._number(session, "max_tokens", 100, 64000),
                             timeout_s=self._number(session, "timeout_s", 5, 900, float), **kwargs)
 
-    async def _step(self, session: Session, state: dict, turn: dict, correction: str = "") -> dict[str, Any]:
-        speak_up = bool(impulse(session.trigger))
+    async def _step(self, session: Session, state: dict, turn: dict) -> dict[str, Any]:
+        speak_up, reading = bool(impulse(session.trigger)), Reading(session, self.settings, turn["persona"])
         if not speak_up and self._native(session):
             try:
-                return await self._native_step(session, state, turn, correction)
+                return await self._native_step(session, state, turn, reading)
             except ModelError as error:  # no candidate here can call tools, or none would: this step in JSON
                 if error.kind not in ("tools_unsupported", "invalid_output"):
                     raise
-        return await self._json_step(session, state, turn, correction, final=speak_up)
+        return await self._json_step(session, state, turn, reading, final=speak_up)
 
-    async def _native_step(self, session: Session, state: dict, turn: dict, correction: str = "") -> dict[str, Any]:
+    async def _native_step(self, session: Session, state: dict, turn: dict, reading: Reading) -> dict[str, Any]:
+        correction = ""
         tools = self._tools(session, turn)
         for attempt in range(2):  # then the step falls back to JSON (its own corrections follow)
             try:
                 result = await session.models.generate(self._request(
-                    session, state, turn, self._messages(session, state, turn, correction, native=True), tools=tools))
+                    session, state, turn, reading, self._messages(session, state, turn, reading, correction, native=True),
+                    tools=tools))
             except ModelError as error:
                 if error.kind != "invalid_output" or attempt == 1:
                     raise
@@ -482,13 +505,13 @@ class MomoChatEngine(Engine):
             correction = f"Your previous step was rejected: {problem} Send a corrected step."
         raise ModelError("invalid_output", "The model did not produce a valid step after corrections")
 
-    async def _json_step(self, session: Session, state: dict, turn: dict, correction: str = "",
+    async def _json_step(self, session: Session, state: dict, turn: dict, reading: Reading, correction: str = "",
                          final: bool = False) -> dict[str, Any]:
         names = set() if final or turn["optional"] else {tool["name"] for tool in session.tools.list(turn["persona"])}
         for attempt in range(3):
             try:
                 result = await session.models.generate(self._request(
-                    session, state, turn, self._messages(session, state, turn, correction, final=final),
+                    session, state, turn, reading, self._messages(session, state, turn, reading, correction, final=final),
                     output_schema=steps.TURN_SCHEMA, schema_name="turn"))
             except ModelError as error:
                 if error.kind != "invalid_output" or attempt == 2:
@@ -506,15 +529,16 @@ class MomoChatEngine(Engine):
         """Her steps ran out: one closing step, with no actions, says what is done and what is not."""
         turn["status"] = "done"
         try:
-            step = await self._json_step(session, state, turn, steps.CLOSING, final=True)
+            step = await self._json_step(session, state, turn, Reading(session, self.settings, turn["persona"]),
+                                         steps.CLOSING, final=True)
         except ModelError:
             return
         if step["status"] != "pass":
             await self._say(session, state, turn, step["message"].strip(), True)
 
     # ---- the request ----------------------------------------------------------------------------------------
-    def _messages(self, session: Session, state: dict, turn: dict, correction: str = "", native: bool = False,
-                  final: bool = False) -> list[dict]:
+    def _messages(self, session: Session, state: dict, turn: dict, reading: Reading, correction: str = "",
+                  native: bool = False, final: bool = False) -> list[dict]:
         """The request's messages: her system prompt, the conversation, this turn's context, the message she
         answers and her turn so far. `native`: for function calls (the transcript's calls and their results as such,
         the tools offered as functions rather than listed)."""
@@ -565,9 +589,8 @@ class MomoChatEngine(Engine):
             context.append(turn["instruction"])
         if turn["optional"]:
             context.append(steps.PASS_RULE[native])
-        reading = Reading(session, self.settings, turn["persona"])
         messages: list[dict] = [{"role": "system", "content": system}]
-        kept = session.context(persona.name, reading.thread_since())
+        kept = self._context(session, persona.name)
         summary = None if kept else reading.summary()
         if kept:
             messages.extend(dict(message) for message in kept.messages)
@@ -606,10 +629,6 @@ class MomoChatEngine(Engine):
         if len(merged) == 1 or merged[1]["role"] != "user":
             merged.insert(1, {"role": "user", "content": "(conversation continues)"})
         return merged
-
-    def _images(self, session: Session, state: dict):
-        reading = Reading(session, self.settings)
-        return combine_images(reading.shown_images(reading.window()), images(state))
 
     @staticmethod
     def _activity(session: Session) -> str:
