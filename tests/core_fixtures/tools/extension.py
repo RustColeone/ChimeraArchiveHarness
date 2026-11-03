@@ -18,12 +18,12 @@ def _count(name):
 
 async def read_value(arguments, context):
     _count("read_value")
-    return ToolResult.ok(f"value={context.storage.get(arguments['key'])}")
+    return ToolResult.ok(f"value={context.store().get(arguments['key'])}")
 
 
 async def write_value(arguments, context):
     count = _count("write_value")
-    context.storage.set(arguments["key"], arguments["value"])
+    context.store().set(arguments["key"], arguments["value"])
     return ToolResult.ok(f"wrote {arguments['key']} (execution {count})")
 
 
@@ -67,7 +67,7 @@ def setup(context):
                    command="setvalue", command_argument="value"),
         Capability("tools.make_file", "Create a file", make_file, {"name": {"type": "string"}}, ("name",),
                    Risk.PREPARE, needs={"files"}, command="makefile", command_argument="name"),
-        Capability("tools.secret", "Owner-only data", secret, owner_only=True),
+        Capability("tools.secret", "Owner-only data", secret, access="creator"),
         Capability("tools.slow", "A long conversion", slow, risk=Risk.PREPARE),
         Capability("tools.broken", "Always times out", broken),
         Capability("tools.bad_result", "Returns the wrong type", not_a_result),

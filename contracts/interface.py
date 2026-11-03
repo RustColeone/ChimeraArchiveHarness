@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, Mapping, Protocol, Sequence
 
 from contracts.capability import Risk, ToolContext, ToolResult
-from contracts.commands import Command
+from contracts.commands import Access, Command
 from contracts.messages import Address, Delivery, Display, FileRef, Reply, Request, Sender, SubmitResult
 from contracts.stores import Store
 
@@ -17,10 +17,10 @@ class Operation:
     """A platform-specific action (for example `login`, or playing music) run through the core.
 
     It becomes the capability `<interface>.<name>`; `command`, if set, also makes it available as
-    `$<command> <text>` with the text passed as `command_argument`. Operations are owner-only unless
-    `owner_only=False`; a public operation must act only on the calling conversation
-    (`context.address`), never on others. `risk` and the attributes (`private`, `subject`, `subject_kind`,
-    `never_auto`, `grantable`, `confirm`) mean the same as on a Capability.
+    `$<command> <text>` with the text passed as `command_argument`. Operations are the creator's unless `access` says
+    otherwise; a public operation must act only on the calling conversation (`context.address`), never on others.
+    `risk` and the attributes (`private`, `subject`, `subject_kind`, `never_auto`, `grantable`, `confirm`) mean the same
+    as on a Capability.
     """
 
     name: str
@@ -31,7 +31,7 @@ class Operation:
     command: Command | str | None = None
     command_argument: str | None = None
     timeout_s: float = 120.0
-    owner_only: bool = True
+    access: Access = "creator"
     private: bool = False
     subject: str | None = None
     subject_kind: str = "value"

@@ -111,15 +111,15 @@ def _key(context) -> str:
 
 
 def load(context) -> list[dict]:
-    value = context.storage.get(_key(context))
+    value = context.store().get(_key(context))
     return [dict(clip) for clip in (value or {}).get("clips", [])]
 
 
 def save(context, clips: list[dict]) -> None:
     if clips:
-        context.storage.set(_key(context), {"clips": clips, "updated_at": time.time()})
+        context.store().set(_key(context), {"clips": clips, "updated_at": time.time()})
     else:
-        context.storage.delete(_key(context))
+        context.store().delete(_key(context))
 
 
 def summary(clip: dict) -> dict:

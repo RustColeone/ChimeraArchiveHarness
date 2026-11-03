@@ -116,7 +116,7 @@ def module_store(manager: "Manager", module: str, address: Address, sender: Send
                  conversation: bool, persona: str | None, person: bool):
     """A module's store, scoped by any combination of conversation, persona and person. The
     module's name comes first, so no module can reach another's; with no scope it is the module's store
-    everywhere (the same as ToolContext.storage)."""
+    everywhere."""
     parts: dict[str, str] = {}
     if conversation:
         parts["conversation"] = str(address)
@@ -245,7 +245,6 @@ class ToolContextHandle:
                 own.extend(attached)
         self.files: tuple[FileRef, ...] = tuple(files) or tuple(trigger.files)
         self.own_files: tuple[FileRef, ...] = tuple(own) or (tuple(trigger.files) if not files else ())
-        self.storage = manager.tank.store("extension:" + extension)
         self._extension, self._personas = extension, list(record.personas)
         profile = (manager.personas[record.personas[0]].profile if record.personas else "default")
         self.models = ModelsHandle(manager, record.id, profile)

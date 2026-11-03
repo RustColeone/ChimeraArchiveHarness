@@ -113,23 +113,23 @@ class DiscordInterface(Interface):
         Operation("music", "The music player in the caller's voice channel in this server. Text: init, play, pause, "
                   "stop, next, prev, status, queue, or -y <YouTube URLs> [--queue] (play now, or add after the "
                   "current song).", {"command": {"type": "string"}}, risk=Risk.WRITE, command="music",
-                  command_argument="command", timeout_s=180, owner_only=False),
-        Operation("music_status", "Show this server's music player track and position.", owner_only=False),
+                  command_argument="command", timeout_s=180, access="member"),
+        Operation("music_status", "Show this server's music player track and position.", access="member"),
         Operation("music_control", "Initialize (join the caller's voice channel and play), play, pause, stop, or "
                   "change tracks in this server's music player.",
                   {"action": {"type": "string", "enum": list(CONTROL_ACTIONS)}}, ("action",), Risk.WRITE,
-                  timeout_s=180, owner_only=False),
+                  timeout_s=180, access="member"),
         Operation("queue_music", "Add a YouTube music URL after the current song in this server's playlist; "
                   "play_now plays it immediately in the caller's voice channel. Resolve references such as "
                   "'that music' from the conversation and pass its URL.",
                   {"url": {"type": "string"}, "play_now": {"type": "boolean"}}, ("url",), Risk.WRITE,
-                  timeout_s=180, owner_only=False),
+                  timeout_s=180, access="member"),
         Operation("time", "The study clock: UTC minutes:seconds (break time from minute 45) and Beijing, "
-                  "Los Angeles and London times.", command="time", owner_only=False),
+                  "Los Angeles and London times.", command="time", access="member"),
         Operation("clock_start", "Start the live study clock (one message edited every second) in this "
-                  "conversation.", risk=Risk.WRITE, command="start", owner_only=False),
+                  "conversation.", risk=Risk.WRITE, command="start", access="member"),
         Operation("clock_stop", "Stop the live study clock in this conversation.", risk=Risk.WRITE, command="stop",
-                  owner_only=False),
+                  access="member"),
     )
 
     def __init__(self, token: str, data_dir: Path, attachment_max_mb: float = 25.0, client: Any = None,

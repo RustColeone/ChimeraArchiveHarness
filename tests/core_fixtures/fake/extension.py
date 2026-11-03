@@ -19,7 +19,7 @@ class FakeInterface(Interface):
                                      command="echoop" if name == "chat" else None,
                                      command_argument="value" if name == "chat" else None),
                            Operation("reset", "Pretend to reset", risk=Risk.WRITE),
-                           Operation("where", "Say where it was called from", owner_only=False,
+                           Operation("where", "Say where it was called from", access="member",
                                      command="where" if name == "chat" else None))
         self.delivered: list[Reply] = []
         self.port = None

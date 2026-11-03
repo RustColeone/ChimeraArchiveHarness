@@ -46,7 +46,7 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(store(sender=bob, person=True).get("k"), None)
         self.assertEqual(store(address=other, person=True).get("k"), "alice")  # person: across conversations
         self.assertEqual(store(persona="luna", person=True).get("k"), "luna-alice")
-        self.assertEqual(core.tank.store("extension:room").get("k"), "module")  # no scope = ToolContext.storage
+        self.assertEqual(core.tank.store("extension:room").get("k"), "module")  # no scope: the module's store
         # A conversation ID may contain anything, even what looks like another scope's name.
         tricky = Address("chat", 'room|persona:luna')
         store(conversation=True, persona="luna").set("t", "luna in room")

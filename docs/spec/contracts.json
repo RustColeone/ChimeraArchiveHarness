@@ -168,7 +168,7 @@
    ]
   },
   "Capability": {
-   "doc": "One action. `name` is `<extension>.<action>`. `parameters` are JSON-schema properties; `required` lists mandatory ones. `needs` lists Display features the conversation must support (for example `files`). `internal` capabilities are callable by engines but not offered to models as tools. `access` is the lowest level that may call it (`member`, `admin`, `creator`; `owner_only` means `creator`). The caller's level is `ToolContext.access`, so a capability may also do more for higher levels (an admin sees every conversation's items, a member only their own). `command`, when set, makes the capability available as `$<command> <text>`, with the text passed as `command_argument`. It may be a name or a `Command` declaring options and a template for interfaces with native command menus; a name becomes a `Command` with one option for `command_argument`. `risk` is the tier (see Risk). Attributes refine it; the core enforces them and configuration can only make them stricter: * `private`: shows the owner's private data (messages, screen, clipboard, files). Offered only in conversations private to the owner; its run's output goes nowhere else. * `subject`: the parameter that permission rules and saved grants match on (a unit, a chat, a path); `subject_kind=\"path\"` also makes the core refuse secret paths (`.env`, keys) to models. * `escalate(arguments)`: may return a higher tier for a call (never a lower one). * `never_auto`: a model's call always asks the owner; no rule or grant changes that. * `grantable`: the owner may answer an approval with \"always allow\" for that exact subject in that conversation (needs `subject`). * `confirm`: even the owner's own typed command asks for a one-tap confirmation. * `describe(arguments)`: one plain line for approval prompts (\"Restart navidrome.service\"). `personas`, when given, are the only personas it is offered to: an engine that says whose turn it is (`Tools.list(persona)`) leaves it out of others', and a call made for another persona is refused. Without a persona, a run with any of them is offered it.",
+   "doc": "One action. `name` is `<extension>.<action>`. `parameters` are JSON-schema properties; `required` lists mandatory ones. `needs` lists Display features the conversation must support (for example `files`). `internal` capabilities are callable by engines but not offered to models as tools. `access` is the lowest level that may call it (`member`, `admin`, `creator`). The caller's level is `ToolContext.access`, so a capability may also do more for higher levels (an admin sees every conversation's items, a member only their own). `command`, when set, makes the capability available as `$<command> <text>`, with the text passed as `command_argument`. It may be a name or a `Command` declaring options and a template for interfaces with native command menus; a name becomes a `Command` with one option for `command_argument`. `risk` is the tier (see Risk). Attributes refine it; the core enforces them and configuration can only make them stricter: * `private`: shows the owner's private data (messages, screen, clipboard, files). Offered only in conversations private to the owner; its run's output goes nowhere else. * `subject`: the parameter that permission rules and saved grants match on (a unit, a chat, a path); `subject_kind=\"path\"` also makes the core refuse secret paths (`.env`, keys) to models. * `escalate(arguments)`: may return a higher tier for a call (never a lower one). * `never_auto`: a model's call always asks the owner; no rule or grant changes that. * `grantable`: the owner may answer an approval with \"always allow\" for that exact subject in that conversation (needs `subject`). * `confirm`: even the owner's own typed command asks for a one-tap confirmation. * `describe(arguments)`: one plain line for approval prompts (\"Restart navidrome.service\"). `personas`, when given, are the only personas it is offered to: an engine that says whose turn it is (`Tools.list(persona)`) leaves it out of others', and a call made for another persona is refused. Without a persona, a run with any of them is offered it.",
    "fields": [
     {
      "name": "name",
@@ -199,11 +199,6 @@
     },
     {
      "name": "internal",
-     "type": "bool",
-     "default": false
-    },
-    {
-     "name": "owner_only",
      "type": "bool",
      "default": false
     },
@@ -889,7 +884,7 @@
    ]
   },
   "Operation": {
-   "doc": "A platform-specific action (for example `login`, or playing music) run through the core. It becomes the capability `<interface>.<name>`; `command`, if set, also makes it available as `$<command> <text>` with the text passed as `command_argument`. Operations are owner-only unless `owner_only=False`; a public operation must act only on the calling conversation (`context.address`), never on others. `risk` and the attributes (`private`, `subject`, `subject_kind`, `never_auto`, `grantable`, `confirm`) mean the same as on a Capability.",
+   "doc": "A platform-specific action (for example `login`, or playing music) run through the core. It becomes the capability `<interface>.<name>`; `command`, if set, also makes it available as `$<command> <text>` with the text passed as `command_argument`. Operations are owner-only unless `access=\"member\"`; a public operation must act only on the calling conversation (`context.address`), never on others. `risk` and the attributes (`private`, `subject`, `subject_kind`, `never_auto`, `grantable`, `confirm`) mean the same as on a Capability.",
    "fields": [
     {
      "name": "name",
@@ -2752,10 +2747,6 @@
      "type": "tuple[FileRef, ...]"
     },
     {
-     "name": "storage",
-     "type": "Store"
-    },
-    {
      "name": "models",
      "type": "Models"
     },
@@ -2852,7 +2843,7 @@
       }
      ],
      "returns": "Store",
-     "doc": "A key-value store of this capability's module, scoped by any combination of this `conversation`, one of the run's personas, and the caller (`person`); no arguments: the module's store everywhere (the same as `storage`)."
+     "doc": "A key-value store of this capability's module, scoped by any combination of this `conversation`, one of the run's personas, and the caller (`person`); no arguments: the module's store everywhere."
     },
     {
      "name": "unschedule",

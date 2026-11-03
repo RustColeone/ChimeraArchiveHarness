@@ -167,26 +167,26 @@ def core_capabilities(manager: "Manager", gateway: "GatewayLink") -> list[Capabi
                    "allowance or an account's budget.", guarded(stamina_settings),
                    {"text": {"type": "string", "description": "empty, 'total <dollars>', '<persona> <dollars>|reset' or "
                                                               "'budget <provider> <dollars>'"}},
-                   risk=Risk.WRITE, internal=True, owner_only=True,
+                   risk=Risk.WRITE, internal=True, access="creator",
                    command=Command("stamina", "Show today's spending, or set the daily total, an allowance or a budget",
                                    (Option("text", "total <dollars>, <persona> <dollars>, or budget <provider> <dollars>"),),
                                    examples=("total 3", "deepseek 0.8", "budget openai 20")),
                    command_argument="text"),
         Capability("core.send_message", "Send a text message to another conversation (interface:conversation).",
                    guarded(send_message), {"address": {"type": "string"}, "text": {"type": "string"}},
-                   ("address", "text"), Risk.CRITICAL, owner_only=True, subject="address", grantable=True,
+                   ("address", "text"), Risk.CRITICAL, access="creator", subject="address", grantable=True,
                    describe=lambda a: f"Send to {a.get('address')}: {str(a.get('text', ''))[:300]}"),
         Capability("core.list_rules", "List gateway admission rules by address pattern.",
-                   guarded(lister(admin.rules, "rules")), risk=Risk.READ, owner_only=True, private=True),
+                   guarded(lister(admin.rules, "rules")), risk=Risk.READ, access="creator", private=True),
         Capability("core.set_rule", "Set or delete (rule=null) the admission rule for an address pattern.",
                    guarded(set_rule), {"pattern": {"type": "string"}, "rule": rule_schema}, ("pattern",),
-                   Risk.CRITICAL, owner_only=True, never_auto=True),
+                   Risk.CRITICAL, access="creator", never_auto=True),
         Capability("core.list_routes", "List reply routes by address pattern.",
-                   guarded(lister(admin.routes, "routes")), risk=Risk.READ, owner_only=True, private=True),
+                   guarded(lister(admin.routes, "routes")), risk=Risk.READ, access="creator", private=True),
         Capability("core.set_route", "Set or delete (route=null) where replies for an address pattern go. "
                    "route: {target: 'interface:conversation', kinds: ['text','file','progress','notice']}",
                    guarded(set_route), {"pattern": {"type": "string"}, "route": {"type": ["object", "null"]}},
-                   ("pattern",), Risk.CRITICAL, owner_only=True, never_auto=True),
+                   ("pattern",), Risk.CRITICAL, access="creator", never_auto=True),
         Capability("core.add_routine",
                    "Repeat a message or a $command on a schedule in this conversation, sent as the person who "
                    "asked (plain text goes to the bot as their message; '$status' runs that command). schedule: "
@@ -205,26 +205,26 @@ def core_capabilities(manager: "Manager", gateway: "GatewayLink") -> list[Capabi
                    guarded(set_routine),
                    {"name": {"type": "string"}, "text": {"type": "string"},
                     "every_minutes": {"type": "number", "minimum": 1}, "daily_at": {"type": "string"},
-                    "enabled": {"type": "boolean"}}, ("name", "text"), Risk.CRITICAL, owner_only=True,
+                    "enabled": {"type": "boolean"}}, ("name", "text"), Risk.CRITICAL, access="creator",
                    never_auto=True),
         Capability("core.delete_routine", "Delete a routine by ID (your own here; admins: any).",
                    guarded(changer("delete")), {"id": {"type": "string"}}, ("id",), Risk.WRITE),
         Capability("core.list_assignments", "List engine/persona/policy assignments by address pattern.",
-                   guarded(list_assignments), risk=Risk.READ, owner_only=True, private=True),
+                   guarded(list_assignments), risk=Risk.READ, access="creator", private=True),
         Capability("core.set_assignment", "Create or replace the runtime assignment for an address pattern. "
                    "assignment: {engine, personas, budget, trusted, lane, enabled, options}. What may run there is set "
                    "under permissions in core.yml.",
                    guarded(set_assignment), {"pattern": {"type": "string"}, "assignment": {"type": "object"}},
-                   ("pattern", "assignment"), Risk.CRITICAL, owner_only=True, never_auto=True),
+                   ("pattern", "assignment"), Risk.CRITICAL, access="creator", never_auto=True),
         Capability("core.delete_assignment", "Delete a runtime assignment (configured ones stay).",
                    guarded(delete_assignment), {"pattern": {"type": "string"}}, ("pattern",), Risk.CRITICAL,
-                   owner_only=True, never_auto=True),
+                   access="creator", never_auto=True),
         Capability("core.list_forwards", "List conversations whose owner messages are forwarded elsewhere.",
-                   guarded(lister(admin.forwards, "forwards")), risk=Risk.READ, owner_only=True, private=True),
+                   guarded(lister(admin.forwards, "forwards")), risk=Risk.READ, access="creator", private=True),
         Capability("core.set_forward", "Forward the owner's ordinary messages in one conversation (exact address) "
                    "to another (target), or remove it (target=null). The target must be admitted.",
                    guarded(set_forward), {"address": {"type": "string"}, "target": {"type": ["string", "null"]}},
-                   ("address",), Risk.CRITICAL, owner_only=True, never_auto=True),
+                   ("address",), Risk.CRITICAL, access="creator", never_auto=True),
         # Only this conversation's own messages, which its members could scroll back to anyway.
         Capability("core.search_history", "Find earlier messages of this conversation that contain a word or "
                    "phrase, beyond what you can see of it (newest first, with time and speaker). Use it when the "
@@ -242,7 +242,7 @@ def core_capabilities(manager: "Manager", gateway: "GatewayLink") -> list[Capabi
                                    examples=("grok grok/grok-4.3", "grok reset", "openai"), access="admin"),
                    command_argument="text"),
         Capability("core.cancel_runs", "Cancel all open runs in a conversation (interface:conversation).",
-                   guarded(cancel_runs), {"address": {"type": "string"}}, ("address",), Risk.WRITE, owner_only=True),
+                   guarded(cancel_runs), {"address": {"type": "string"}}, ("address",), Risk.WRITE, access="creator"),
     ]
     for interface, operations in gateway.interface_operations().items():
         for operation in operations:
@@ -254,7 +254,7 @@ def _operation_capability(gateway: "GatewayLink", interface: str, operation) -> 
     async def run(arguments, context) -> ToolResult:
         return await gateway.operate(interface, operation.name, arguments, context)
     return Capability(f"{interface}.{operation.name}", operation.description, run, dict(operation.parameters),
-                      tuple(operation.required), operation.risk, owner_only=operation.owner_only,
+                      tuple(operation.required), operation.risk, access=operation.access,
                       command=operation.command,
                       command_argument=operation.command_argument, timeout_s=operation.timeout_s,
                       private=operation.private, subject=operation.subject, subject_kind=operation.subject_kind,

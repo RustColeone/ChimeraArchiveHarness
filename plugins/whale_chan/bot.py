@@ -376,7 +376,7 @@ class WhaleChanBot(Interface):
             return ToolResult.ok(self._voice_command(here, [mode] if mode else []))
         return [Capability("whale_chan.speakup", "鲸酱 messaging first: status, rehearse, now, on, off or dry.", speak_up,
                            {"do": {"type": "string", "enum": list(SPEAK_UP)}}, risk=Risk.WRITE, internal=True,
-                           owner_only=True, command="speakup", command_argument="do"),
+                           access="creator", command="speakup", command_argument="do"),
                 Capability("whale_chan.voice", "Her replies in this chat as voice messages: on or off.", voice_mode,
                            {"mode": {"type": "string", "enum": ["on", "off"]}}, risk=Risk.WRITE, internal=True,
                            command="voice", command_argument="mode")]

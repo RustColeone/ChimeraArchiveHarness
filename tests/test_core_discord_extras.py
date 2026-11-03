@@ -145,7 +145,7 @@ class MusicTests(ExtrasTestBase):
                                     ("discord.time", "read", "time"), ("discord.clock_start", "write", "start"),
                                     ("discord.clock_stop", "write", "stop")]:
             capability = capabilities[name]
-            self.assertFalse(capability.owner_only, name)
+            self.assertEqual(capability.access, "member", name)
             self.assertEqual((capability.risk.value, capability.command and capability.command.name), (risk, command))
         self.assertTrue(capabilities["discord.status"].owner_only)
 

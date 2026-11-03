@@ -33,10 +33,10 @@ async def remember(arguments, context) -> ToolResult:
     text = arguments["text"].strip()
     if not text:
         return ToolResult.fail("Nothing to remember", "empty")
-    notes = context.storage.get(key(context), [])
+    notes = context.store().get(key(context), [])
     notes.append({"text": text[:2000], "at": time.time(), "by": context.sender.name or context.sender.id})
     notes = notes[-KEEP:]
-    context.storage.set(key(context), notes)
+    context.store().set(key(context), notes)
     return ToolResult.ok(f"Saved note #{len(notes)}.")
 
 
@@ -45,8 +45,8 @@ def listing(stored: list) -> list[str]:
 
 
 async def notes(arguments, context) -> ToolResult:
-    stored = context.storage.get(key(context), [])
-    shared = context.storage.get(SHARED, []) if context.access == "creator" else []
+    stored = context.store().get(key(context), [])
+    shared = context.store().get(SHARED, []) if context.access == "creator" else []
     if not stored and not shared:
         return ToolResult.ok("No notes here yet.", data={"notes": []})
     lines = listing(stored) or ["No notes here yet."]

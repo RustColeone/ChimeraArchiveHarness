@@ -109,7 +109,6 @@ class ToolContext(Protocol):
     is_direct: bool
     files: tuple[FileRef, ...]
     own_files: tuple[FileRef, ...]
-    storage: Store
     models: Models
     workspace: Path
     access: Access  # the caller's effective level: member, admin or creator
@@ -130,7 +129,7 @@ class ToolContext(Protocol):
     def store(self, *, conversation: bool = False, persona: str | None = None, person: bool = False) -> Store:
         """A key-value store of this capability's module, scoped by any combination of this
         `conversation`, one of the run's personas, and the caller (`person`); no arguments: the module's
-        store everywhere (the same as `storage`)."""
+        store everywhere."""
 
     def memory(self, persona: str) -> Store:
         """A persona's private store, as `Session.memory` opens it, for a command that changes what her
@@ -147,9 +146,9 @@ class Capability:
     `name` is `<extension>.<action>`. `parameters` are JSON-schema properties; `required` lists
     mandatory ones. `needs` lists Display features the conversation must support (for example `files`).
     `internal` capabilities are callable by engines but not offered to models as tools.
-    `access` is the lowest level that may call it (`member`, `admin`, `creator`; `owner_only` means
-    `creator`). The caller's level is `ToolContext.access`, so a capability may also do more for higher
-    levels (an admin sees every conversation's items, a member only their own).
+    `access` is the lowest level that may call it (`member`, `admin`, `creator`). The caller's level is
+    `ToolContext.access`, so a capability may also do more for higher levels (an admin sees every conversation's items,
+    a member only their own).
     `command`, when set, makes the capability available as `$<command> <text>`, with the text passed
     as `command_argument`. It may be a name or a `Command` declaring options and a template for
     interfaces with native command menus; a name becomes a `Command` with one option for
@@ -180,7 +179,6 @@ class Capability:
     required: tuple[str, ...] = ()
     risk: Risk = Risk.READ
     internal: bool = False
-    owner_only: bool = False
     needs: frozenset[str] = frozenset()
     command: Command | str | None = None
     command_argument: str | None = None
@@ -197,8 +195,6 @@ class Capability:
     personas: tuple[str, ...] = ()
 
     def __post_init__(self):
-        if self.owner_only:
-            object.__setattr__(self, "access", "creator")
         if self.access not in ("member", "admin", "creator"):
             raise ValueError(f"{self.name}: access must be member, admin or creator")
         if isinstance(self.command, str):
