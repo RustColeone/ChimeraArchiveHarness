@@ -7,17 +7,13 @@ the older ones as the conversation's rolling summary, and the images shared shor
 from __future__ import annotations
 
 import dataclasses
-import datetime as dt
 import math
 import time
 
-from contracts import FileRef, ModelError, ModelRequest, Session
+from contracts import IMPULSE, FileRef, ModelError, ModelRequest, Session, flag, impulse_line, is_command, local_time, number
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".gif", ".webp")
 NEW_THREAD = {"/new", "/reset", "/clear"}
-# How an interface marks a message it sent on a persona's own impulse (with `extra.speak_up`, Whale-chan's bot
-# speaking up): in history it is her impulse, not something the person said.
-IMPULSE = "⟨speak-up⟩ "
 COMPACT_RETRY_S = 15 * 60  # after a failed summary call, wait this long before trying again
 COMPACT = """You keep the running summary of a group conversation, so its participants can follow it once the messages themselves are out of view. Rewrite the summary to cover the new messages too: who said what that matters, decisions, plans, promises, open questions, facts people shared about themselves, and the mood. Drop small talk and anything already settled. Plain text, in the conversation's main language, at most 300 words."""
 
@@ -65,17 +61,11 @@ def new_thread(text: str) -> list[str] | None:
     return words[1:] if 1 <= len(words) <= 2 and words[0] in NEW_THREAD else None
 
 
-def is_command(text: str) -> bool:
-    """A `$command`, as the core tells them apart (`$` and a letter)."""
-    text = text.strip()
-    return len(text) > 1 and text[0] == "$" and text[1].isalpha()
-
-
 def line(item, named: bool, shown: set[str]) -> str:
     """One readable entry from someone else: time, speaker (in a group), text, what it replied to, attachments."""
     if item.direction == "in" and item.text.startswith(IMPULSE):
-        return f"(You messaged them on your own then: {item.text[len(IMPULSE):].strip()})"
-    when = dt.datetime.fromtimestamp(item.at).astimezone().strftime("%m-%d %H:%M")
+        return impulse_line(item.text[len(IMPULSE):].strip())
+    when = local_time(item.at, "%m-%d %H:%M")
     speaker = (item.sender_name or ("assistant" if item.direction == "out" else item.sender_id))
     text = f"[{when}] {speaker + ': ' if named or item.direction == 'out' else ''}{item.text}"
     if item.quoted_text:
@@ -84,30 +74,6 @@ def line(item, named: bool, shown: set[str]) -> str:
         text += f"\n[{'image' if is_image(file) else 'file'} {file.name or 'attachment'}"
         text += ", shown to you with this request]" if file.path in shown else "]"
     return text
-
-
-def number(value, default: float, low: float, high: float, kind=int):
-    """A numeric setting clamped to [low, high]; a value that is not a number (or not finite) is the default."""
-    if value is None or isinstance(value, bool):
-        return kind(default)
-    try:
-        result = kind(value) if not isinstance(value, str) else kind(float(value.strip()))
-    except (TypeError, ValueError, OverflowError):
-        return kind(default)
-    if isinstance(result, float) and not math.isfinite(result):
-        return kind(default)
-    return max(kind(low), min(result, kind(high)))
-
-
-def flag(value, default: bool) -> bool:
-    """An on/off setting as people write it in YAML or JSON: true/false, yes/no, on/off, 1/0. Anything else (or
-    nothing) is the default, so `"false"` is never mistaken for on."""
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value != 0
-    text = str(value).strip().lower() if isinstance(value, str) else ""
-    return True if text in ("true", "yes", "on", "1") else False if text in ("false", "no", "off", "0") else default
 
 
 class Reading:

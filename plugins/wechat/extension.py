@@ -41,6 +41,9 @@ NUMBERS = {"max_upload_mb": (1, 100), "max_text_chars": (20, 4000), "poll_second
            "account_interval_s": (0, 3600), "chat_interval_s": (0, 3600)}
 
 
+SECRETS = ("keys.json", "image_key.json")  # the keys kept in its data folder
+
+
 def settings_from(config, data_dir: Path, environ=os.environ) -> dict:
     settings = dict(DEFAULTS)
     for key, value in config.items():
@@ -65,10 +68,10 @@ def setup(context) -> Contributions:
     if not context.config and not any(os.environ.get(name, "").strip() for name in ENVIRONMENT.values()):
         # A drop-in every install has: stay out of the way until WeChat is configured.
         context.log("not_configured")
-        return Contributions()
+        return Contributions(secrets=SECRETS)
     # Defaults core.yml overrides: no chat is answered until core.yml opens it (`admission`, chat by chat), and
     # the chats it opens get MomoChat with 本鲸 (this module's agent).
-    return Contributions(interfaces=[WeChatInterface(settings_from(context.config, context.data_dir))],
+    return Contributions(interfaces=[WeChatInterface(settings_from(context.config, context.data_dir))], secrets=SECRETS,
                          personas=[PERSONA], admission={"wechat:*": {"enabled": False}},
                          assignments={"wechat:*": {"engine": "momochat", "personas": [PERSONA.name]}})
 

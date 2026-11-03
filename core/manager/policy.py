@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import fnmatch
-import os
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Mapping
 
-from contracts import Address, Sender
+from contracts import LEVELS, Address, Risk, Sender
+from core.manager.secrets import normalize
 
 
 @dataclass(frozen=True)
@@ -117,8 +116,7 @@ class Owners:
 
 
 # ---- permissions: access, approval ------------------------------------------------------------------
-LEVELS = {"member": 0, "admin": 1, "creator": 2}
-TIERS = ("read", "prepare", "write", "critical")
+RISKS = tuple(risk.value for risk in Risk)
 TIER_DECISIONS = ("auto", "ask", "always-ask")
 RULE_DECISIONS = ("auto", "ask")
 BUILTIN_TIERS = {"read": "auto", "prepare": "auto", "write": "ask", "critical": "ask"}
@@ -157,18 +155,11 @@ class RuleSpec:
         return spec
 
 
-def _path(value: str) -> str:
-    path = Path(os.path.expanduser(str(value).strip()))
-    if not path.is_absolute():
-        path = Path.home() / path
-    return os.path.normpath(str(path))
-
-
 def subject_matches(rule_subject: str, value: str | None, kind: str) -> bool:
     if value is None:
         return False
     if kind == "path":
-        return fnmatch.fnmatchcase(_path(value), _path(rule_subject))
+        return fnmatch.fnmatchcase(normalize(value), normalize(rule_subject))
     return value == rule_subject
 
 
@@ -251,7 +242,7 @@ class Permissions:
     def describe(self, address: Address) -> dict[str, Any]:
         """What applies in one conversation, for `$permissions`."""
         use, use_pattern = self.use_for(address)
-        tiers = {tier: self.tier_setting(address, tier) for tier in TIERS}
+        tiers = {tier: self.tier_setting(address, tier) for tier in RISKS}
         rules, seen = [], set()
         for pattern in address_patterns(address):
             for key, (spec, levels) in self.rules.get(pattern, {}).items():
@@ -295,7 +286,7 @@ def parse_section(pattern: str, section: Any) -> dict[str, Any]:
             raise ValueError(f"permissions {pattern!r}: tiers must map read/prepare/write/critical to a decision")
         parsed = {}
         for tier, decision in tiers.items():
-            if tier not in TIERS:
+            if tier not in RISKS:
                 raise ValueError(f"permissions {pattern!r}: unknown tier {tier!r}")
             if decision not in TIER_DECISIONS:
                 raise ValueError(f"permissions {pattern!r}: tier {tier} must be one of {TIER_DECISIONS}")

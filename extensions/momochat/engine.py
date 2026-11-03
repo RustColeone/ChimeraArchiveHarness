@@ -1,6 +1,4 @@
-"""MomoChat: the conversation harness. It was three engines until 2026-10-27: the assistant (one persona, tools,
-questions), Whale-chan's chat engine (a personal AI chat client: one thread until `/new`, full answers) and the room
-(group chats). They are its former names.
+"""MomoChat: the conversation harness.
 
 A run is the answer to one message. Who speaks is decided first: in a direct chat (one persona) she does; in a group
 chat (several) those the message calls on, everyone for "you all", whose turn it is when it names no one (and, with
@@ -18,31 +16,25 @@ its watcher), and an agent has none.
 from __future__ import annotations
 
 import asyncio
-import datetime as dt
 import json
-import re
 import time
 from typing import Any
 
-from contracts import Engine, EngineSpec, ModelError, ModelRequest, RunYield, Session, ToolResult, ToolSpec
+from contracts import (Engine, EngineSpec, ModelError, ModelRequest, RunYield, Session, ToolResult, ToolSpec, chinese,
+                       flag, impulse, local_time, number)
 
 from . import group, steps
-from .history import Reading, add_images, combine_images, flag, images, line, new_thread, number
+from .history import Reading, add_images, combine_images, images, line, new_thread
 from .steps import ASK, HAND_OFF, PASS
 
 VERSION = 2  # of the state a run saves (runs another engine saved start over: their calls are `c…`, ours `m…`)
 STYLES = ("brief", "full", "chat")
-DEEPER = ("deep", "gut")  # what `/new` leaves to `$new`
 DAY = 86400
 ANSWER_ONLY = ("full", "chat")  # the styles that post only her answer, her notes while working shown as progress
 FAILURES = {
     "request_failed": ("我这边的请求失败了，这一步还没完成；其他成员可以继续各自的工作。",
                        "My request failed; this step is unfinished. The others can continue."),
 }
-
-
-def chinese(text: str) -> bool:
-    return bool(re.search(r"[一-鿿]", text))
 
 
 def owner_instructions(session: Session) -> str:
@@ -90,8 +82,7 @@ class MomoChatEngine(Engine):
         since = session.trigger.received_at - DAY
         lines = [line for line in session.logbook.recent(limit * 3) if line.kind not in ("note", "command")
                  and line.at >= since][-limit:] if limit else []
-        return "\n".join(f"- {dt.datetime.fromtimestamp(line.at).astimezone().strftime('%H:%M')} {line.text}"
-                         for line in lines)
+        return "\n".join(f"- {local_time(line.at, '%H:%M')} {line.text}" for line in lines)
 
     def _option(self, session: Session, name: str):
         value = session.options.get(name)
@@ -105,12 +96,6 @@ class MomoChatEngine(Engine):
         return number(session.options.get(name), getattr(self.settings, name), low, high, kind)
 
     @staticmethod
-    def _speak_up(session: Session) -> str:
-        """Her motive when this run is her own impulse to talk, else "". Only an interface's own code marks a
-        request so (`extra.speak_up`, which people cannot set); text that merely looks like one is a message."""
-        return str(session.trigger.extra.get("speak_up") or "")
-
-    @staticmethod
     def _persona(session: Session, name: str):
         return next((persona for persona in session.personas if persona.name == name), session.personas[0])
 
@@ -119,7 +104,7 @@ class MomoChatEngine(Engine):
 
     def _new_thread(self, session: Session) -> str:
         """`/new` starts a fresh thread here for everyone, and `/new <student>` for her alone; what to answer, or "" for
-        a message that is no such thing. Going deeper is a command of its own, for the creator (`$new`)."""
+        a message that is no such thing, as `/new` with any other word is."""
         words = new_thread(session.trigger.text)
         if words is None:
             return ""
@@ -127,8 +112,6 @@ class MomoChatEngine(Engine):
         if not words:
             session.store(conversation=True).set("thread_since", at)
             return str(session.options.get("new_chat_text") or self.settings.new_chat_text)
-        if words[0] in DEEPER:
-            return f"That is `$new {words[0]}`: only the creator can use it, and it asks first."
         named = next((persona for persona in session.personas
                       if words[0] in (persona.name.lower(), persona.display_name.lower())), None)
         if named is None:
@@ -473,7 +456,7 @@ class MomoChatEngine(Engine):
                             timeout_s=self._number(session, "timeout_s", 5, 900, float), **kwargs)
 
     async def _step(self, session: Session, state: dict, turn: dict, correction: str = "") -> dict[str, Any]:
-        speak_up = bool(self._speak_up(session))
+        speak_up = bool(impulse(session.trigger))
         if not speak_up and self._native(session):
             try:
                 return await self._native_step(session, state, turn, correction)
@@ -543,7 +526,7 @@ class MomoChatEngine(Engine):
         else:
             layout = ("You may use Markdown." if display.markdown else "Use plain text only; no Markdown.") \
                 + f" Keep each message under {display.max_text_chars} characters."
-        motive = self._speak_up(session)
+        motive = impulse(session.trigger)
         listed = [] if final or motive or turn["optional"] else [
             {key: tool[key] for key in ("name", "description", "parameters", "risk")}
             for tool in session.tools.list(persona.name)]
@@ -563,8 +546,7 @@ class MomoChatEngine(Engine):
         if many:
             roster = ", ".join(f"{item.display_name} ({item.name})" for item in session.personas)
             system += "\n\n" + steps.GROUP.format(roster=roster, hand_off=steps.HAND_OFF_RULE[native])
-        now = dt.datetime.fromtimestamp(session.trigger.received_at).astimezone()
-        context = [f"The current time is {now.strftime('%A %Y-%m-%d %H:%M')} (UTC{now.strftime('%z')})."]
+        context = [f"The current time is {local_time(session.trigger.received_at, '%A %Y-%m-%d %H:%M (UTC%z)')}."]
         if turn["parts"]["turn"]:
             context.append(turn["parts"]["turn"])
         logged = self._logged(session)

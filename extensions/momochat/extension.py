@@ -10,7 +10,11 @@ from .engine import MomoChatEngine, Settings
 
 
 def setup(context) -> Contributions:
-    return Contributions(engines=[MomoChatEngine(Settings(context.config))])
+    # The core's own agent answers here wherever nothing else is assigned.
+    return Contributions(engines=[MomoChatEngine(Settings(context.config))], assignments={
+        "*": {"engine": "momochat", "personas": ["assistant"]},
+        "routine:*": {"engine": "momochat", "personas": ["assistant"],
+                      "budget": {"model_calls": 8, "tool_calls": 8, "seconds": 300}}})
 
 
 EXTENSION = Extension("momochat", setup,

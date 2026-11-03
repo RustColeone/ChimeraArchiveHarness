@@ -816,7 +816,7 @@ class SplitTests(unittest.TestCase):
     def test_every_chunk_fits_the_limit(self):
         package = __import__("core.loader", fromlist=["import_extension"]).import_extension(
             ROOT / "plugins" / "wechat")[1].__name__.rsplit(".", 1)[0]
-        split_text = __import__(f"{package}.interface", fromlist=["split_text"]).split_text
+        split_text = __import__(f"{package}.interface", fromlist=["parts"]).parts
         self.assertEqual([len(chunk) for chunk in split_text("a" * 4000 + " " + "b" * 100)], [4000, 101])
         self.assertEqual([len(chunk) for chunk in split_text("a" * 3999 + "\n\n" + "b" * 10)], [4000, 11])
         generator = random.Random(7)

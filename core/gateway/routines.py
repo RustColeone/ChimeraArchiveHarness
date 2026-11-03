@@ -13,6 +13,8 @@ import re
 import secrets
 from typing import Any, Mapping
 
+from contracts import local_time
+
 DAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
 DAY_NAMES = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 UNITS = {"m": 1, "h": 60, "d": 1440}
@@ -99,7 +101,7 @@ def next_fire(routine: Mapping[str, Any], now: float) -> float | None:
 
 def describe(routine: Mapping[str, Any]) -> str:
     if routine.get("once_at") is not None:
-        return "once at " + dt.datetime.fromtimestamp(float(routine["once_at"])).astimezone().strftime("%Y-%m-%d %H:%M")
+        return "once at " + local_time(float(routine["once_at"]))
     if routine.get("every_minutes"):
         value = float(routine["every_minutes"])
         if value % 1440 == 0:

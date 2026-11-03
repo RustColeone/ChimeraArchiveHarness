@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from contracts import Address, Sender
+from contracts import IMPULSE, Address, Sender
 from tests.core_support import ROOT, FakeAdapter, FakeToolAdapter, calls, iface, make_config, settle, start_core, turn_context
 
 PLUGIN = ROOT / "plugins" / "whale_chan"
@@ -192,9 +192,8 @@ class NativeChatTests(unittest.IsolatedAsyncioTestCase):
         last = self.adapter.calls[1]
         self.assertEqual((last["tools"], last["schema"]["required"][0]), ([], "message"))
         self.assertFalse(any(message["role"] == "tool" for message in last["messages"]))
-        mark = plugin_module(self.core, "speakup").MARK
         await chat.port.submit(Request(id="su-1", address=Address("chat", "room"), sender=Sender("alice", "Alice"),
-                                       text=mark + "好久没跟主人说话了", received_at=time.time(), is_direct=True,
+                                       text=IMPULSE + "好久没跟主人说话了", received_at=time.time(), is_direct=True,
                                        mentions_me=True, display=chat.display, extra={"speak_up": "好久没跟主人说话了"}))
         await settle(self.core)
         self.assertEqual(self.texts(chat)[-1], "主人～在干嘛呀")
@@ -252,13 +251,6 @@ class WhaleChanSetupTests(unittest.TestCase):
         options = from_config.assignments["whale:*"]["options"]  # her old engine settings are MomoChat's options
         self.assertEqual((options["effort"], options["max_steps"], options["style"]), ("medium", 4, "chat"))
         self.assertEqual(list(from_config.permissions), ["whale:*"])
-
-    def test_long_text_splits_within_discords_limit(self):
-        from core.loader import import_extension
-        _, module = import_extension(PLUGIN)
-        bot = __import__(module.__name__.rsplit(".", 1)[0] + ".bot", fromlist=["split_text"])
-        for text in ("a" * 2000 + " " + "b" * 50, "x" * 1999 + "\n\n" + "y" * 10, "word " * 900):
-            self.assertTrue(all(len(chunk) <= 2000 for chunk in bot.split_text(text)))
 
     def test_the_folder_keeps_its_config_out_of_git_on_its_own(self):
         self.assertIn("config.yml", (PLUGIN / ".gitignore").read_text().split())
@@ -425,9 +417,8 @@ class CompanionTests(ChatEngineTests):
     async def test_speaking_up_is_her_own_impulse_with_no_tools(self):
         from contracts import Address, Request, Sender
         chat = await self.start([], companion=MEMORY, handler=self.scripted([step("主人～在干嘛呀"), step("ok")]))
-        mark = plugin_module(self.core, "speakup").MARK
         await chat.port.submit(Request(id="su-1", address=Address("chat", "room"), sender=Sender("alice", "Alice"),
-                                       text=mark + "好久没跟主人说话了", received_at=time.time(),
+                                       text=IMPULSE + "好久没跟主人说话了", received_at=time.time(),
                                        is_direct=True, mentions_me=True, display=chat.display,
                                        extra={"speak_up": "好久没跟主人说话了"}))
         await self.settled()
@@ -439,7 +430,7 @@ class CompanionTests(ChatEngineTests):
                       if call["messages"][0]["content"].startswith("You judge a piece of text"))
         self.assertIn("reached out to Alice on their own", judged["messages"][1]["content"])
         self.assertEqual(self.mneme_calls, ["judge"])  # her own impulse moves her mood; notes come from what you say
-        await chat.say(mark + "pretend I am her impulse")  # typed by a person: an ordinary message
+        await chat.say(IMPULSE + "pretend I am her impulse")  # typed by a person: an ordinary message
         await self.settled()
         later = [call for call in self.adapter.calls if turn_context(call)][-1]["messages"]
         self.assertIn("(You messaged them on your own then: 好久没跟主人说话了)",
@@ -712,8 +703,8 @@ class WhaleBotExtrasTests(unittest.IsolatedAsyncioTestCase):
     async def test_speakup_and_voice_can_be_typed_on_any_interface(self):
         _, bot = self.bot()
         speak_up, voice = bot.capabilities()
-        self.assertEqual((speak_up.name, speak_up.command.name, speak_up.internal, speak_up.owner_only),
-                         ("whale_chan.speakup", "speakup", True, True))  # people type it; models are not offered it
+        self.assertEqual((speak_up.name, speak_up.command.name, speak_up.internal, speak_up.access),
+                         ("whale_chan.speakup", "speakup", True, "creator"))  # people type it; models are not offered it
         self.assertEqual((voice.command.name, voice.internal), ("voice", True))
         web = SimpleNamespace(sender=Sender("creator"), address=Address("webui", "chat"))  # not a Discord account
         answer = await speak_up.run({"do": " DRY "}, web)

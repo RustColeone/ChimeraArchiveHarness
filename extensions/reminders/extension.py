@@ -6,7 +6,7 @@ import datetime as dt
 import re
 import time
 
-from contracts import Capability, Command, Contributions, Extension, Option, Risk, ToolResult
+from contracts import Capability, Command, Contributions, Extension, Option, Risk, ToolResult, local_time
 
 UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
 DURATION = re.compile(r"^(\d+(?:\.\d+)?)\s*(seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d)(?=\d|\s|$)",
@@ -14,7 +14,7 @@ DURATION = re.compile(r"^(\d+(?:\.\d+)?)\s*(seconds?|secs?|s|minutes?|mins?|m|ho
 
 
 def local_text(at: float) -> str:
-    return dt.datetime.fromtimestamp(at).astimezone().strftime("%Y-%m-%d %H:%M %Z")
+    return local_time(at, "%Y-%m-%d %H:%M %Z")
 
 
 def parse_spec(spec: str, now: float) -> tuple[float, str]:
@@ -92,7 +92,9 @@ async def cancel(arguments, context) -> ToolResult:
 
 
 def setup(context) -> Contributions:
-    return Contributions(capabilities=[
+    # They only affect the requester's own conversation, so anyone may use them without the owner's approval.
+    return Contributions(permissions={"*": {"rules": {"reminders.create": "auto", "reminders.cancel": "auto"}}},
+                         capabilities=[
         Capability("reminders.create",
                    "Set a one-time reminder in this conversation. Give text and either `at` (ISO 8601 with UTC offset, "
                    "computed from the current time) or `in_minutes`. `spec` is the $remind form, e.g. '10m drink water'.",

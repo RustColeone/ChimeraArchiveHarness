@@ -7,7 +7,7 @@ and every message in a thread the bot opened (`thread_channels`) or that was sta
 count as addressed too.
 
 Public operations act on the calling conversation only: music in the caller's voice channel of that
-server (music.py), the study clock (clock.py). Text replies render math (math_render.py).
+server (music.py), the study clock (clock.py). Text replies render math (contracts.discord_bot.math_render).
 """
 
 from __future__ import annotations
@@ -23,12 +23,12 @@ from typing import Any
 import discord
 
 from contracts import (Address, Delivery, Display, FileRef, Interface, Operation, Reply, Request, Risk, Sender,
-                       ToolResult)
+                       ToolResult, split_text)
+from contracts.discord_bot import slash
+from contracts.discord_bot.math_render import MathRenderer, fallback_text, split_math
 
 from .clock import LiveClocks, clock_text
-from .math_render import MathRenderer, fallback_text, split_math
 from .music import CONTROL_ACTIONS, MusicCommand, MusicPlayer, is_url, parse_music_command
-from . import slash
 from .status_log import StatusLog, code_safe
 
 DEFAULT_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -68,23 +68,6 @@ def reaction_action(emoji: str, actions) -> dict | None:
 
 def thread_name(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()[:80] or "Task"
-
-
-def split_text(text: str, limit: int = MESSAGE_LIMIT) -> list[str]:
-    chunks, remaining = [], text
-    while len(remaining) > limit:
-        cut = 0
-        for separator in ("\n\n", "\n", " "):
-            boundary = remaining.rfind(separator, 0, limit - len(separator) + 1)
-            if boundary >= limit // 2:
-                cut = boundary + len(separator)
-                break
-        cut = cut or limit
-        chunks.append(remaining[:cut])
-        remaining = remaining[cut:]
-    if remaining or not chunks:
-        chunks.append(remaining)
-    return chunks
 
 
 def inline_code(text: str) -> str:
@@ -705,11 +688,11 @@ class DiscordInterface(Interface):
         """Text chunks and rendered display-math images (`("text", str)` / `("image", path)`) in order."""
         if (reply.kind != "text" or reply.source == "owner" or not self.math.enabled
                 or ("$" not in text and "\\" not in text)):
-            return [("text", chunk) for chunk in split_text(text)]
+            return [("text", chunk) for chunk in split_text(text, MESSAGE_LIMIT)]
         items, images = [], 0
         for kind, value in split_math(text):
             if kind == "text":
-                items.extend(("text", chunk) for chunk in split_text(value) if value.strip())
+                items.extend(("text", chunk) for chunk in split_text(value, MESSAGE_LIMIT) if value.strip())
                 continue
             path = None
             if images < self.math.max_images:
@@ -718,8 +701,8 @@ class DiscordInterface(Interface):
                     images += 1
                 except Exception as error:
                     self.port.log("math_render_failed", error=type(error).__name__)
-            items.extend([("image", path)] if path else [("text", chunk) for chunk in split_text(fallback_text(value))])
-        return items or [("text", chunk) for chunk in split_text(text)]
+            items.extend([("image", path)] if path else [("text", chunk) for chunk in split_text(fallback_text(value), MESSAGE_LIMIT)])
+        return items or [("text", chunk) for chunk in split_text(text, MESSAGE_LIMIT)]
 
     async def _send_status(self, conversation: str, text: str):
         channel = await self._channel(conversation)

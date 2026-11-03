@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Protocol
 
 from contracts.engine import History, Persona
 from contracts.messages import Address, Request
 from contracts.models import Models
+from contracts.shared import NAME, persona_names
 from contracts.stores import Facts, Store
-
-NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 @dataclass(frozen=True)
@@ -70,9 +68,6 @@ class Watcher:
             raise ValueError(f"A watcher's name is lowercase letters, digits or _, got {self.name!r}")
         if not callable(self.run):
             raise ValueError(f"watcher {self.name!r}: run is an async function of an Exchange and a WatchContext")
-        personas = (self.personas,) if isinstance(self.personas, str) else self.personas
-        if not isinstance(personas, (tuple, list)) or not all(isinstance(name, str) and name for name in personas):
-            raise ValueError(f"watcher {self.name!r}: personas is a list of persona names")
-        object.__setattr__(self, "personas", tuple(personas))
+        object.__setattr__(self, "personas", persona_names(self.personas, f"watcher {self.name!r}"))
         if not isinstance(self.timeout_s, (int, float)) or isinstance(self.timeout_s, bool) or self.timeout_s <= 0:
             raise ValueError(f"watcher {self.name!r}: timeout_s is a positive number of seconds")

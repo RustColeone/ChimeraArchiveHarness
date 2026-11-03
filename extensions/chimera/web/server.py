@@ -34,7 +34,7 @@ from urllib.parse import urlsplit
 
 from aiohttp import WSMsgType, web
 
-from contracts import Address, Delivery, Display, Interface, Reply, Request, Sender
+from contracts import Address, Delivery, Display, Interface, Reply, Request, Sender, fact
 
 from .. import places, views
 from ..kernel.flow import new_id
@@ -765,7 +765,7 @@ class ClassroomUI(Interface):
         pictures = self._student_pictures()
         for seat in self.team.seats.values():
             values = self.port.facts(seat.persona, self.user_id)
-            alias = next((value for key, value in values.items() if key.rsplit(".", 1)[-1] == "alias"), None)
+            alias = fact(values, "alias")
             alone = next((row for row in benchmark_rows(seat.persona, summaries)
                           if row["formation"] == "alone" and row["seats"] == ["builder"]), None)  # (the design's word)
             team.append({"persona": seat.persona, "name": seat.name, "family": seat.family, "voice": seat.voice,

@@ -16,10 +16,14 @@ from core.loader import ExtensionError, LoadedExtension, import_extension, load_
 from core.manager.manager import Manager
 from core.manager.policy import Permissions, check_extension_permissions
 from core.providers.prices import PriceBook
+from core.setup import Setup
 from core.manager.secrets import Secrets
 from core.providers.registry import Providers
 from core.storage.bottle import Bottle
 from core.storage.tank import Tank
+
+
+FALLBACKS = ("*", "routine:*")
 
 
 class Core:
@@ -29,7 +33,7 @@ class Core:
         self._tick_seconds, self._clock = tick_seconds, clock
         self.extensions: list[LoadedExtension] = []
         self.skipped: dict[str, str] = {}  # module → why it is not loaded
-        self.set_aside: list[tuple[str, str, str]] = []  # (module or "core", pattern, why): defaults not applied
+        self.set_aside: list[tuple[str, str, str]] = []  # (module, pattern, why): defaults not applied
         self.started = False
         self.exit_code = 0  # 75 asks the supervisor for a restart (core/supervisor.py)
         self._stopping = asyncio.Event()
@@ -72,6 +76,7 @@ class Core:
             if extension.name in found:
                 raise ConfigError(f"Two modules are named {extension.name!r}; exclude one (`modules: {{exclude: [...]}}`)")
             found[extension.name] = (path, extension, module)
+        self._platforms = {name: platform for item in found.values() for name, platform in item[1].platforms.items()}
         order, cyclic = load_order({name: item[1] for name, item in found.items()})
         for name, why in cyclic.items():
             self._skip(name, why, found[name][0])
@@ -83,9 +88,7 @@ class Core:
         self.manager.attach_gateway(self.gateway)
         self.manager.permissions = self._permissions()
         self.manager.secrets = self._secrets()
-        from core.setup import Setup
         self.manager.setup_desk = Setup(config)
-        self._set_aside_builtin_defaults()
         problems = self.manager.problems()
         if config.control is not None and config.control.interface not in self.gateway.interfaces:
             problems.append(f"control route {config.control} uses an interface that is not loaded")
@@ -110,7 +113,8 @@ class Core:
             loaded = await load_extension(path, lambda module_name: config.extension_config.get(module_name, {}),
                                           config.data_dir / "extensions", self.audit.record,
                                           self.manager.facts.handle, present, (extension, module),
-                                          lambda: self.manager.persona_views(config.profiles), self.providers.prices)
+                                          lambda: self.manager.persona_views(config.profiles), self.providers.prices,
+                                          self._platforms)
         except ExtensionError as error:
             return self._skip(name, str(error), path)
         why, aside = self._check_names(loaded, loaded_names)
@@ -168,8 +172,9 @@ class Core:
                 if not item or (kind, item) in own:
                     continue
                 owner = self._owners.get((kind, item))
-                if owner is None and absent:
-                    aside.setdefault(pattern, f"the {kind} {item!r} is not loaded (without {', '.join(absent)})")
+                if owner is None and (absent or pattern in FALLBACKS):
+                    aside.setdefault(pattern, f"the {kind} {item!r} is not loaded"
+                                     + (f" (without {', '.join(absent)})" if absent else ""))
                 elif owner is None:
                     return (f"its default for {pattern!r} names the {kind} {item!r}, which no loaded module adds and "
                             "no module it declares could add (add that module to `requires` or `uses`)"), {}
@@ -179,15 +184,16 @@ class Core:
         return None, aside
 
     def _check_defaults(self, loaded: LoadedExtension) -> None:
-        """What _register_defaults would refuse, checked before anything is registered."""
-        contributions, name = loaded.contributions, loaded.extension.name
+        """What _register_defaults would refuse, checked before anything is registered. A module may suggest what
+        answers where nothing else does (`*`, `routine:*`); all else in its defaults is its own interfaces'."""
+        contributions = loaded.contributions
         own = {interface.name for interface in contributions.interfaces}
-        for pattern in [*contributions.assignments, *contributions.admission]:
+        for pattern in [*(item for item in contributions.assignments if item not in FALLBACKS), *contributions.admission]:
             if pattern.split(":", 1)[0] not in own or ":" not in pattern:
                 raise ConfigError(f"defaults may only cover its own interfaces, not {pattern!r}")
         for kind, factory in contributions.adapters.items():
-            if kind in self.providers._kinds or not callable(factory):
-                raise ConfigError(f"provider kind {kind!r} " + ("already exists" if kind in self.providers._kinds
+            if self.providers.has_kind(kind) or not callable(factory):
+                raise ConfigError(f"provider kind {kind!r} " + ("already exists" if self.providers.has_kind(kind)
                                                                  else "needs an adapter factory"))
 
     def _register(self, loaded: LoadedExtension) -> None:
@@ -209,9 +215,8 @@ class Core:
 
     def _registries(self) -> list:
         """The registries a module adds to, copied, so a module that fails halfway can be taken out again."""
-        gateway, manager = self.gateway, self.manager
-        return [(store, type(store)(store)) for store in (
-            gateway.interfaces, manager.engines, manager._origin, manager.capabilities, manager.personas, manager.prompt_parts, manager._part_origin, manager.watchers, self._owners)]
+        return [(store, type(store)(store)) for store in (self.gateway.interfaces, *self.manager.registries(),
+                                                          self._owners)]
 
     @staticmethod
     def _restore(saved: list) -> None:
@@ -221,20 +226,6 @@ class Core:
                 store.update(copy)
             else:
                 store[:] = copy
-
-    def _set_aside_builtin_defaults(self) -> None:
-        """The core's own default assignments (`*`, `routine:*`) apply only while what they name is loaded."""
-        for pattern in self.config.builtin_assignments:
-            assignment = self.manager.assignments.get(pattern)
-            if assignment is None or pattern in self.manager._overrides.keys():
-                continue
-            missing = ([f"the engine {assignment.engine!r}"] if self.manager.engines.get(assignment.engine) is None else []) \
-                + [f"the persona {item!r}" for item in assignment.personas if item not in self.manager.personas]
-            if missing:
-                self.manager._config_assignments.pop(pattern, None)
-                reason = f"{' and '.join(missing)} not loaded"
-                self.set_aside.append(("core", pattern, reason))
-                self.audit.record("default_unusable", extension="core", pattern=pattern, reason=reason)
 
     def _permissions(self) -> Permissions:
         """Built-in defaults, extension defaults (code, then the module's config.yml), then core.yml, setting by
@@ -263,9 +254,9 @@ class Core:
                  if setting.kind == "secret" for variable in setting.env}
         names.update(self.providers.key_variables())  # configured and contributed providers alike
         paths = [str(path / "config.yml") for path in self.config.all_modules()]
-        paths += [str(self.config.data_dir / pattern) for pattern in ("*.db", "*.db-wal", "*.db-shm",
-                                                                       "extensions/*/*.db*", "extensions/*/keys.json",
-                                                                       "extensions/*/session.key")]
+        paths += [str(self.config.data_dir / pattern) for pattern in ("*.db", "*.db-wal", "*.db-shm", "extensions/*/*.db*")]
+        paths += [str(self.config.data_dir / "extensions" / loaded.extension.name / pattern)
+                  for loaded in self.extensions for pattern in loaded.contributions.secrets]
         # A relative `secrets:` entry is under the home folder (as it always was) and, since prompt part files are
         # relative to core.yml's folder, under that folder too.
         relative = [str(self.config.path(item)) for item in self.config.secret_paths

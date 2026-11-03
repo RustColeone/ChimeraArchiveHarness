@@ -15,6 +15,7 @@ def load(name):
 class Context:
     def __init__(self, config=None):
         self.name, self.config, self.data_dir, self.logged, self.facts = "test", config or {}, Path("."), [], None
+        self.platforms = {}
 
     def log(self, event, **fields):
         self.logged.append((event, fields))

@@ -116,7 +116,7 @@ def describe() -> dict:
         elif isinstance(item, (str, int, float, tuple)):
             constants[name] = list(item) if isinstance(item, tuple) else item
         elif isinstance(item, dict):
-            constants[name] = {key: value for key, value in item.items()}
+            constants[name] = {key: value.__name__ if isinstance(value, type) else value for key, value in item.items()}
     return {"version": contracts.CONTRACTS_VERSION, "constants": constants, "enums": enums, "types": data,
             "interfaces": interfaces}
 

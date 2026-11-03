@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
-import datetime as dt
 import json
 import math
 import time
@@ -98,15 +97,6 @@ class ReadingHistory:
 
     def summarize(self, text: str, upto: float) -> None:
         raise ValueError("A capability reads the conversation's history; only engines write its summary")
-
-
-def local_time(at: float) -> str:
-    """A stored time for people, `YYYY-MM-DD HH:MM` in local time; one an interface recorded wrongly (in
-    milliseconds, say) is shown as unknown instead of failing whatever shows it."""
-    try:
-        return dt.datetime.fromtimestamp(at).astimezone().strftime("%Y-%m-%d %H:%M")
-    except (OverflowError, OSError, ValueError, TypeError):
-        return "unknown time"
 
 
 def module_store(manager: "Manager", module: str, address: Address, sender: Sender, personas: Sequence[str], *,

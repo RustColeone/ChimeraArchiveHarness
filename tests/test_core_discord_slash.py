@@ -14,14 +14,14 @@ from contracts import Action, Address, Command, Option, Reply
 from tests.core_support import ROOT, FakeAdapter, make_config, settle
 from tests.test_core_discord import FakeChannel, FakeClient, FakeUser
 from core.app import Core
+from contracts.discord_bot import slash
 from core.loader import import_extension
 
 ids = itertools.count(9000)
 
 
 def slash_module():
-    _, module = import_extension(ROOT / "extensions" / "discord")
-    return __import__(module.__name__.rsplit(".", 1)[0] + ".slash", fromlist=["payload"])
+    return slash
 
 
 class FakeResponse:
@@ -81,6 +81,10 @@ class PayloadTests(unittest.TestCase):
         self.assertNotIn("default_member_permissions", clip)
         self.assertEqual((action["type"], action["name"]), (3, "Download video"))
         self.assertEqual(slash.fingerprint(definitions), slash.fingerprint(slash.payload(commands)))
+
+    def test_a_command_kept_out_of_the_menu_is_no_application_command(self):
+        kept, typed = Command("alias", "A name"), Command("new", "Start over", menu=False)
+        self.assertEqual([item["name"] for item in slash_module().payload([kept, typed])], ["alias"])
 
     def test_invocations_become_values_including_message_actions(self):
         slash = slash_module()

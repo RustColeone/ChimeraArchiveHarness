@@ -2,19 +2,25 @@
  "version": "2.0",
  "constants": {
   "CONTRACTS_VERSION": "2.0",
+  "IMPULSE": "⟨speak-up⟩ ",
+  "LEVELS": {
+   "member": 0,
+   "admin": 1,
+   "creator": 2
+  },
   "PART_PLACES": [
    "stable",
    "turn",
    "context"
   ],
-  "PLACE_STATUS": [
-   "place",
-   "people",
-   "away",
-   "tickets",
-   "views",
-   "you"
-  ],
+  "PLACE_STATUS": {
+   "place": "dict",
+   "people": "list",
+   "away": "list",
+   "tickets": "list",
+   "views": "list",
+   "you": "dict"
+  },
   "SHUTDOWN": "core-shutdown",
   "TIERS": [
    "own",
@@ -264,7 +270,7 @@
    ]
   },
   "Command": {
-   "doc": "A command declaration. `template` renders option values into the text after `$name`: `{option}` is replaced by its value and `[...]` sections are dropped when an option inside them has no value, e.g. `-u {url}[ -s {start}][ -e {end}]`. Without a template, values are joined with spaces in option order. `examples` are argument texts shown in help (`10m drink water`). `access` is the lowest level that may run it; `admin_help` is extra help shown to admins and the creator only. `message_action`, when set, is a label for acting on an existing message (its text fills the first option).",
+   "doc": "A command declaration. `template` renders option values into the text after `$name`: `{option}` is replaced by its value and `[...]` sections are dropped when an option inside them has no value, e.g. `-u {url}[ -s {start}][ -e {end}]`. Without a template, values are joined with spaces in option order. `examples` are argument texts shown in help (`10m drink water`). `access` is the lowest level that may run it; `admin_help` is extra help shown to admins and the creator only. `message_action`, when set, is a label for acting on an existing message (its text fills the first option). `menu=False` keeps it out of native command menus and suggestions: it is typed as `$name`, and `/name` stays a message.",
    "fields": [
     {
      "name": "name",
@@ -304,6 +310,11 @@
      "name": "message_action",
      "type": "str",
      "default": ""
+    },
+    {
+     "name": "menu",
+     "type": "bool",
+     "default": true
     }
    ]
   },
@@ -321,7 +332,7 @@
    ]
   },
   "Contributions": {
-   "doc": "What an extension adds. Besides interfaces, engines, capabilities and personas, an extension may suggest defaults so it works when dropped in: model `providers` (name → settings, as in core.yml; configured settings win key by key) and `profiles` (name → ordered candidates, as in core.yml), and `assignments` and `admission` rules for its own interfaces' addresses (`<interface>:*` or `<interface>:<conversation>`). core.yml and runtime edits always win. `permissions` suggests permission defaults in the core.yml `permissions:` form (`{pattern: {use, tiers, rules}}`): `use` and `tiers` only for its own interfaces' addresses, `rules` only for its own capabilities. The module's config.yml `permissions:` overrides these, and core.yml overrides both, setting by setting. `adapters` adds provider kinds (kind → AdapterFactory) for APIs the built-in kinds do not speak; its providers, and core.yml's, may then use `kind: <that kind>`. A kind that already exists is refused. `watchers` see every persona's delivered messages, whichever engine she spoke in (see Watcher).",
+   "doc": "What an extension adds. Besides interfaces, engines, capabilities and personas, an extension may suggest defaults so it works when dropped in: model `providers` (name → settings, as in core.yml; configured settings win key by key) and `profiles` (name → ordered candidates, as in core.yml), and `assignments` and `admission` rules for its own interfaces' addresses (`<interface>:*` or `<interface>:<conversation>`). core.yml and runtime edits always win. `permissions` suggests permission defaults in the core.yml `permissions:` form (`{pattern: {use, tiers, rules}}`): `use` and `tiers` only for its own interfaces' addresses, `rules` only for its own capabilities. The module's config.yml `permissions:` overrides these, and core.yml overrides both, setting by setting. `adapters` adds provider kinds (kind → AdapterFactory) for APIs the built-in kinds do not speak; its providers, and core.yml's, may then use `kind: <that kind>`. A kind that already exists is refused. `watchers` see every persona's delivered messages, whichever engine she spoke in (see Watcher). `secrets` are file patterns in the module's data folder that models may never read (keys it keeps there).",
    "fields": [
     {
      "name": "interfaces",
@@ -380,6 +391,11 @@
     },
     {
      "name": "watchers",
+     "type": "Sequence",
+     "default": "()"
+    },
+    {
+     "name": "secrets",
      "type": "Sequence",
      "default": "()"
     }
@@ -534,7 +550,7 @@
    ]
   },
   "Extension": {
-   "doc": "Declared as `EXTENSION` in an extension's `extension.py`. `setup` receives an ExtensionContext and returns Contributions. `settings` declares what the module can be set up with (see Setting); it is read without running `setup`. `requires` and `uses` declare the other modules it builds on, by module name. Without one it `requires`, the module is not loaded (and says why); a Python package is `package:<name>` or `package:<name>>=<version>`. Without one it `uses`, it loads, minus what that module would add: its setup is told which are there (`ExtensionContext.present`). Every engine and persona its defaults name must belong to the core or to a module it declares, or it is refused.",
+   "doc": "Declared as `EXTENSION` in an extension's `extension.py`. `setup` receives an ExtensionContext and returns Contributions. `settings` declares what the module can be set up with (see Setting); it is read without running `setup`. `requires` and `uses` declare the other modules it builds on, by module name. Without one it `requires`, the module is not loaded (and says why); a Python package is `package:<name>` or `package:<name>>=<version>`. Without one it `uses`, it loads, minus what that module would add: its setup is told which are there (`ExtensionContext.present`). Every engine and persona its defaults name must belong to the core or to a module it declares, or it is refused. `platforms` names the interfaces of this module that reach another platform's people (`{\"whale_chan\": \"discord\"}`: one person, whichever bot they talk to). Every module is told them at setup (`ExtensionContext.platforms`), so a module that keeps people apart by platform needs no one's name.",
    "fields": [
     {
      "name": "name",
@@ -563,6 +579,11 @@
      "name": "uses",
      "type": "Sequence",
      "default": "()"
+    },
+    {
+     "name": "platforms",
+     "type": "Mapping",
+     "default": "{}"
     }
    ]
   },
@@ -1484,6 +1505,10 @@
     {
      "name": "prices",
      "type": "any"
+    },
+    {
+     "name": "platforms",
+     "type": "Mapping"
     }
    ],
    "methods": [

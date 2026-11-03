@@ -44,7 +44,8 @@ def setup(context) -> Contributions:
     # Its chats need MomoChat and the students; without either the page still opens, greyed, and says so.
     usable = {"momochat", "students"} <= set(context.present)
     interface.momochat = usable
-    return Contributions(interfaces=[interface], assignments={f"{name}:*": assignment} if usable else {},
+    return Contributions(interfaces=[interface], secrets=("session.key",),
+                         assignments={f"{name}:*": assignment} if usable else {},
                          admission={f"{name}:*": {"enabled": True, "require_mention_in_groups": False}})
 
 

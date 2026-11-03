@@ -29,6 +29,7 @@ URL = re.compile(r"https?://\S+")
 def payload(commands: list[Command]) -> list[dict]:
     """Application-command definitions for a bulk overwrite (chat commands, then message actions)."""
     result = []
+    commands = [command for command in commands if command.menu]
     for command in commands:
         options = sorted(command.options, key=lambda option: not option.required)
         definition = {

@@ -15,11 +15,8 @@ DEFAULT_PROMPT = ("You are a helpful, friendly assistant in a Discord server. An
                   "the person writes in. Use tools when they help, and say plainly when you cannot do something.")
 
 
-# Basic features that only affect the requester's own conversation (or its server's voice channel), so
-# anyone may use them without the owner's approval.
-BASIC_FEATURES = ["reminders.create", "reminders.cancel", "discord.music", "discord.music_control",
-                  "discord.queue_music", "discord.clock_start", "discord.clock_stop", "core.add_routine",
-                  "core.delete_routine", "core.pause_routine", "core.resume_routine"]
+# A person's own routines only affect their own conversation, so anyone may use them without the owner's approval.
+OWN_ROUTINES = ["core.add_routine", "core.delete_routine", "core.pause_routine", "core.resume_routine"]
 # What $model offers to choose from: language models released since mid-2026 (models_since uses the release
 # dates OpenAI, xAI and Anthropic give; Gemini gives none, so its list is narrowed by name only).
 MODELS_SINCE = "2026-06-01"
@@ -60,18 +57,12 @@ def default_config() -> dict:
                            "effort_param": True},
         },
         # Candidates without an API key are skipped, so any one configured provider works. Modules ship their
-        # own profiles (the room: one per character).
+        # own profiles (one per student).
         "profiles": {"default": DEFAULT_CHAIN},
         "agents": {"assistant": {"display_name": "Assistant", "profile": "default", "prompt": DEFAULT_PROMPT}},
-        # The core's own agent, answering in MomoChat (extensions/momochat) wherever nothing else is assigned.
-        "assignments": {
-            "*": {"engine": "momochat", "personas": ["assistant"]},
-            "routine:*": {"engine": "momochat", "personas": ["assistant"],
-                          "budget": {"model_calls": 8, "tool_calls": 8, "seconds": 300}},
-        },
         # Access (use), approval defaults per tier (tiers) and exceptions (rules); see ARCHITECTURE.md.
         "permissions": {
-            "*": {"rules": {name: "auto" for name in BASIC_FEATURES}},
+            "*": {"rules": {name: "auto" for name in OWN_ROUTINES}},
             "routine:*": {"use": ["basic.*"]},
         },
         # Files models may never read, besides the built-in list (.env, keys, credentials, modules' config.yml).

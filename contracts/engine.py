@@ -10,6 +10,7 @@ from typing import Any, Awaitable, Callable, Literal, Mapping, Protocol, Sequenc
 from contracts.capability import ToolResult
 from contracts.messages import Address, Delivery, Display, FileRef, Request
 from contracts.models import Models
+from contracts.shared import persona_names
 from contracts.stores import Store
 
 
@@ -97,10 +98,7 @@ class PromptPart:
             raise ValueError(f"prompt part {self.name!r}: text is a string or a function of a PartContext")
         if isinstance(self.order, bool) or not isinstance(self.order, int):
             raise ValueError(f"prompt part {self.name!r}: order is a whole number")
-        personas = (self.personas,) if isinstance(self.personas, str) else self.personas
-        if not isinstance(personas, (tuple, list)) or not all(isinstance(name, str) and name for name in personas):
-            raise ValueError(f"prompt part {self.name!r}: personas is a list of persona names")
-        object.__setattr__(self, "personas", tuple(personas))
+        object.__setattr__(self, "personas", persona_names(self.personas, f"prompt part {self.name!r}"))
 
 
 # The model tiers a persona may name besides her `profile` (Persona.profiles).

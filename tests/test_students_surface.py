@@ -78,14 +78,10 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("violin", str(script.prompts["GPT"][-1][:-1]))
 
     async def test_new_with_another_word_is_a_message(self):
-        script = room.Script(GPT=[room.turn("Sure.")])
+        script = room.Script(GPT=[room.turn("Sure."), room.turn("Deep?")])
         chat = await self.start(Head(script), gut=False)
         self.assertEqual(await self.say(chat, "/new year"), "Sure.")
-
-    async def test_new_deep_points_to_the_command(self):
-        chat = await self.start(Head(room.Script(GPT=[])), gut=False)
-        self.assertIn("$new deep", await self.say(chat, "/new deep"))
-        self.assertIn("$new gut", await self.say(chat, "/new gut"))
+        self.assertEqual(await self.say(chat, "/new deep"), "Deep?")
 
     async def test_the_deeper_tiers_are_the_creators(self):
         chat = await self.start(Head(room.Script(GPT=[room.turn("Noted.")])), owner=False, gut=False)

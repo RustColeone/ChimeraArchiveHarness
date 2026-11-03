@@ -1,15 +1,17 @@
 """Public contracts between the core and extensions. Extensions import only this package."""
 
 from contracts.capability import Capability, Risk, ToolContext, ToolResult
-from contracts.commands import Command, Option
+from contracts.commands import LEVELS, Command, Option
 from contracts.engine import (PART_PLACES, Activity, Engine, EngineSpec, Event, History, LogEntry, Logbook,
                               HistoryItem, HistorySummary, Context, PartContext, Persona, PromptPart, RunYield, SHUTDOWN, Session,
                               TIERS, Tools)
 from contracts.extension import Contributions, Extension, ExtensionContext, Setting
-from contracts.interface import PLACE_STATUS, Interface, InterfacePort, Operation
+from contracts.interface import PLACE_STATUS, Interface, InterfacePort, Operation, place_problems
 from contracts.messages import Action, Address, Delivery, Display, FileRef, Reply, Request, Sender, SubmitResult
 from contracts.models import (AdapterFactory, AdapterResult, Image, ModelAdapter, ModelError, ModelRequest,
                               ModelResult, Models, NotConfigured, ToolCall, ToolSpec)
+from contracts.shared import (IMPULSE, NAME, chinese, code_style, fact, flag, impulse, impulse_line, is_command,
+                              local_time, number, persona_names, place_key, split_text)
 from contracts.stores import Facts, Store
 from contracts.watchers import Exchange, WatchContext, Watcher
 
@@ -25,5 +27,5 @@ __all__ = [
     "Interface", "InterfacePort", "PLACE_STATUS", "ModelError", "ModelRequest", "ModelResult", "Models", "Operation",
     "PART_PLACES", "PartContext", "Persona", "PromptPart", "Reply", "Request", "Risk", "TIERS", "RunYield", "SHUTDOWN", "Sender", "Session", "Setting", "Store", "SubmitResult", "ToolContext",
     "ToolCall", "ToolResult", "ToolSpec", "Tools",
-    "WatchContext", "Watcher",
+    "WatchContext", "Watcher", "IMPULSE", "LEVELS",
 ]

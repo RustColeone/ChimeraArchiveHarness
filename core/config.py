@@ -18,6 +18,12 @@ class ConfigError(ValueError):
     pass
 
 
+def resolve(value, base: Path) -> Path:
+    """A path as written in core.yml: relative to `base`."""
+    path = Path(os.path.expanduser(str(value)))
+    return path if path.is_absolute() else (base / path).resolve()
+
+
 def candidates(name: str, models) -> list[dict]:
     """An agent's `models:`: `provider/model` strings or `{provider, model, ...}` mappings, in order."""
     if isinstance(models, (str, dict)):
@@ -121,11 +127,6 @@ class CoreConfig:
                     self.persona_parts[name] = parts
             self.assignments = {pattern: Assignment.from_config(pattern, value)
                                 for pattern, value in (raw.get("assignments") or {}).items()}
-            # The core's own defaults, where core.yml left them as they are: they apply only while what they name is
-            # loaded, while an assignment the owner wrote that names something missing stops the core.
-            builtin = default_config().get("assignments") or {}
-            self.builtin_assignments = [pattern for pattern, value in builtin.items()
-                                        if (raw.get("assignments") or {}).get(pattern) == value]
         except (KeyError, TypeError, ValueError) as error:
             raise ConfigError(f"Invalid persona or assignment: {error}") from error
         self.permissions = dict(raw.get("permissions") or {})
@@ -167,8 +168,7 @@ class CoreConfig:
         return path.resolve().parent == ROOT / "extensions"
 
     def path(self, value: str) -> Path:
-        path = Path(os.path.expanduser(str(value)))
-        return path if path.is_absolute() else (self.base_dir / path).resolve()
+        return resolve(value, self.base_dir)
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> "CoreConfig":
@@ -181,7 +181,7 @@ class CoreConfig:
             if not isinstance(raw, dict):
                 raise ConfigError("The core configuration must be a mapping")
             base = path.parent
-        env_files = [cls._resolve(item, base) for item in raw.get("env_files", [".env"])]
+        env_files = [resolve(item, base) for item in raw.get("env_files", [".env"])]
         for env_file in env_files:
             load_env_file(env_file)
         loaded = list(env_files)
@@ -192,12 +192,12 @@ class CoreConfig:
         # Paths written in core.yml are relative to core.yml; built-in ones are already absolute.
         for key in ("data_dir",):
             if key in raw:
-                raw[key] = str(cls._resolve(raw[key], base))
+                raw[key] = str(resolve(raw[key], base))
         modules = raw.get("modules")
         if isinstance(modules, dict):
             for key in ("dirs", "paths"):
                 if key in modules:
-                    modules[key] = [str(cls._resolve(item, base)) for item in modules[key]]
+                    modules[key] = [str(resolve(item, base)) for item in modules[key]]
         config = cls(merge(defaults, raw), base)
         config.file = path if path is not None and Path(path).is_file() else None
         config.env_file = env_files[0] if env_files else base / ".env"
@@ -208,8 +208,3 @@ class CoreConfig:
         # Providers likewise: a module's suggestions override the built-in settings, core.yml overrides both.
         config.configured_providers = dict(raw.get("providers") or {})
         return config
-
-    @staticmethod
-    def _resolve(value, base: Path) -> Path:
-        path = Path(os.path.expanduser(str(value)))
-        return path if path.is_absolute() else (base / path).resolve()

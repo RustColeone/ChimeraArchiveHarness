@@ -11,10 +11,10 @@ from contracts.capability import Capability
 from contracts.engine import Engine, Persona, PromptPart
 from contracts.interface import Interface
 from contracts.models import AdapterFactory
+from contracts.shared import NAME
 from contracts.stores import Facts
 from contracts.watchers import Watcher
 
-NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 PACKAGE = re.compile(r"^package:[A-Za-z0-9][A-Za-z0-9._-]*(>=[0-9][0-9A-Za-z.]*)?$")
 
 
@@ -27,6 +27,7 @@ class ExtensionContext(Protocol):
     facts: Facts  # what this module publishes about personas, for interfaces (any time after setup)
     present: frozenset  # which of the modules it `uses` are loaded (they were set up before it)
     prices: Any  # the core's model prices (contracts.stores.Prices)
+    platforms: Mapping[str, str]  # every module's `Extension.platforms`, known before any is set up
 
     def log(self, event: str, **fields: Any) -> None: ...
 
@@ -53,7 +54,8 @@ class Contributions:
     `adapters` adds provider kinds (kind → AdapterFactory) for APIs the built-in kinds do not speak; its
     providers, and core.yml's, may then use `kind: <that kind>`. A kind that already exists is refused.
 
-    `watchers` see every persona's delivered messages, whichever engine she spoke in (see Watcher)."""
+    `watchers` see every persona's delivered messages, whichever engine she spoke in (see Watcher). `secrets` are file
+    patterns in the module's data folder that models may never read (keys it keeps there)."""
 
     interfaces: Sequence[Interface] = ()
     engines: Sequence[Engine] = ()
@@ -67,6 +69,7 @@ class Contributions:
     adapters: Mapping[str, AdapterFactory] = field(default_factory=dict)
     prompt_parts: Sequence[PromptPart] = ()  # parts for every persona, or for those each part names
     watchers: Sequence[Watcher] = ()
+    secrets: Sequence[str] = ()
 
 
 @dataclass(frozen=True)
@@ -97,7 +100,7 @@ class Setting:
         object.__setattr__(self, "env", tuple(name for name in names if name))
         if self.kind == "secret" and not self.env:
             raise ValueError(f"Setting {self.key!r}: a secret needs `env` (the .env variable it is kept in)")
-        if not re.match(r"^[a-z][a-z0-9_]*$", self.key):
+        if not NAME.match(self.key):
             raise ValueError(f"Setting keys are lowercase letters, digits or _, got {self.key!r}")
 
 
@@ -113,6 +116,10 @@ class Extension:
     `package:<name>>=<version>`. Without one it `uses`, it loads, minus what that module would add: its setup is
     told which are there (`ExtensionContext.present`). Every engine and persona its defaults name must belong to the
     core or to a module it declares, or it is refused.
+
+    `platforms` names the interfaces of this module that reach another platform's people (`{"whale_chan": "discord"}`:
+    one person, whichever bot they talk to). Every module is told them at setup (`ExtensionContext.platforms`), so a
+    module that keeps people apart by platform needs no one's name.
     """
 
     name: str
@@ -121,11 +128,13 @@ class Extension:
     settings: Sequence[Setting] = ()
     requires: Sequence[str] = ()
     uses: Sequence[str] = ()
+    platforms: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
         if not NAME.match(self.name):
             raise ValueError(f"Extension name must be lowercase letters, digits or _, got {self.name!r}")
         object.__setattr__(self, "settings", tuple(self.settings))
+        object.__setattr__(self, "platforms", dict(self.platforms))
         for key in ("requires", "uses"):
             value = getattr(self, key)
             if isinstance(value, str):

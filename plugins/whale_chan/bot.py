@@ -19,12 +19,13 @@ from pathlib import Path
 
 import discord
 
-from contracts import (Address, Capability, Command, Delivery, Display, FileRef, Interface, Option, Reply, Request,
-                       Risk, Sender, ToolResult)
+from contracts import (IMPULSE, Address, Capability, Command, Delivery, Display, FileRef, Interface, Option, Reply,
+                       Request, Risk, Sender, ToolResult, split_text)
+from contracts.discord_bot import slash
+from contracts.discord_bot.math_render import MathRenderer, fallback_text, split_math
 
-from . import slash, voice
-from .math_render import MathRenderer, fallback_text, split_math
-from .speakup import MARK, Ledger, Settings, SpeakUp
+from . import voice
+from .speakup import Ledger, Settings, SpeakUp
 from .voice import VOICE_NAME, speakable
 
 # Her own commands: `/new` becomes the message MomoChat starts a fresh thread on; `/voice` and `/speakup` the bot
@@ -51,20 +52,6 @@ NOTICES = {
     "budget_exceeded": "⚠️ That took more work than I'm allowed for one request.",
     "locked": "🔧 本鲸在维护中，请稍后再来～",
 }
-
-
-def split_text(text: str, limit: int = LIMIT) -> list[str]:
-    chunks, remaining = [], text
-    while len(remaining) > limit:
-        cut = 0
-        for separator in ("\n\n", "\n", " "):
-            boundary = remaining.rfind(separator, 0, limit - len(separator) + 1)
-            if boundary >= limit // 2:
-                cut = boundary + len(separator)
-                break
-        chunks.append(remaining[:cut or limit])
-        remaining = remaining[cut or limit:]
-    return [*chunks, remaining] if remaining or not chunks else chunks
 
 
 class VoiceFile(discord.File):
@@ -223,8 +210,6 @@ class WhaleChanBot(Interface):
                     files.append(FileRef(str(path), attachment.filename, attachment.content_type or "", attachment.size))
         if not text and files:
             text = " ".join(f"[{file.name}]" for file in files)
-        if text.startswith(MARK):  # only she starts messages with her impulse's mark
-            text = text[len(MARK):]
         if text.strip().lower().split()[:1] == ["/voice"]:
             answer = self._voice_command(conversation, text.strip().lower().split()[1:2])
             await message.channel.send(answer, reference=message, mention_author=False)
@@ -349,7 +334,7 @@ class WhaleChanBot(Interface):
         in their name, marked in `extra` (which only this code sets) and shown to her as her own thought."""
         result = await self.port.submit(Request(
             id=f"speak-up-{user}-{time.time_ns()}", address=Address(self.name, f"dm:{user}"),
-            sender=Sender(str(user), name), text=MARK + motive, received_at=time.time(),
+            sender=Sender(str(user), name), text=IMPULSE + motive, received_at=time.time(),
             is_direct=True, mentions_me=True, display=self.display, extra={"speak_up": motive}))
         return bool(result)
 
@@ -597,11 +582,11 @@ class WhaleChanBot(Interface):
     async def _parts(self, reply: Reply, text: str) -> list[tuple[str, str]]:
         """Text chunks and rendered display-math images, in order."""
         if reply.kind != "text" or not self.math.enabled or "$" not in text and "\\" not in text:
-            return [("text", chunk) for chunk in split_text(text)]
+            return [("text", chunk) for chunk in split_text(text, LIMIT)]
         parts, images = [], 0
         for kind, value in split_math(text):
             if kind == "text":
-                parts.extend(("text", chunk) for chunk in split_text(value) if value.strip())
+                parts.extend(("text", chunk) for chunk in split_text(value, LIMIT) if value.strip())
                 continue
             path = None
             if images < self.math.max_images:
@@ -610,8 +595,8 @@ class WhaleChanBot(Interface):
                     images += 1
                 except Exception as error:
                     self.port.log("math_render_failed", error=type(error).__name__)
-            parts.extend([("image", str(path))] if path else [("text", chunk) for chunk in split_text(fallback_text(value))])
-        return parts or [("text", chunk) for chunk in split_text(text)]
+            parts.extend([("image", str(path))] if path else [("text", chunk) for chunk in split_text(fallback_text(value), LIMIT)])
+        return parts or [("text", chunk) for chunk in split_text(text, LIMIT)]
 
     async def _show_progress(self, channel, reply: Reply) -> Delivery:
         key = reply.run_id or reply.address.conversation

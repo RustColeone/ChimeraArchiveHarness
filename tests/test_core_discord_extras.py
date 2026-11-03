@@ -102,7 +102,7 @@ class ExtrasTestBase(unittest.IsolatedAsyncioTestCase):
 
     async def begin(self, discord_config=None, preapprove=True):
         assignment = {"engine": "probe", "personas": ["p"]}
-        rules = {name: "auto" for name in PUBLIC_WRITES} if preapprove else {}
+        rules = {name: "auto" if preapprove else "ask" for name in PUBLIC_WRITES}
         await self.start({"extension_config": {"discord": discord_config or {}}, "assignments": {"*": assignment},
                           "permissions": {"*": {"rules": rules}}})
         self.server = FakeGuild()
@@ -147,7 +147,7 @@ class MusicTests(ExtrasTestBase):
             capability = capabilities[name]
             self.assertEqual(capability.access, "member", name)
             self.assertEqual((capability.risk.value, capability.command and capability.command.name), (risk, command))
-        self.assertTrue(capabilities["discord.status"].owner_only)
+        self.assertEqual(capabilities["discord.status"].access, "creator")
 
     async def test_music_plays_the_playlist_in_the_requesters_voice_channel(self):
         await self.begin_music()

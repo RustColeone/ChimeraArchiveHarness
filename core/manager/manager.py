@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import dataclasses
-import datetime as dt
 import hashlib
 import json
 import secrets
@@ -20,13 +19,14 @@ from typing import Any, Mapping, Protocol
 
 import jsonschema
 
-from contracts import (SHUTDOWN, TIERS, Action, Address, Capability, Command, Context, Delivery, Display, Engine, Exchange,
-                       FileRef, ModelError, ModelRequest, ModelResult, Operation, Option, PartContext, Persona,
-                       PromptPart, Reply, Request, Risk, RunYield, Sender, ToolResult, Watcher)
+from contracts import (LEVELS, SHUTDOWN, TIERS, Action, Address, Capability, Command, Context, Delivery, Display, Engine,
+                       Exchange, FileRef, ModelError, ModelRequest, ModelResult, Operation, Option, PartContext, Persona,
+                       PromptPart, Reply, Request, Risk, RunYield, Sender, ToolResult, Watcher, code_style, local_time)
 from core.audit import Audit
+from core.manager.core_capabilities import core_capabilities
 from core.manager.facts import FactsDesk
 from core.manager.logbook import LINES_KEPT, MAX_TEXT
-from core.manager.handles import SUMMARIES, SessionHandle, ToolContextHandle, WatchContextHandle, local_time
+from core.manager.handles import SUMMARIES, SessionHandle, ToolContextHandle, WatchContextHandle
 from core.manager.model_choice import ModelChoices
 from core.manager.routines import Caller, RoutineDesk
 from core.manager.policy import Assignment, Owners, Permissions, most_specific
@@ -35,7 +35,8 @@ from core.manager.stamina import Paused, Stamina, money
 from core.prompts import FileText, arender, conversation_of, parts_for, with_parts
 from core.providers.registry import Providers
 from core.serialize import request_from_dict, request_to_dict
-from core.storage.tank import RunRecord, Tank
+from core.setup import RESTART, command as setup_command
+from core.storage.tank import OPEN, RunRecord, Tank
 
 COMMAND_ENGINE = "$command"
 BUILTIN_COMMANDS = (
@@ -97,12 +98,11 @@ PERMISSIONS_COMMAND = Command(
                "module's config.yml (`permissions:`); grants are made by answering an approval with Always allow.")
 BUILTIN_COMMANDS = (*BUILTIN_COMMANDS, ADMIN_COMMAND, ROUTINE_COMMAND, SETUP_COMMAND, PERMISSIONS_COMMAND)
 GRANT_DAYS = 30
+LIVE = ("running", "waiting_approval")  # the open runs an approval can still reach
 STAMINA = "core.stamina"  # the approval a run waits for at a spending limit (core/manager/stamina.py)
 CORE_COMMANDS = tuple(command.name for command in BUILTIN_COMMANDS)
 NOTHING_ANSWERS = ("Nothing answers here yet: no engine is assigned to this conversation (see `--check`). "
                    "`$help` lists what works.")
-LEVELS = {"member": 0, "admin": 1, "creator": 2}
-
 
 # The run whose engine task (or a task it started) is executing; child tasks inherit it.
 DRIVING: contextvars.ContextVar[str | None] = contextvars.ContextVar("driving_run", default=None)
@@ -304,7 +304,7 @@ class Manager:
 
     def _sweep_disabled(self) -> None:
         """Turning a conversation off also cancels its open work and expires its pending approvals."""
-        for record in self.tank.runs(("running", "waiting_input", "waiting_approval"), limit=1000):
+        for record in self.tank.runs(limit=1000):
             if record.engine == COMMAND_ENGINE:
                 continue
             assignment = self.assignment_for(Address.parse(record.address))
@@ -319,6 +319,11 @@ class Manager:
             return
         self._side_tasks.add(task)
         task.add_done_callback(self._side_tasks.discard)
+
+    def registries(self) -> tuple:
+        """What modules add to, for a module that fails halfway to be taken out again."""
+        return (self.engines, self._origin, self.capabilities, self.personas, self.prompt_parts, self._part_origin,
+                self.watchers)
 
     def register_engine(self, engine: Engine, extension: str) -> None:
         name = engine.spec.name
@@ -344,7 +349,6 @@ class Manager:
 
     def attach_gateway(self, gateway: GatewayLink) -> None:
         self.gateway = gateway
-        from core.manager.core_capabilities import core_capabilities
         for capability in core_capabilities(self, gateway):
             self.register_capability(capability, capability.extension)
 
@@ -555,7 +559,7 @@ class Manager:
         """Other open runs in the same conversation, for engines to see work already in progress."""
         record = self.tank.run(run_id)
         result = []
-        for other in self.tank.runs(("running", "waiting_input", "waiting_approval"), address=record.address):
+        for other in self.tank.runs(address=record.address):
             if other.id == run_id or other.engine == COMMAND_ENGINE:
                 continue
             trigger = request_from_dict(other.trigger)
@@ -1081,7 +1085,7 @@ class Manager:
                 return f"Approval {approval_id} is not pending."
             record = self.tank.run(approval["run_id"])
             assignment = self.assignment_for(Address.parse(approval["address"]))
-            if (record is None or record.status not in ("running", "waiting_approval")
+            if (record is None or record.status not in LIVE
                     or (record.engine != COMMAND_ENGINE and (assignment is None or not assignment.enabled))):
                 self._expire(approval, str(decided_by.address))
                 return f"Approval {approval_id} expired; its run or conversation is no longer active."
@@ -1135,7 +1139,7 @@ class Manager:
 
     async def _stop_at_limit(self, run_id: str, stop: Mapping[str, Any]) -> None:
         record = self.tank.run(run_id)
-        if record is None or record.status not in ("running", "waiting_approval"):
+        if record is None or record.status not in LIVE:
             return
         who = self.stamina.name(str(stop.get("persona") or "")) if stop.get("persona") else "The session"
         reason = (f"{who} reached her daily allowance ({money(float(stop.get('limit') or 0))}) and you said no more today"
@@ -1143,7 +1147,7 @@ class Manager:
                   f"The session reached its budget ({money(float(stop.get('limit') or 0))}) and you said no more")
         async with self._locks[record.address]:
             record = self.tank.run(run_id)
-            if record.status in ("running", "waiting_approval"):
+            if record.status in LIVE:
                 await self._fail(record, "stamina", reason)
 
     async def _carry_out(self, record: RunRecord, approval: Mapping[str, Any], arguments: Any) -> ToolResult:
@@ -1407,7 +1411,7 @@ class Manager:
         return "run_closed" if record is None else self._closed(record)
 
     async def cancel_interface(self, interface: str, reason: str) -> int:
-        records = [record for record in self.tank.runs(("running", "waiting_input", "waiting_approval"), limit=1000)
+        records = [record for record in self.tank.runs(limit=1000)
                    if record.address.startswith(interface + ":")]
         for record in records:
             await self._cancel_record(record, reason)
@@ -1429,7 +1433,7 @@ class Manager:
                                         "detail": delivery.detail}))
 
     async def cancel_conversation(self, address: Address, reason: str) -> int:
-        records = self.tank.runs(("running", "waiting_input", "waiting_approval"), address=str(address), limit=100)
+        records = self.tank.runs(address=str(address))
         for record in records:
             await self._cancel_record(record, reason)
         return len(records)
@@ -1535,7 +1539,6 @@ class Manager:
             if level < LEVELS["creator"] or self.setup_desk is None:
                 await self._deliver(Reply(request.address, "notice", code="not_permitted", in_reply_to=request.id))
                 return
-            from core.setup import RESTART, command as setup_command
             message = await setup_command(self.setup_desk, rest, request.address.interface, request.display.markdown)
             actions = (Action("Restart now", "$admin restart", "danger"),) \
                 if RESTART in message and self.restart is not None else ()
@@ -1561,7 +1564,7 @@ class Manager:
 
     def permissions_command(self, text: str, request: Request) -> str:
         """`$permissions`: what applies in a conversation, and the saved grants."""
-        code = (lambda value: f"`{value}`") if request.display.markdown else str
+        code = code_style(request.display.markdown)
         parts = text.split()
         grants = []
         for key in self.grants.keys():
@@ -1580,7 +1583,7 @@ class Manager:
             return f"Grant {wanted} revoked; that action asks again."
 
         def grant_line(grant_id, grant):
-            day = dt.datetime.fromtimestamp(grant["expires"]).astimezone().strftime("%Y-%m-%d")
+            day = local_time(grant["expires"], "%Y-%m-%d")
             return (f"{code(grant_id)} {grant['capability']}({grant['subject']}) in {grant['address']} · until {day}"
                     f" · used {grant.get('uses', 0)}×")
         if parts[:1] == ["grants"]:
@@ -1634,10 +1637,9 @@ class Manager:
         return [*BUILTIN_COMMANDS, *sorted(declared, key=lambda command: command.name)]
 
     def help_text(self, text: str, request: Request) -> str:
-        level = {"member": 0, "admin": 1, "creator": 2}[self.access_of(request)]
-        visible = [command for command in self.commands()
-                   if {"member": 0, "admin": 1, "creator": 2}[command.access] <= level]
-        code = (lambda value: f"`{value}`") if request.display.markdown else str
+        level = LEVELS[self.access_of(request)]
+        visible = [command for command in self.commands() if LEVELS[command.access] <= level]
+        code = code_style(request.display.markdown)
         wanted = text.strip().lstrip("$/").lower()
         if not wanted:
             lines = [f"{code(command.usage())} {command.description}".rstrip() for command in visible]
@@ -1706,7 +1708,7 @@ class Manager:
             return f"{who} is {'now an admin' if action == 'add' else 'no longer an admin'}."
         if action != "status":
             return self.help_text("admin", request)
-        open_runs = self.tank.runs(("running", "waiting_input", "waiting_approval"), limit=200)
+        open_runs = self.tank.runs(limit=200)
         pending = self.tank.approvals("pending")
         ready = self.gateway.ready()
         lines = [f"Role: {role}" + (" (view off)" if self.settings.get("view_off:" + me) else ""),
@@ -1719,7 +1721,7 @@ class Manager:
     def memory_command(self, text: str, request: Request) -> str:
         """`$memory`: this chat's rolling summary, to read or (`clear`) remove."""
         conversation = str(request.address)
-        code = (lambda value: f"`{value}`") if request.display.markdown else str
+        code = code_style(request.display.markdown)
         summaries = self.tank.store(SUMMARIES)
         parts = text.lower().split()
         if parts in ([], ["summary"]):
@@ -1741,7 +1743,7 @@ class Manager:
         them, an admin all of them; `forget <id>` and `clear` take away what one may see."""
         conversation = str(request.address)
         subject = None if LEVELS[self.access_of(request)] >= LEVELS["admin"] else request.sender.id
-        code = (lambda value: f"`{value}`") if request.display.markdown else str
+        code = code_style(request.display.markdown)
         usage = (f"{code('$log [page]')} read this chat's log\n{code('$log forget <id>')} remove one line\n"
                  f"{code('$log clear')} remove all of it")
         parts = text.split()
@@ -1766,8 +1768,7 @@ class Manager:
             return ("Nothing in this chat's log yet.\n" + usage) if page == 1 else f"Page {page} is empty."
         shown = [f"This chat's log (page {page}, newest first)"]
         for line in lines:
-            day = dt.datetime.fromtimestamp(line.at).astimezone().strftime("%Y-%m-%d %H:%M")
-            shown.append(f"{code('#' + str(line.id))} {day} · {line.module} · {line.kind}: {line.text}")
+            shown.append(f"{code('#' + str(line.id))} {local_time(line.at)} · {line.module} · {line.kind}: {line.text}")
         return "\n".join(shown)
 
     async def _command_run(self, request: Request, capability: Capability, text: str, owner: bool,
@@ -1820,14 +1821,13 @@ class Manager:
                 return "Only admins can cancel a whole conversation.", None
             count = await self.cancel_conversation(Address.parse(target), f"cancelled by {request.address}")
             return f"Cancelled {count} run(s) in {target}.", None
-        open_statuses = ("running", "waiting_input", "waiting_approval")
         if target:
             record = self.tank.run(target)
         else:
-            mine = [run for run in self.tank.runs(open_statuses, address=str(request.address))
+            mine = [run for run in self.tank.runs(address=str(request.address))
                     if request_from_dict(run.trigger).sender.id == request.sender.id]
             record = mine[0] if mine else None
-        if record is None or record.status not in open_statuses:
+        if record is None or record.status not in OPEN:
             return "No open run to cancel.", None
         trigger = request_from_dict(record.trigger)
         if not (LEVELS[self.access_of(request)] >= LEVELS["admin"]
@@ -1839,7 +1839,7 @@ class Manager:
     async def _cancel_record(self, record: RunRecord, reason: str) -> None:
         async with self._locks[record.address]:
             current = self.tank.run(record.id)
-            if current.status not in ("running", "waiting_input", "waiting_approval"):
+            if current.status not in OPEN:
                 return
             self.tank.update_run(record.id, status="cancelled", error=reason[:500])
             for approval in self.tank.approvals("pending", record.id):

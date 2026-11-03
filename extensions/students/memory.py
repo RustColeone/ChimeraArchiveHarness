@@ -22,7 +22,8 @@ import secrets
 import time
 from pathlib import Path
 
-from contracts import Capability, Context, ModelRequest, PromptPart, Risk, ToolResult, Watcher
+from contracts import (Capability, Command, Context, ModelRequest, Option, PromptPart, Risk, ToolResult, Watcher, flag,
+                       impulse, impulse_line, number)
 
 import mneme_llm
 from mneme_llm.gut import GROWS
@@ -46,8 +47,6 @@ DEEPER = ("deep", "gut")  # what `$new` clears: what she remembers; and what peo
 EVERYONE = "everyone"
 STARTER = "gut-starter.json.gz"  # in her folder: the lessons she is born with (tools/gut_starter.py)
 TOOLBOXES = 64  # the newest runs' search tools kept (each remembers what its searches showed)
-# Interfaces whose people are another's (`platforms:` adds to it): Whale-chan's own bot is on Discord.
-PLATFORMS = {"whale_chan": "discord"}
 
 
 def conversation(engine: str, settings: "Settings") -> bool:
@@ -57,21 +56,6 @@ def conversation(engine: str, settings: "Settings") -> bool:
 
 def key(text: str) -> str:
     return re.sub(r"\s+", "", str(text or "")).casefold()
-
-
-def flag(value, default: bool) -> bool:
-    if isinstance(value, str):
-        return value.strip().lower() not in ("false", "no", "off", "0", "")
-    return default if value is None else bool(value)
-
-
-def whole(value, default: int, low: int, high: int) -> int:
-    """A whole-number setting within [low, high]; one that is not a number is the default."""
-    try:
-        number = int(value) if value is not None and not isinstance(value, bool) else default
-    except (TypeError, ValueError):
-        number = default
-    return max(low, min(high, number))
 
 
 class Settings:
@@ -94,7 +78,7 @@ class Settings:
         # each message (0: none), found by meaning as well as words with `embed` (OpenAI embeddings, OPENAI_API_KEY), and
         # `search`: a search comes with it, and her tools to look through the rest.
         self.episodes = flag(config.get("episodes"), True)
-        self.said = whole(config.get("said"), 6000, 0, 50_000)
+        self.said = number(config.get("said"), 6000, 0, 50_000)
         self.embed = flag(config.get("embed"), True)
         self.search = flag(config.get("search"), True)
         self.gut = flag(config.get("gut"), False)  # what stays of her without her memory or her model (gut.py)
@@ -311,13 +295,15 @@ class Book:
                 # what the person has coming (from yesterday to a month ahead): something to ask them about
                 "plans": [{"text": note.text[:160], "at": round(note.happened_at)} for note in plans] or None, **own}
 
-    def calling(self, persona: str, subject: str) -> dict:
-        """What she calls the owner, and why (for the pages): `name` (None: their name where they write), `asked`
-        (what they asked of her), `everyone` (what they asked of every student), `setting` (call_owner)."""
+    def calling(self, persona: str, subject: str, owner: bool = True) -> dict:
+        """What she calls a person, and why, the most particular first: `name` (None: their name where they write), what
+        they `asked` of her (`$callme <student> <name>`), `call_owner` set for her alone (the owner), what they asked of
+        `everyone` (`$callme <name>`), `call_owner` for all (the `setting`, the owner's), their name in `people:`."""
         asked, everyone = self.call(subject, persona), self.call(subject)
         alone = str(self.settings.students.get(persona, {}).get("call_owner") or "")
         setting = alone or self.settings.call_owner
-        name = asked or alone or everyone or self.settings.call_owner or self.name_of(subject)
+        name = asked or (alone if owner else "") or everyone or (self.settings.call_owner if owner else "") \
+            or self.name_of(subject)
         return {"name": name or None, "asked": asked or None, "everyone": everyone or None, "setting": setting or None}
 
     def publish(self, facts, persona: str, subject: str) -> None:
@@ -383,19 +369,9 @@ def classmates_line(book: "Book", persona: str, subject: str, language: str) -> 
     return "(" + "; ".join(f"{name} seems {word[0]} today" for name, word in seen) + ".)"
 
 
-def impulse(trigger) -> str:
-    """Her own motive when the message is a turn she started herself (an interface marks it `extra.speak_up`: a
-    student's Discord bot speaking up), else ""."""
-    return str(trigger.extra.get("speak_up") or "")
-
-
 def called(book: Book, persona: str, subject: str, owner: bool, sender) -> str:
-    """What her memory calls the person, the most particular first: what they asked of her (`$callme <student>
-    <name>`), `call_owner` set for her alone (the owner), what they asked of every student (`$callme <name>`),
-    `call_owner` for all (the owner), their name in `people:`, the name they have where they wrote."""
-    alone = str(book.settings.students.get(persona, {}).get("call_owner") or "")
-    return (book.call(subject, persona) or (alone if owner else "") or book.call(subject)
-            or (book.settings.call_owner if owner else "") or book.name_of(subject) or sender.name or sender.id)
+    """What her memory calls the person: `Book.calling`, else the name they have where they wrote."""
+    return book.calling(persona, subject, owner)["name"] or sender.name or sender.id
 
 
 def where(address) -> str:
@@ -551,7 +527,7 @@ def make_learner(book: Book, settings: Settings):
         keep = own.episodes and not motive
         place = {"conversation": where(exchange.address), "at": exchange.at}
         if own.episodes and motive:  # (without it, what they answer next answers nothing she reads)
-            memory.episodes.keep(subject, [("", f"(You messaged them on your own then: {motive})"), said[1]], **place)
+            memory.episodes.keep(subject, [("", impulse_line(motive)), said[1]], **place)
         if own.mood or own.notes:
             seen = await memory.aobserve(subject, said, source="speak-up" if motive else "user", user_name=person,
                                          complete=complete, mood=own.mood, capture=own.notes, keep=keep, **place)
@@ -635,7 +611,8 @@ def make_callme(book: Book, facts):
         subject = book.subject(context.address.interface, context.sender.id)
         text = " ".join(str(arguments.get("text") or "").split())
         if not text:
-            lines = [f"{book.shown(persona)}: {book.calling(persona, subject)['name'] or context.sender.name}"
+            owner = context.access == "creator"
+            lines = [f"{book.shown(persona)}: {book.calling(persona, subject, owner)['name'] or context.sender.name}"
                      for persona in book.known()]
             return ToolResult.ok("\n".join(["What the students call you:", *lines]) if lines else "No students yet.")
         who, _, rest = text.partition(" ")
@@ -767,10 +744,7 @@ def make_new(book: Book, settings: Settings, guts: "Guts | None"):
             except ValueError:  # (a student no longer here keeps a file, and has no context)
                 pass
             if words[0] == "gut" and guts is not None and settings.of(name).gut:
-                gut = guts.of(name)
-                if not gut.awake:
-                    await asyncio.to_thread(gut.wake)
-                lessons += await asyncio.to_thread(gut.wipe)
+                lessons += await asyncio.to_thread((await guts.woken(name)).wipe)
         shown = book.shown(persona) if persona else "Every student"
         told = f"{shown}: {kept} exchanges gone for good, with the notes"
         return ToolResult.ok(told + (f", and {lessons} lessons of the gut." if words[0] == "gut" else "."))
@@ -784,10 +758,7 @@ def make_gut(book: Book, settings: Settings, guts: Guts):
         for persona in settings.personas:
             if not settings.of(persona).gut:
                 continue
-            gut = guts.of(persona)
-            if not gut.awake:
-                await asyncio.to_thread(gut.wake)
-            found = gut.report()
+            found = (await guts.woken(persona)).report()
             lines.append(f"{book.shown(persona)}: {found['lessons']} lessons, born with {found['born']} (they count "
                          f"{found['starter']}), last balance {found.get('share', '?')}")
             if owner and found["sides"]:
@@ -804,7 +775,7 @@ def make_gut(book: Book, settings: Settings, guts: Guts):
     return show
 
 
-def number(text: str) -> float | None:
+def weight_of(text: str) -> float | None:
     """A weight for `$side`: a number above nothing, or None for a sentence."""
     try:
         value = float(text)
@@ -822,12 +793,10 @@ def make_side(book: Book, settings: Settings, guts: Guts):
         if len(words) < 3 or persona is None or not settings.of(persona).gut:
             return ToolResult.fail("Use `$side <student> <side> <sentence>`, `$side <student> <side> <number>`, or "
                                    "`$side <student> <side> off`.", "invalid_side")
-        gut = guts.of(persona)
-        if not gut.awake:
-            await asyncio.to_thread(gut.wake)
+        gut = await guts.woken(persona)
         if words[2] == "off":
             return ToolResult.ok(f"Gone: {words[1]}." if gut.drop_side(words[1]) else f"She has no side {words[1]}.")
-        weight = number(words[2])
+        weight = weight_of(words[2])
         if weight is not None:
             if words[1] not in gut.grown:
                 return ToolResult.fail(f"She has no side {words[1]}.", "invalid_side")
@@ -853,7 +822,7 @@ def contributions(context, students: dict[str, dict]) -> dict:
     keep = tuple(name for name in settings.personas or students if name in students)
     settings.personas = keep
     book = Book(context.data_dir, personas=keep, names=students,
-                platforms={**PLATFORMS, **dict(config.get("platforms") or {})}, roles=config.get("roles"),
+                platforms={**context.platforms, **dict(config.get("platforms") or {})}, roles=config.get("roles"),
                 people=config.get("people"), settings=settings)
     facts = context.facts
     book.publish_all(facts)
@@ -882,7 +851,9 @@ def contributions(context, students: dict[str, dict]) -> dict:
             Capability("students.new", "Start over deeper than /new, for one student or everyone: what they remember, "
                        "for good.", make_new(book, settings, guts),
                        {"text": {"type": "string", "description": "deep or gut, then a student or everyone"}},
-                       risk=Risk.WRITE, access="creator", internal=True, command="new", command_argument="text"),
+                       risk=Risk.CRITICAL, access="creator", internal=True, command_argument="text",
+                       command=Command("new", "Start over deeper than /new, for one student or everyone",
+                                       (Option("text", "deep or gut, then a student or everyone"),), menu=False)),
             Capability("students.alias", "Show or set what you call a student.", make_alias(book, facts),
                        {"text": {"type": "string", "description": "<student> <name>, <student> reset, or nothing"}},
                        risk=Risk.WRITE, internal=True, command="alias", command_argument="text"),

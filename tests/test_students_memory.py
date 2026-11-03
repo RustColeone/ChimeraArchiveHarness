@@ -245,7 +245,8 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.core = None
         from core.loader import import_extension
         memory = memory_module()
-        context = SimpleNamespace(config={"learn": False}, data_dir=self.tmp / "off", log=lambda *a, **k: None, facts=None)
+        context = SimpleNamespace(config={"learn": False}, data_dir=self.tmp / "off", log=lambda *a, **k: None, facts=None,
+                                  platforms={})
         self.assertEqual(memory.contributions(context, {"gpt": {"display_name": "GPT"}})["watchers"], [])
 
     async def test_each_student_may_have_settings_of_her_own(self):

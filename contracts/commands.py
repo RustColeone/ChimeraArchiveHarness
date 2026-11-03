@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, Mapping
 
 Access = Literal["member", "admin", "creator"]
+LEVELS = {"member": 0, "admin": 1, "creator": 2}  # who outranks whom
 OptionType = Literal["string", "integer", "number", "boolean", "attachment"]
 NAME = re.compile(r"^[a-z0-9_-]{1,32}$")
 PLACEHOLDER = re.compile(r"\{([a-z0-9_-]+)\}")
@@ -45,7 +46,8 @@ class Command:
     `-u {url}[ -s {start}][ -e {end}]`. Without a template, values are joined with spaces in option
     order. `examples` are argument texts shown in help (`10m drink water`). `access` is the lowest level
     that may run it; `admin_help` is extra help shown to admins and the creator only. `message_action`,
-    when set, is a label for acting on an existing message (its text fills the first option).
+    when set, is a label for acting on an existing message (its text fills the first option). `menu=False` keeps it
+    out of native command menus and suggestions: it is typed as `$name`, and `/name` stays a message.
     """
 
     name: str
@@ -56,6 +58,7 @@ class Command:
     access: Access = "member"
     admin_help: str = ""
     message_action: str = ""
+    menu: bool = True
 
     def __post_init__(self):
         if not NAME.match(self.name):

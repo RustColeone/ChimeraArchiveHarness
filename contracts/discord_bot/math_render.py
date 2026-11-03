@@ -1,4 +1,4 @@
-"""Math in Discord text replies (ported from the legacy rich content pass).
+"""Math in Discord text replies.
 
 Inline `$...$` / `\\(...\\)` math becomes readable Unicode; display `$$...$$` / `\\[...\\]` math is
 rendered to PNG with Matplotlib MathText (no LaTeX installation needed) on a fixed-width canvas, so
@@ -126,7 +126,7 @@ def fallback_text(formula: str) -> str:
 
 
 class MathRenderer:
-    """Settings (this plugin's config): `math` (true), `math_width_px` (1440, min 640), `math_dpi`
+    """Settings (the bot's own config): `math` (true), `math_width_px` (1440, min 640), `math_dpi`
     (180, min 72), `math_font_size_pt` (20, min 12), `math_min_height_px` (220, min 120),
     `math_max_images` (10 per reply; further equations are shown as text)."""
 

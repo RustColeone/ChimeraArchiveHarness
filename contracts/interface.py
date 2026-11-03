@@ -141,14 +141,20 @@ class InterfacePort(Protocol):
     def log(self, event: str, **fields: Any) -> None: ...
 
 
-# The shape of a published `status` that describes a place people can go (a classroom, a lab), so any interface
-# can draw any other place: {"place": {"name", "icon", "note"}, "people": [{"key", "name", "avatar", "doing",
-# "title"}], "away": [keys of people from elsewhere who are here now], "tickets": [{"key", "by", "title", "link"}:
-# invitations to come here, held by people elsewhere], "views": [{"name", "icon", "path", "order", "off", "note"}: the
-# tabs this place adds to every page's places bar, paths relative to its link, sorted by `order` across places; `off`
-# greys one, `note` says why], "you": {"path", "name"}: your tab in the header}. A key is the name lowercased, with only its letters and digits
-# kept, in any script ("Flash-chan" → "flashchan", "露娜" → "露娜"); an empty key matches nobody.
-PLACE_STATUS = ("place", "people", "away", "tickets", "views", "you")
+# The shape of a published `status` that describes a place people can go (a classroom, a lab), so any interface can
+# draw any other place: {"place": {"name", "icon", "note"}, "people": [{"key", "name", "avatar", "doing", "title"}],
+# "away": [keys of people from elsewhere who are here now], "tickets": [{"key", "by", "title", "link"}: invitations to
+# come here, held by people elsewhere], "views": [{"name", "icon", "path", "order", "off", "note"}: the tabs this place
+# adds to every page's places bar, paths relative to its link, sorted by `order` across places; `off` greys one, `note`
+# says why], "you": {"path", "name"}: your tab in the header}. A key is `place_key` of the name.
+PLACE_STATUS = {"place": dict, "people": list, "away": list, "tickets": list, "views": list, "you": dict}
+
+
+def place_problems(status: Mapping[str, Any]) -> list[str]:
+    """The parts of a published status that do not have the shape of PLACE_STATUS."""
+    wrong = [name for name, kind in PLACE_STATUS.items() if name in status and not isinstance(status[name], kind)]
+    return wrong + [name for name in ("people", "tickets") if isinstance(status.get(name), list)
+                    and not all(isinstance(item, dict) for item in status[name])]
 
 
 class Interface(ABC):

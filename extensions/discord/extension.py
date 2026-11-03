@@ -44,8 +44,11 @@ def setup(context) -> Contributions:
     # From .env (the proper place), else `token:` written in this module's config.yml (as setup counts it).
     token = (next((os.environ[name].strip().strip("\"'") for name in names if os.environ.get(name, "").strip()), "")
              or str(config.get("token") or "").strip().strip("\"'"))
+    # Music and the study clock only affect the requester's own server, so anyone may use them without approval.
     return Contributions(interfaces=[DiscordInterface(token, context.data_dir,
-                                                      float(config.get("attachment_max_mb", 25)), config=config)])
+                                                      float(config.get("attachment_max_mb", 25)), config=config)],
+                         permissions={"*": {"rules": {f"discord.{name}": "auto" for name in (
+                             "music", "music_control", "queue_music", "clock_start", "clock_stop")}}})
 
 
 EXTENSION = Extension("discord", setup,

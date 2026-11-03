@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import discord
 
-from contracts import Address, Request, Sender
+from contracts import Address, Request, Sender, split_text
 from core.app import Core
 from tests.core_support import FIXTURES, ROOT, FakeAdapter, extension_module, make_config, settle
 
@@ -203,11 +203,8 @@ class DiscordInterfaceTests(unittest.IsolatedAsyncioTestCase):
                          ("12345", "earlier answer", 25.0))
 
     def test_split_text_never_exceeds_discords_limit(self):
-        from core.loader import import_extension
-        _, module = import_extension(ROOT / "extensions" / "discord")
-        interface = __import__(module.__name__.rsplit(".", 1)[0] + ".interface", fromlist=["split_text"])
         for text in ("a" * 2000 + " " + "b" * 50, "x" * 1999 + "\n\n" + "y" * 10, "word " * 900):
-            self.assertTrue(all(len(chunk) <= 2000 for chunk in interface.split_text(text)))
+            self.assertTrue(all(len(chunk) <= 2000 for chunk in split_text(text, 2000)))
 
     async def test_talk_prefixes_address_the_bot_like_a_mention(self):
         await self.start({"extension_config": {"discord": {"talk_prefixes": ["$agent", "$chat"]}}})
@@ -480,11 +477,10 @@ class DefaultConfigurationTests(unittest.TestCase):
         self.assertEqual(modules[:len(built_in)], [path for path in modules if config.builtin(path)])
         self.assertTrue({"wechat", "whale_chan"} <= {path.name for path in modules if not config.builtin(path)})
         self.assertEqual(list(config.profiles), ["default"])  # the students ship their own
-        self.assertEqual(config.builtin_permissions["*"]["rules"]["reminders.create"], "auto")
-        self.assertEqual(config.builtin_permissions["*"]["rules"]["discord.music"], "auto")
+        self.assertEqual(config.builtin_permissions["*"]["rules"]["core.add_routine"], "auto")
         self.assertEqual(config.builtin_permissions["routine:*"], {"use": ["basic.*"]})
         self.assertEqual(config.permissions, {})
-        self.assertEqual(config.assignments["*"].engine, "momochat")
+        self.assertEqual(config.assignments, {})  # what answers where nothing else does is MomoChat's to suggest
         self.assertIsNone(config.control)
         with tempfile.TemporaryDirectory() as directory:
             override = Path(directory) / "core.yml"
@@ -494,7 +490,6 @@ class DefaultConfigurationTests(unittest.TestCase):
                 config = CoreConfig.load(override)
         self.assertEqual(config.data_dir, (Path(directory) / "data").resolve())
         self.assertEqual(config.personas["assistant"].display_name, "Pal")
-        self.assertIn("*", config.assignments)
         self.assertFalse(config.assignments["discord:123"].enabled)
         self.assertEqual(str(config.control), "discord:dm:77")
 

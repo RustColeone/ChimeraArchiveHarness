@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, Mapping, Pr
 from contracts.commands import Access, Command, derive
 from contracts.messages import Address, Display, FileRef, Sender
 from contracts.models import Models
+from contracts.shared import persona_names
 from contracts.stores import Store
 
 if TYPE_CHECKING:
@@ -209,11 +210,7 @@ class Capability:
             raise ValueError(f"{self.name}: subject_kind must be value or path")
         if self.grantable and self.subject is None:
             raise ValueError(f"{self.name}: grantable needs a subject")
-        personas = (self.personas,) if isinstance(self.personas, str) else self.personas
-        if not isinstance(personas, (tuple, list, frozenset, set)) or \
-                not all(isinstance(name, str) and name for name in personas):
-            raise ValueError(f"{self.name}: personas is a list of persona names")
-        object.__setattr__(self, "personas", tuple(personas))
+        object.__setattr__(self, "personas", persona_names(self.personas, self.name))
 
     def offered_to(self, persona: str, run_personas=()) -> bool:
         """Whether this capability is for `persona`'s turn (or, with none named, for a run of these personas)."""

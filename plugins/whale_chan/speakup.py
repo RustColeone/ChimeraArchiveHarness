@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo
 
-MARK = "⟨speak-up⟩ "  # starts the text of a speak-up trigger, so history shows it as her impulse
+from contracts import fact
 
 MOTIVES = {
     "plan": "想起{person}说过「{note}」，想问问怎么样了",
@@ -138,11 +138,6 @@ def decide(person: Person, now: float, settings: Settings, rng: random.Random) -
     value, how = line(when, since, person.misses, settings)
     roll = rng.uniform(0, 100)
     return Roll(roll < value, value, roll, f"rolled {roll:.1f} against {how}")
-
-
-def fact(facts, name: str):
-    """A fact by its name, whichever module publishes it (`companion.plans` is `plans`)."""
-    return next((value for key, value in dict(facts or {}).items() if str(key).rsplit(".", 1)[-1] == name), None)
 
 
 def motive(facts, name: str, now: float, settings: Settings, silent_h: float = 0.0) -> str:

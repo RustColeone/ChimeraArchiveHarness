@@ -8,14 +8,14 @@ none can change another's facts; interfaces read through their port, only about 
 from __future__ import annotations
 
 import json
-import re
 from typing import TYPE_CHECKING, Any
+
+from contracts import NAME
 
 if TYPE_CHECKING:
     from core.storage.tank import Tank
 
 FACTS = "core:facts"
-KEY = re.compile(r"^[a-z][a-z0-9_]*$")
 LIMIT = 4096  # characters of a value once encoded
 
 
@@ -46,7 +46,7 @@ class FactsDesk:
     def write(self, module: str, persona: str, key: str, value: Any, person=None) -> None:
         if not isinstance(persona, str) or not persona:
             raise ValueError("A fact is about a persona: give her name")
-        if not isinstance(key, str) or not KEY.match(key):
+        if not isinstance(key, str) or not NAME.match(key):
             raise ValueError(f"A fact's key is lowercase letters, digits or _, got {key!r}")
         where = slot(persona, check_person(person))
         facts = dict(self.store.get(where) or {})

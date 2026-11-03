@@ -172,7 +172,7 @@ class MinimumCoreTests(Base):
         self.cores.append(core)
         await core.start()
         self.assertEqual(core.manager.engines, {})
-        self.assertEqual({pattern for _, pattern, _ in core.set_aside}, {"*", "routine:*"})
+        self.assertEqual(core.manager.assignments, {})  # (nothing answers: `*` is MomoChat's to suggest)
         self.assertTrue(any(name.startswith("core.") for name in core.manager.capabilities))
 
     async def test_commands_work_without_an_engine_and_the_owner_is_told_once_why_nothing_answers(self):

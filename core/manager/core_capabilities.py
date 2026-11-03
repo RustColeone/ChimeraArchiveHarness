@@ -11,10 +11,9 @@ import datetime as dt
 import json
 from typing import TYPE_CHECKING, Any, Mapping
 
-from contracts import Address, Capability, Command, Option, Reply, Risk, ToolResult
+from contracts import Address, Capability, Command, Option, Reply, Risk, ToolResult, local_time as when
 from core.gateway.routines import describe
 from core.serialize import request_from_dict
-from core.manager.handles import local_time as when
 from core.manager.model_choice import model_arguments_tier
 from core.manager.routines import Caller
 from core.manager.stamina import money

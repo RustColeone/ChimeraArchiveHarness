@@ -92,7 +92,7 @@ def assemble(context) -> tuple[Contributions, dict]:
     if page is not None and not team.seats:
         context.log("no_seats", hint="no students and no seats under team:; the Classroom has nobody to work")
     contributions = Contributions(
-        interfaces=interfaces, engines=[engine], capabilities=build(chimera),
+        interfaces=interfaces, engines=[engine], capabilities=build(chimera), secrets=("session.key",),
         personas=team.personas(), profiles=profiles,  # the agents of the seats team: adds
         assignments={f"{name}:*": assignment} if page and team.seats else {},
         admission={f"{name}:*": {"enabled": True, "require_mention_in_groups": False}} if page else {},

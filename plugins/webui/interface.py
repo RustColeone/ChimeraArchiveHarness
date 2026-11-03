@@ -26,7 +26,7 @@ from typing import Any
 
 from aiohttp import WSMsgType, web
 
-from contracts import Address, Delivery, Display, FileRef, Interface, Reply, Request, Sender
+from contracts import Address, Delivery, Display, FileRef, Interface, Reply, Request, Sender, fact, place_key
 
 from .store import Store
 
@@ -102,11 +102,6 @@ def local_host(host: str | None, hostnames: set[str]) -> bool:
 
 def avatar_key(name: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (name or "").lower())[:40]
-
-
-def place_key(name: str) -> str:
-    """A name as places compare them (contracts.PLACE_STATUS): its letters and digits in any script, lowercased."""
-    return re.sub(r"[\W_]", "", (name or "").lower())[:40]
 
 
 def lan_address() -> str:
@@ -195,8 +190,7 @@ class WebUI(Interface):
         found = []
         for item in self.roster:
             values = self.port.facts(item["name"], self.user_id)
-            found.append({**item, **{kind: next((value for key, value in values.items()
-                                                 if key.rsplit(".", 1)[-1] == kind), None) for kind in STANDING},
+            found.append({**item, **{kind: fact(values, kind) for kind in STANDING},
                           "stamina": self.port.stamina(item["name"]),  # what she spent today and her account
                           # her mood faces that are drawn (mood-happy, ...), for her face as she feels now
                           "faces": sorted(kind for kind in self._pictures_of(item["name"]) if kind.startswith("mood-"))})
@@ -209,7 +203,7 @@ class WebUI(Interface):
         for name in self.personas:
             view = self.views.get(name, {})
             values = self.port.facts(name)
-            record = next((value for key, value in values.items() if key.rsplit(".", 1)[-1] == "record"), None)
+            record = fact(values, "record")
             models = view.get("models") or {}
             listed = lambda tier: [f"{item.get('provider')}/{item.get('model')}" for item in models.get(tier) or ()
                                    if isinstance(item, dict)]
@@ -569,13 +563,10 @@ class WebUI(Interface):
         return {"title": self.title, "students": students, "avatars": self.avatars(), "rooms": self.rooms(),
                 "here": self.here(), "places": self._places(), "stamina": self.stamina_total()}
 
-    def _fact(self, values: dict, kind: str):
-        return next((value for key, value in values.items() if key.rsplit(".", 1)[-1] == kind), None)
-
     def you_name(self) -> str:
         """What the students call you, when you asked it of all of them (`$callme`), else your name here."""
         for item in self.roster:
-            called = self._fact(self.port.facts(item["name"], self.user_id), "called") or {}
+            called = fact(self.port.facts(item["name"], self.user_id), "called") or {}
             if called.get("everyone"):
                 return str(called["everyone"])
         return self.user_name
@@ -588,9 +579,9 @@ class WebUI(Interface):
         students, everyone, accounts = [], None, None
         for item in self.roster:
             values = self.port.facts(item["name"], self.user_id)
-            called, bond = self._fact(values, "called") or {}, self._fact(values, "bond") or {}
+            called, bond = fact(values, "called") or {}, fact(values, "bond") or {}
             everyone = everyone or called.get("everyone")
-            accounts = accounts or self._fact(values, "accounts")
+            accounts = accounts or fact(values, "accounts")
             students.append({"name": item["name"], "display": item["display"], "avatar": avatar_key(item["name"]),
                              "called": called.get("name"), "asked": called.get("asked"),
                              "setting": called.get("setting"), "role": bond.get("role")})
@@ -625,9 +616,8 @@ class WebUI(Interface):
     async def _link(self, request: web.Request) -> web.Response:
         """A code to join another account of yours (`$link`), sent quietly as you."""
         answer = await self._quietly(DEFAULT_CONVERSATION, "$link", "link")
-        code = re.search(r"`\$link ([A-Z0-9]{6})`", answer.get("text") or "")
-        return web.json_response({"ok": bool(answer.get("ok") and code), "text": answer.get("text") or "",
-                                  "code": code.group(1) if code else None})
+        code = answer["result"].get("code")
+        return web.json_response({"ok": bool(answer.get("ok") and code), "text": answer.get("text") or "", "code": code})
 
     def students(self) -> dict:
         """Every student for the Students page: who she is and where she stands with you (as the cafe has it), her
@@ -638,8 +628,7 @@ class WebUI(Interface):
         for item in self.cafe()["students"]:
             name = item["name"]
             values = self.port.facts(name, self.user_id)
-            work = {kind: next((value for key, value in values.items() if key.rsplit(".", 1)[-1] == kind), None)
-                    for kind in WORK}
+            work = {kind: fact(values, kind) for kind in WORK}
             pictures = self._pictures_of(name)
             folder = pictures["avatar"].parent if "avatar" in pictures else None
             files = sorted(entry.name for entry in folder.iterdir() if entry.is_file()
@@ -776,7 +765,7 @@ class WebUI(Interface):
     def state(self) -> dict:
         commands = [{"name": command.name, "description": command.description, "usage": command.usage(),
                      "examples": [example for example in command.examples if example]}
-                    for command in self.port.commands()]
+                    for command in self.port.commands() if command.menu]
         self._standing_shown = self.standing()
         return {"title": self.title, "user": {"id": self.user_id, "name": self.user_name},
                 "classmates": self.classmates, "roster": self._standing_shown, "people": self.people(),

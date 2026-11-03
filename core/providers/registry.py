@@ -186,6 +186,9 @@ class Providers:
                 if candidate.get("provider") not in self._settings and candidate.get("provider") not in self._adapters:
                     raise ValueError(f"Profile {name!r} uses unknown provider {candidate.get('provider')!r}")
 
+    def has_kind(self, kind: str) -> bool:
+        return kind in self._kinds
+
     def add_kind(self, kind: str, factory) -> None:
         """A provider kind a module adds (contracts.AdapterFactory); an existing kind is never replaced."""
         if kind in self._kinds:

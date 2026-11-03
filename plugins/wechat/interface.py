@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from contracts import (Address, Command, Delivery, Display, FileRef, Interface, Operation, Option, Reply, Request,
-                       Risk, Sender, ToolResult)
+                       Risk, Sender, ToolResult, split_text)
 
 from .images import mime_for
 from .native import strip_mention
@@ -39,21 +39,9 @@ STATES = {
 }
 
 
-def split_text(text: str, limit: int = SEND_LIMIT) -> list[str]:
-    chunks, remaining = [], text
-    while len(remaining) > limit:
-        cut = 0
-        for separator in ("\n\n", "\n", " "):
-            # The chunk keeps its separator, so the separator must end within the limit.
-            boundary = remaining.rfind(separator, 0, limit - len(separator) + 1)
-            if boundary >= limit // 2:
-                cut = boundary + len(separator)
-                break
-        cut = cut or limit
-        chunks.append(remaining[:cut])
-        remaining = remaining[cut:]
-    if remaining or not chunks:
-        chunks.append(remaining)
+def parts(text: str, limit: int = SEND_LIMIT) -> list[str]:
+    """Text as WeChat messages: never an empty one, unless there is nothing else."""
+    chunks = split_text(text, limit)
     return [chunk for chunk in chunks if chunk.strip()] or chunks[:1]
 
 
@@ -461,7 +449,7 @@ class WeChatInterface(Interface):
         if not text:
             return Delivery(True, detail="suppressed")
         first = None
-        for index, part in enumerate(split_text(text)):
+        for index, part in enumerate(parts(text)):
             delivery = await self._send_text(native, part, reply, reply.quote if index == 0 else None)
             if not delivery.ok:
                 return Delivery(False, first, delivery.detail, uncertain=delivery.uncertain or index > 0)

@@ -4,11 +4,10 @@ and the creator see and manage every conversation's routines and have no limits.
 
 from __future__ import annotations
 
-import datetime as dt
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from contracts import Address, Sender
+from contracts import LEVELS, Address, Sender, code_style, local_time
 from core.gateway import routines as schedules
 
 if TYPE_CHECKING:
@@ -16,7 +15,6 @@ if TYPE_CHECKING:
 
 MEMBER_MAX_PER_CONVERSATION = 5
 MEMBER_MIN_MINUTES = 30
-LEVELS = {"member": 0, "admin": 1, "creator": 2}
 
 
 @dataclass(frozen=True)
@@ -48,7 +46,7 @@ class RoutineDesk:
         if chat:
             if not caller.admin:
                 raise PermissionError("Only admins can add routines to another conversation")
-            address, is_direct = Address.parse(chat), chat.split(":", 1)[-1].startswith("dm:")
+            address, is_direct = Address.parse(chat), False  # (nobody here can tell: it is treated as shared)
         schedule, rest = schedules.parse(f"{schedule_text} {text}".strip(), self._gateway.now())
         if not caller.admin:
             if schedule.get("every_minutes") and float(schedule["every_minutes"]) < MEMBER_MIN_MINUTES:
@@ -86,9 +84,9 @@ class RoutineDesk:
         return self._gateway.update_routine(routine["id"], enabled=action == "resume", delete=action == "delete")
 
     def line(self, caller: Caller, routine: dict) -> str:
-        code = (lambda value: f"`{value}`") if caller.markdown else str
+        code = code_style(caller.markdown)
         upcoming = routine.get("next_at")
-        when = dt.datetime.fromtimestamp(upcoming).astimezone().strftime("%m-%d %H:%M") if upcoming else "—"
+        when = local_time(upcoming, "%m-%d %H:%M") if upcoming else "—"
         state = "" if routine.get("enabled", True) else " · ⏸ paused"
         text = routine["text"] if len(routine["text"]) <= 80 else routine["text"][:79] + "…"
         parts = [code(routine["id"]), schedules.describe(routine), f"next {when}", code(text)]
@@ -131,6 +129,5 @@ class RoutineDesk:
             routine = self.add(caller, "", " ".join(tokens), chat, via=via)
         except (ValueError, LookupError, PermissionError) as error:
             return str(error)
-        when = dt.datetime.fromtimestamp(routine["next_at"]).astimezone().strftime("%Y-%m-%d %H:%M")
-        return (f"Routine {routine['id']} added: {schedules.describe(routine)}, first at {when}"
+        return (f"Routine {routine['id']} added: {schedules.describe(routine)}, first at {local_time(routine['next_at'])}"
                 + (f" in {routine['address']}" if chat else "") + f". It sends: {routine['text']}")

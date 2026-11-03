@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from contracts import ToolSpec
+from contracts import ToolSpec, chinese
 
 
 def strict(properties: dict, required: list[str] | None = None) -> dict:
@@ -488,10 +488,6 @@ LINES = {
     "baseline_failed": ("Heads-up: the project's tests already fail before any change, so they can't confirm the "
                         "result on their own.", "提醒：改动之前项目的测试就已经失败了，所以测试本身无法确认结果。"),
 }
-
-
-def chinese(text: str) -> bool:
-    return bool(re.search(r"[一-鿿]", text or ""))
 
 
 LANGUAGES = ((re.compile("[぀-ヿ]"), "Japanese"), (re.compile("[一-鿿]"), "Chinese"),

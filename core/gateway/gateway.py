@@ -15,14 +15,15 @@ import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Mapping
 
-from contracts import (Address, Delivery, Display, Interface, Operation, Reply, Request, Sender, SubmitResult,
-                       ToolResult)
+from contracts import (IMPULSE, Address, Delivery, Display, Interface, Operation, Reply, Request, Sender, SubmitResult,
+                       ToolResult, impulse, is_command, place_problems)
 from core.audit import Audit
 from core.gateway import routines as schedules
 from core.gateway.routines import next_fire
 from core.manager.policy import most_specific
 from core.storage.bottle import Bottle
 from core.storage.sqlite import ScopedStore
+from core.storage.tank import OPEN
 
 if TYPE_CHECKING:
     from core.manager.manager import Manager
@@ -183,11 +184,6 @@ class Gateway:
                 self.audit.record("interface_stop_failed", interface=name, error=type(error).__name__)
 
     # ---- inbound ----------------------------------------------------------------------------------
-    @staticmethod
-    def is_command(request: Request) -> bool:
-        text = request.text.strip()
-        return len(text) > 1 and text[0] == "$" and text[1].isalpha()
-
     def rule_for(self, address: Address) -> dict:
         return {**DEFAULT_RULE, **(most_specific(self.bottle.rules(), address)[1] or {})}
 
@@ -218,6 +214,8 @@ class Gateway:
             raise ValueError(f"Interface {interface!r} cannot submit for {request.address.interface!r}")
         if request.origin != "person":
             raise ValueError("Interfaces submit person requests only")
+        if request.text.startswith(IMPULSE) and not impulse(request):  # (typed by a person: it is only text)
+            request = dataclasses.replace(request, text=request.text[len(IMPULSE):])
         return await self._submit(request)
 
     async def _submit(self, request: Request) -> SubmitResult:
@@ -228,7 +226,7 @@ class Gateway:
                 return SubmitResult(False, "duplicate")
             try:
                 owner = self.manager.is_owner(request)
-                command = self.is_command(request) and (
+                command = is_command(request.text) and (
                     owner or self.rule_for(request.address).get("commands", "all") == "all")
                 if owner and not command and request.origin == "person":
                     receipt = (self.bottle.receipt(f"{request.address.interface}:{request.reply_to}")
@@ -378,10 +376,7 @@ class Gateway:
                 raise ValueError(f"status must be plain JSON: {error}") from None
             if len(text.encode("utf-8")) > 16384 or not isinstance(status, dict):
                 raise ValueError("status must be a JSON object of at most 16 KB")
-            shape = {"place": dict, "people": list, "away": list, "tickets": list}  # contracts.PLACE_STATUS
-            wrong = [name for name, kind in shape.items() if name in status and not isinstance(status[name], kind)]
-            wrong += [name for name in ("people", "tickets") if isinstance(status.get(name), list)
-                      and not all(isinstance(item, dict) for item in status[name])]
+            wrong = place_problems(status)
             if wrong:
                 raise ValueError(f"a place's status has the wrong shape for {', '.join(wrong)} (contracts.PLACE_STATUS)")
             entry["status"] = json.loads(text)
@@ -397,8 +392,7 @@ class Gateway:
         if record["status"] != "pending":
             return record["status"]
         run = manager.tank.run(record["run_id"])
-        return "pending" if run is not None and run.status in ("running", "waiting_input", "waiting_approval") \
-            else "expired"
+        return "pending" if run is not None and run.status in OPEN else "expired"
 
     def directory(self) -> dict[str, dict]:
         """Every interface with what it published (copies), and whether it is ready."""
@@ -417,7 +411,7 @@ class Gateway:
 
     def sweep_disabled(self) -> None:
         """A rule that stops admitting a conversation also cancels that conversation's open runs."""
-        for record in self.manager.tank.runs(("running", "waiting_input", "waiting_approval"), limit=1000):
+        for record in self.manager.tank.runs(limit=1000):
             address = Address.parse(record.address)
             if address.interface != ROUTINE and not self.rule_for(address).get("enabled", True):
                 self._spawn(self.manager.cancel_conversation(address, "not_admitted"))

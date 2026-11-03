@@ -9,9 +9,10 @@ holding an invitation you have not followed yet stays where she is, with a ticke
 
 from __future__ import annotations
 
-import re
 import time
 from typing import Callable
+
+from contracts import place_key as key
 
 # This page's entries in every page's places bar (paths relative to its link), sorted among all places' by `order`.
 # (The Students page is the web UI's, which reads every student's record from Chimera's facts.)
@@ -19,12 +20,6 @@ VIEWS = [{"name": "Classroom", "icon": "📝", "path": "", "order": 30},
          {"name": "Logbook", "icon": "📖", "path": "#logbook", "order": 50}]
 DOING = {"review": "waiting for your check", "approved": "waiting for the final approval", "landed": "just landed it",
          "answered": "answered", "failed": "waiting for you"}
-
-
-def key(name) -> str:
-    """A name as places compare them (contracts.PLACE_STATUS): lowercased, its letters and digits in any script
-    ("Flash-chan" → "flashchan", "露娜" → "露娜")."""
-    return re.sub(r"[\W_]", "", str(name or "").lower())[:40]
 
 
 def lab_place(board, team, link: Callable[[str, str], str], visit_minutes: float = 30) -> dict:

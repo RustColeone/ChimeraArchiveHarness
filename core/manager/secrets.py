@@ -1,9 +1,9 @@
 """Secrets enforcement (S1-S3): keep credentials out of models, chats and the bot's own records.
 
-Scope: only what passes through the bot itself, meaning capability arguments, tool results, replies,
-approval prompts and stored history. A process the bot starts (a terminal shell) reads files and the
-network directly as the bot's OS user; that is bounded by the owner's approval of each line and by OS
-isolation, never by this module.
+Scope: only what the bot itself writes or passes on: capability arguments, tool results, replies, approval prompts
+and what it records of them. What people say is kept as they said it, in history and in memory. A process the bot
+starts (a terminal shell) reads files and the network directly as the bot's OS user; that is bounded by the owner's
+approval of each line and by OS isolation, never by this module.
 
 * Known values: everything named in the env files, every `Setting(kind="secret")` variable, provider
   key variables, and any environment variable whose name ends in KEY, TOKEN, SECRET, PASSWORD,

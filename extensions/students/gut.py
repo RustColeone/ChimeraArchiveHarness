@@ -24,13 +24,26 @@ class Guts:
             self.opened[persona] = Gut(self.folder / f"{persona}.db", self.starters.get(persona))
         return self.opened[persona]
 
+    @staticmethod
+    def wake(gut: Gut) -> asyncio.Future:
+        """Her waking, the one under way or a new one (it takes a while: it reads what she was born with)."""
+        if gut.waking is None or gut.waking.done():
+            gut.waking = asyncio.ensure_future(asyncio.to_thread(gut.wake))
+        return gut.waking
+
+    async def woken(self, persona: str) -> Gut:
+        """Her gut, awake."""
+        gut = self.of(persona)
+        if not gut.awake:
+            await asyncio.shield(self.wake(gut))
+        return gut
+
     def begin(self, context, subject: str) -> Turn | None:
         """Her turn, or None until her gut has woken (the first message after a start: it wakes beside it)."""
         persona, trigger = context.persona, context.trigger
         gut = self.of(persona.name)
         if not gut.awake:
-            if gut.waking is None or gut.waking.done():
-                gut.waking = asyncio.ensure_future(asyncio.to_thread(gut.wake))
+            self.wake(gut)
             return None
 
         async def ask(messages: list[dict], tokens: int, timeout: float = 30.0) -> str:
