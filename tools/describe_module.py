@@ -25,7 +25,8 @@ def describe() -> dict:
     from extensions.chimera.kernel import flow, prompts, router
     from extensions.chimera.workspace import commands
     with tempfile.TemporaryDirectory() as folder:
-        context = SimpleNamespace(name="chimera", config={}, data_dir=Path(folder), log=lambda *a, **k: None)
+        context = SimpleNamespace(name="chimera", config={}, data_dir=Path(folder), log=lambda *a, **k: None,
+                                  personas=list, facts=None, prices=None)
         contributions, parts = extension.assemble(context)
         capabilities = [{
             "name": item.name, "description": item.description, "parameters": dict(item.parameters),

@@ -305,9 +305,8 @@ class ClassroomUI(Interface):
 
     def _pictures(self) -> dict[str, Path]:
         """The students' own pictures (Persona.pictures, from the core's personas), by name key."""
-        personas = getattr(self.port, "personas", None) if self.port is not None else None
         found: dict[str, Path] = {}
-        for view in personas() if callable(personas) else ():
+        for view in self.port.personas():
             avatar = (view.get("pictures") or {}).get("avatar")
             if avatar and Path(avatar).suffix.lower() in PICTURES and Path(avatar).is_file():
                 for name in (view.get("name"), view.get("display_name")):
@@ -318,9 +317,8 @@ class ClassroomUI(Interface):
 
     def _student_pictures(self) -> dict[str, dict[str, Path]]:
         """Every picture of each student (Persona.pictures: her card, her ladder of models…), by persona."""
-        personas = getattr(self.port, "personas", None) if self.port is not None else None
         found: dict[str, dict[str, Path]] = {}
-        for view in personas() if callable(personas) else ():
+        for view in self.port.personas():
             for kind, value in dict(view.get("pictures") or {}).items():
                 if KIND.match(str(kind)) and Path(value).suffix.lower() in PICTURES and Path(value).is_file():
                     found.setdefault(str(view.get("name")), {})[str(kind)] = Path(value)
@@ -407,12 +405,10 @@ class ClassroomUI(Interface):
 
     async def _logbook_api(self, request):
         """What was spent each day for the Logbook (everything, chats and sessions: the core's)."""
-        asking = getattr(self.port, "spending", None) if self.port is not None else None
-        return web.json_response({"days": asking(14) if callable(asking) else []})
+        return web.json_response({"days": self.port.spending(14)})
 
     def _stamina(self, persona: str | None):
-        asking = getattr(self.port, "stamina", None) if self.port is not None else None
-        return (asking(persona) if persona else asking()) if callable(asking) else None
+        return self.port.stamina(persona)
 
     async def _presence_api(self, request):
         return web.json_response(self.presence())
@@ -755,8 +751,7 @@ class ClassroomUI(Interface):
     def _approval_state(self, approval_id: str) -> str | None:
         """What the core says of an approval; a card decided or expired elsewhere is closed here too,
         so every open page stops offering its buttons."""
-        asking = getattr(self.port, "approval_status", None)
-        return asking(approval_id) if callable(asking) and approval_id else None
+        return self.port.approval_status(approval_id) if approval_id else None
 
     def _projects(self) -> list[dict]:
         return [project.to_dict() for project in self.registry.all().values()]
@@ -766,11 +761,10 @@ class ClassroomUI(Interface):
         she has a key, her level (record.py), your name for her (any module's `alias` fact) and her run alone."""
         found = records(self.board)
         summaries = benchmarks()
-        facts = getattr(self.port, "facts", None) if self.port is not None else None
         team = []
         pictures = self._student_pictures()
         for seat in self.team.seats.values():
-            values = facts(seat.persona, self.user_id) if callable(facts) else {}
+            values = self.port.facts(seat.persona, self.user_id)
             alias = next((value for key, value in values.items() if key.rsplit(".", 1)[-1] == "alias"), None)
             alone = next((row for row in benchmark_rows(seat.persona, summaries)
                           if row["formation"] == "alone" and row["seats"] == ["builder"]), None)  # (the design's word)
@@ -790,14 +784,8 @@ class ClassroomUI(Interface):
                 for seat in self.team.seats.values() for tier in ("cheap", "strong") for candidate in seat.models(tier)[:1]]
 
     def _ready(self, seat) -> bool | None:
-        """Whether she has a key: the core can tell, else what the latest run saw."""
-        asking = getattr(self.port, "models_ready", None)
-        if callable(asking):
-            try:
-                return bool(asking(seat.profile("cheap")))
-            except Exception:
-                pass
-        return self.team.ready.get(seat.persona)
+        """Whether she has a key: the core can tell."""
+        return bool(self.port.models_ready(seat.profile("cheap")))
 
     def _state(self) -> dict:
         team = self._team()

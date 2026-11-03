@@ -14,7 +14,7 @@ def load(name):
 
 class Context:
     def __init__(self, config=None):
-        self.name, self.config, self.data_dir, self.logged = "test", config or {}, Path("."), []
+        self.name, self.config, self.data_dir, self.logged, self.facts = "test", config or {}, Path("."), [], None
 
     def log(self, event, **fields):
         self.logged.append((event, fields))
@@ -118,14 +118,6 @@ class ShippedStudentsTests(unittest.TestCase):
         self.assertEqual(contributions.providers["grok"]["base_url"], "https://api.x.ai/v1")
         self.assertEqual(contributions.profiles["gpt"], mine)
         self.assertEqual(contributions.profiles["grok"][0], {"provider": "grok", "model": "grok-4-fast"})
-
-    def test_momochat_runs_them_and_notes_models_left_in_the_rooms_config(self):
-        extension, momochat = load("momochat")
-        context = Context({"providers": {"grok": {"models_exclude": ["imagine"]}}})
-        contributions = momochat.setup(context)
-        self.assertEqual((contributions.personas, contributions.providers, contributions.profiles), ((), {}, {}))
-        self.assertEqual(context.logged, [("settings_moved", {"keys": ["providers"],
-                                                              "to": "extensions/students/config.yml"})])
 
 
 if __name__ == "__main__":

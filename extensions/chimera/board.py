@@ -2,7 +2,7 @@
 
 The core keeps each run durable (its state, events and approvals); the board is what people look at: every task
 with its project, status and change set, every step with who did it, on which model, at what cost and how long it
-took, and the page's transcript. It lives in the module's data folder (`workbench.db`). Whoever writes to it, the
+took, and the page's transcript. It lives in the module's data folder (`board.db`). Whoever writes to it, the
 page hears about it at once through `subscribe`, so it can show the work as it happens.
 """
 
@@ -83,14 +83,6 @@ class Board:
     def tasks(self, limit: int = 300) -> list[dict]:
         rows = self._db.execute("select * from tasks order by created desc limit ?", (limit,)).fetchall()
         return [self._task(row) for row in rows]
-
-    def readdress(self, old: str, new: str) -> int:
-        """Tasks of interface `old` (`<old>:<task>`) are interface `new`'s: the page was renamed."""
-        with self._lock:
-            cursor = self._db.execute("update tasks set address = ? || substr(address, ?) where address like ?",
-                                      (new + ":", len(old) + 2, old + ":%"))
-            self._db.commit()
-        return cursor.rowcount
 
     def latest(self, address: str) -> dict | None:
         """The conversation's newest task."""

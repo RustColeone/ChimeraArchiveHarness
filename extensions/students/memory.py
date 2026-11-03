@@ -125,9 +125,11 @@ class Book:
 
     A file is made only when there is something to keep: an alias, a role from the settings, or what she learns."""
 
-    def __init__(self, folder: Path, *, personas=(), platforms=None, roles=None, people=None,
+    def __init__(self, folder: Path, *, personas=(), names=None, platforms=None, roles=None, people=None,
                  settings: Settings | None = None):
         self.folder, self.personas = Path(folder), tuple(personas)
+        self.names = {str(name): dict(value) for name, value in dict(names or {}).items()}  # her display name and others
+        self.opened: dict[str, object] = {}
         self.platforms = {str(name): str(platform) for name, platform in (platforms or {}).items()}
         self.roles = {self.named(subject): str(role) for subject, role in (roles or {}).items()}
         # One person behind several accounts (`people: {Leo: [discord:1, webui:creator]}`): their first account is
@@ -158,18 +160,10 @@ class Book:
             self.join(str(account), str(person))
         self.codes: dict[str, tuple[str, float]] = {}  # a `$link` code → (the person who asked for it, until when)
         self.settings = settings or Settings({})
-        self.opened: dict[str, object] = {}
         self.toolboxes: dict[tuple[str, str], Toolbox] = {}  # (run, student) → her search tools in that run
-        self.index = self.folder / "names.json"  # persona → her display name and other names, as engines showed her
-        try:
-            names = dict(json.loads(self.index.read_text(encoding="utf-8")))
-        except (OSError, ValueError, TypeError):
-            names = {}
-        self.names = {persona: value if isinstance(value, dict) else {"display_name": str(value)}
-                      for persona, value in names.items()}
 
     def keeps(self, persona: str) -> bool:
-        return not self.personas or persona in self.personas
+        return persona in self.personas
 
     def shown(self, persona: str) -> str:
         return self.names.get(persona, {}).get("display_name") or persona
@@ -213,7 +207,7 @@ class Book:
         self.accounts.setdefault(person, [person]).append(account)
         self.person_of.setdefault(person, person)
         self.person_of[account] = person
-        for memory in self.opened.values() if hasattr(self, "opened") else ():
+        for memory in self.opened.values():
             self.link(memory)
         return True
 
@@ -246,16 +240,8 @@ class Book:
                                                              if value == platform)}}
         return sorted(found)
 
-    def met(self, persona) -> None:
-        value = {"display_name": persona.display_name, "aliases": list(getattr(persona, "aliases", ()))}
-        if self.names.get(persona.name) != value:
-            self.names[persona.name] = value
-            self.folder.mkdir(parents=True, exist_ok=True)
-            self.index.write_text(json.dumps(self.names, ensure_ascii=False, indent=1), encoding="utf-8")
-
     def known(self) -> list[str]:
-        found = {path.stem for path in self.folder.glob("*.db")} | set(self.names) | set(self.personas)
-        return sorted(persona for persona in found if self.keeps(persona))
+        return sorted(self.personas)
 
     def find(self, name: str, subject: str = "") -> str | None:
         """The student a name stands for: her persona name, display name, other names, or what this person calls
@@ -335,8 +321,6 @@ class Book:
         return {"name": name or None, "asked": asked or None, "everyone": everyone or None, "setting": setting or None}
 
     def publish(self, facts, persona: str, subject: str) -> None:
-        if facts is None:
-            return
         stand = self.stand(persona, subject)
         for person in self.people(subject):
             for name, value in stand.items():
@@ -344,8 +328,6 @@ class Book:
 
     def publish_all(self, facts) -> None:
         """At start: what the files already hold, so the pages show it before anyone talks."""
-        if facts is None:
-            return
         for persona in self.known():
             memory = self.open(persona)
             if memory is None:
@@ -410,7 +392,7 @@ def classmates_line(book: "Book", persona: str, subject: str, language: str) -> 
 def impulse(trigger) -> str:
     """Her own motive when the message is a turn she started herself (an interface marks it `extra.speak_up`: a
     student's Discord bot speaking up), else ""."""
-    return str((getattr(trigger, "extra", None) or {}).get("speak_up") or "")
+    return str(trigger.extra.get("speak_up") or "")
 
 
 def called(book: Book, persona: str, subject: str, owner: bool, sender) -> str:
@@ -431,7 +413,7 @@ async def hear(book: Book, settings: Settings, exchange, subject: str, said) -> 
     """What was said in a group chat, every student there heard: each classmate keeps the exchange word for word too.
     Returns the classmates who keep it."""
     heard = []
-    for persona in getattr(exchange, "personas", ()):  #
+    for persona in exchange.personas:
         own = settings.of(persona)
         if persona == exchange.persona.name or not book.keeps(persona) or not (own.learn and own.episodes):
             continue
@@ -445,7 +427,7 @@ def share(book: Book, settings: Settings, exchange, subject: str, notes, facts) 
     one kept of it are kept in each classmate's file as well, as her own (source "heard"). A direct chat stays
     between the two. Returns the classmates who keep them."""
     heard = []
-    for persona in getattr(exchange, "personas", ()):  #
+    for persona in exchange.personas:
         own = settings.of(persona)
         if persona == exchange.persona.name or not book.keeps(persona) or not (own.learn and own.notes):
             continue
@@ -464,10 +446,8 @@ def make_part(book: Book, settings: Settings, guts: Guts | None = None):
         on it (her first look), her mood's news (until she has replied) and how her classmates seem today; nothing
         for a routine run, or a person she has nothing on."""
         persona, trigger = context.persona, context.trigger
-        engine = getattr(context, "engine", "")  # (an older core gives none)
-        if trigger.origin != "person" or not book.keeps(persona.name) or not conversation(engine, settings):
+        if trigger.origin != "person" or not book.keeps(persona.name) or not conversation(context.engine, settings):
             return ""
-        book.met(persona)
         own = settings.of(persona.name)
         subject = book.subject(context.address.interface, trigger.sender.id)
         person = called(book, persona.name, subject, context.owner, trigger.sender)
@@ -564,7 +544,6 @@ def make_learner(book: Book, settings: Settings):
         own = settings.of(persona.name)
         if not own.learn:
             return
-        book.met(persona)
         memory = book.open(persona.name, create=True)
         subject = book.subject(exchange.address.interface, trigger.sender.id)
         person = called(book, persona.name, subject, exchange.owner, trigger.sender)
@@ -602,7 +581,7 @@ def make_learner(book: Book, settings: Settings):
     return learn
 
 
-def make_alias(book: Book, facts=None):
+def make_alias(book: Book, facts):
     async def alias(arguments, context) -> ToolResult:
         subject = book.subject(context.address.interface, context.sender.id)
         text = str(arguments.get("text") or "").strip()
@@ -638,7 +617,7 @@ def make_alias(book: Book, facts=None):
 def make_recall(book: Book, settings: Settings, tool: str):
     """Her `search` or `read` through what was said before with the person who wrote, as mneme-llm's tools do it."""
     async def recall(arguments, context) -> ToolResult:
-        persona = getattr(context, "persona", "")  # (whose turn called it)
+        persona = context.persona
         if not persona or not book.keeps(persona) or not settings.of(persona).search:
             return ToolResult.fail("Only a student's own turn can look through her memory.", "not_a_student")
         box = book.toolbox(persona, context.run_id)
@@ -655,7 +634,7 @@ def publish_person(book: Book, facts, subject: str) -> None:
         book.publish(facts, persona, subject)
 
 
-def make_callme(book: Book, facts=None):
+def make_callme(book: Book, facts):
     async def callme(arguments, context) -> ToolResult:
         """`$callme` shows it, `$callme <name>` asks every student, `$callme <student> <name>` one of them, and
         `reset` (for all or for her) takes the name back."""
@@ -684,7 +663,7 @@ def make_callme(book: Book, facts=None):
     return callme
 
 
-def make_link(book: Book, facts=None):
+def make_link(book: Book, facts):
     async def link(arguments, context) -> ToolResult:
         """`$link` gives a code (and lists your accounts); `$link <code>`, sent from another account of yours within
         ten minutes, makes the two one person to every student."""
@@ -807,7 +786,7 @@ def make_new(book: Book, settings: Settings, guts: "Guts | None"):
 def make_gut(book: Book, settings: Settings, guts: Guts):
     async def show(arguments, context) -> ToolResult:
         """`$gut`: where each student's gut stands; nothing of what she was told is shown to anyone but the owner."""
-        lines, owner = [], str(getattr(context.access, "value", context.access)) == "creator"
+        lines, owner = [], context.access == "creator"
         for persona in settings.personas:
             if not settings.of(persona).gut:
                 continue
@@ -879,11 +858,10 @@ def contributions(context, students: dict[str, dict]) -> dict:
     settings = Settings(config, Path(context.data_dir))
     keep = tuple(name for name in settings.personas or students if name in students)
     settings.personas = keep
-    book = Book(context.data_dir, personas=keep, platforms={**PLATFORMS, **dict(config.get("platforms") or {})},
-                roles=config.get("roles"), people=config.get("people"), settings=settings)
-    for name, names in students.items():  # her names, before she has spoken anywhere
-        book.names.setdefault(name, names)
-    facts = getattr(context, "facts", None)  # (None when loaded without a core)
+    book = Book(context.data_dir, personas=keep, names=students,
+                platforms={**PLATFORMS, **dict(config.get("platforms") or {})}, roles=config.get("roles"),
+                people=config.get("people"), settings=settings)
+    facts = context.facts
     book.publish_all(facts)
     learns = settings.learn or any(flag(own.get("learn"), False) for own in settings.students.values())
     searching = tuple(name for name in keep if settings.of(name).search)

@@ -1,7 +1,8 @@
 """The web UI's own record of what it showed: conversations and their messages, in one SQLite file.
 
 The core keeps the real history (the tank); this is the page's transcript, so a reload shows the same
-bubbles, buttons and files that were delivered.
+bubbles, buttons and files that were delivered. Chats keep the order the user arranges (pinned first), and `personas`
+says who is in each (a JSON list of persona names; NULL: the web UI's whole roster).
 """
 
 from __future__ import annotations
@@ -15,7 +16,8 @@ from typing import Any
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at REAL NOT NULL,
-                                          updated_at REAL NOT NULL);
+                                          updated_at REAL NOT NULL, position REAL, pinned INTEGER NOT NULL DEFAULT 0,
+                                          personas TEXT);
 CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, conversation TEXT NOT NULL,
                                      at REAL NOT NULL, approval TEXT, item TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS messages_by_conversation ON messages(conversation, id);
@@ -35,15 +37,6 @@ class Store:
         with self._lock:
             self._db.executescript(SCHEMA)
             self._db.execute("PRAGMA journal_mode=WAL")
-            columns = {row["name"] for row in self._db.execute("PRAGMA table_info(conversations)")}
-            if "position" not in columns:
-                # Chats are kept in the order the user arranges them (pinned first); start from most recent first.
-                self._db.execute("ALTER TABLE conversations ADD COLUMN position REAL")
-                self._db.execute("ALTER TABLE conversations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
-                self._db.execute("UPDATE conversations SET position = -updated_at")
-            if "personas" not in columns:
-                # Who is in each chat (a JSON list of persona names); NULL: the web UI's whole roster.
-                self._db.execute("ALTER TABLE conversations ADD COLUMN personas TEXT")
 
     def close(self) -> None:
         with self._lock:

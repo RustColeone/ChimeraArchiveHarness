@@ -29,7 +29,6 @@ from .projects import Project, is_repository
 
 DEFAULT_IDENTITY = ("-c", "user.name=Chimera", "-c", "user.email=chimera@localhost")
 BASE_FILE = "chimera-base"  # the task's base commit, kept in the worktree's own git directory
-BASE_BEFORE = "workbench-base"  # its name in worktrees made before the workbench was Chimera
 PROBE = ".probe"  # the tester's scratch folder in a worktree: never part of a change set
 
 
@@ -126,10 +125,9 @@ class Worktrees:
         return Path(await out(path, "rev-parse", "--path-format=absolute", "--git-dir"))
 
     async def _base(self, path: Path, project: Project) -> str:
-        folder = await self._gitdir(path)
-        for recorded in (folder / BASE_FILE, folder / BASE_BEFORE):
-            if recorded.is_file():
-                return recorded.read_text(encoding="utf-8").strip()
+        recorded = await self._gitdir(path) / BASE_FILE
+        if recorded.is_file():
+            return recorded.read_text(encoding="utf-8").strip()
         return await out(path, "merge-base", "HEAD", await out(project.path, "rev-parse", "HEAD"))
 
     async def change(self, path: Path, base: str, links=(), context: int = 3) -> ChangeSet:

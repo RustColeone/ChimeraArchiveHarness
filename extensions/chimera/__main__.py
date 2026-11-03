@@ -48,11 +48,8 @@ def also(names: list[str]) -> list[str]:
 
 
 def data_folder(arguments) -> Path:
-    """--data, else data/chimera (data/workbench when only that one exists: the Classroom's folder before)."""
-    if arguments.data:
-        return Path(arguments.data).expanduser().resolve()
-    before = ROOT / "data" / "workbench"
-    return before if before.is_dir() and not (ROOT / "data" / "chimera").exists() else ROOT / "data" / "chimera"
+    """--data, else data/chimera."""
+    return Path(arguments.data).expanduser().resolve() if arguments.data else ROOT / "data" / "chimera"
 
 
 def load_config(paths: list[Path]) -> dict:
@@ -70,9 +67,6 @@ def merge(base: dict, override: dict) -> dict:
     for key, value in override.items():
         result[key] = merge(result[key], value) if isinstance(value, dict) and isinstance(result.get(key), dict) else value
     return result
-
-
-PATH_KEYS = ("data_dir", "env_files", "modules")  # settings of a --core file that name files: relative to it
 
 
 def core_file(path: Path) -> dict:

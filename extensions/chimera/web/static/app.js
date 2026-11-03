@@ -50,7 +50,7 @@
     places: null, links: {}, arrival: new Map(),  // the mini map and where interfaces are; edits to an invitation
     crew: new Set(),  // who comes along on the next new task (nobody picked: the usual roles)
     sent: new Map(),  // what was sent and not acknowledged yet (to give it back if the Classroom refuses it)
-    tab: store.get("workbench.tab", "changes"), diff: null, expanded: new Set(), settings: {},
+    tab: store.get("classroom.tab", "changes"), diff: null, expanded: new Set(), settings: {},
   };
   const timeline = $("#timeline");
   const input = $("#input");
@@ -2069,7 +2069,7 @@
   // ---- inspector ----------------------------------------------------------------------------------
   function showChanges(path) {
     state.tab = "changes";
-    store.set("workbench.tab", "changes");
+    store.set("classroom.tab", "changes");
     setPanel("inspector", true);
     renderInspector(path);
   }
@@ -2422,18 +2422,18 @@
     if (name === "inspector" && open) renderInspector();
   }
   function closeNarrow() { if (narrow()) { setPanel("sidebar", false); setPanel("inspector", false); } }
-  setPanel("sidebar", narrow() ? false : store.get("workbench.sidebar", "open") === "open", false);
-  setPanel("inspector", narrow() ? false : store.get("workbench.inspector", "closed") === "open", false);
+  setPanel("sidebar", narrow() ? false : store.get("classroom.sidebar", "open") === "open", false);
+  setPanel("inspector", narrow() ? false : store.get("classroom.inspector", "closed") === "open", false);
   $("#toggle-sidebar").onclick = () => setPanel("sidebar", !isOpen("sidebar"));
   $("#close-sidebar").onclick = () => setPanel("sidebar", false);
   $("#toggle-inspector").onclick = () => setPanel("inspector", !isOpen("inspector"));
   $("#close-inspector").onclick = () => setPanel("inspector", false);
   $("#scrim").onclick = closeNarrow;
   for (const tab of document.querySelectorAll(".tab")) {
-    tab.onclick = () => { state.tab = tab.dataset.tab; store.set("workbench.tab", state.tab); renderInspector(); };
+    tab.onclick = () => { state.tab = tab.dataset.tab; store.set("classroom.tab", state.tab); renderInspector(); };
   }
   const resizer = $("#resize-inspector");
-  const savedWidth = Number(store.get("workbench.inspector.width"));
+  const savedWidth = Number(store.get("classroom.inspector.width"));
   if (savedWidth) document.documentElement.style.setProperty("--inspector-w", `${savedWidth}px`);
   resizer.addEventListener("pointerdown", (event) => {
     event.preventDefault();
@@ -2442,13 +2442,13 @@
     const move = (moved) => {
       const width = Math.round(Math.max(320, Math.min(window.innerWidth - 420, window.innerWidth - moved.clientX)));
       document.documentElement.style.setProperty("--inspector-w", `${width}px`);
-      store.set("workbench.inspector.width", String(width));
+      store.set("classroom.inspector.width", String(width));
     };
     const up = () => { document.body.classList.remove("is-resizing"); resizer.removeEventListener("pointermove", move); };
     resizer.addEventListener("pointermove", move);
     resizer.addEventListener("pointerup", up, { once: true });
   });
-  resizer.addEventListener("dblclick", () => { document.documentElement.style.removeProperty("--inspector-w"); store.set("workbench.inspector.width", ""); });
+  resizer.addEventListener("dblclick", () => { document.documentElement.style.removeProperty("--inspector-w"); store.set("classroom.inspector.width", ""); });
 
   // ---- input --------------------------------------------------------------------------------------
   $("#composer").onsubmit = (event) => { event.preventDefault(); submit(); };

@@ -1,5 +1,5 @@
 """Chimera: the students work on your code together, the way HydraFusion does, with the classmates in view. It is
-the heavy-work harness (MomoChat is the conversation one); it was the workbench until 2026-10-27.
+the heavy-work harness (MomoChat is the conversation one).
 
 Each task is routed to the simplest workflow likely to be enough (one model, a cheap draft with a quality gate, or
 a draft reviewed by another model family and revised once), worked in its own git worktree, tested, and shown to you
@@ -57,25 +57,22 @@ def assemble(context) -> tuple[Contributions, dict]:
     # (the Classroom on its own keeps data/chimera). Absolute: git commands run from inside each project.
     data_dir = Path(config.get("data_dir") or context.data_dir).expanduser().resolve()
     demo = config.get("demo") is True
-    # The board keeps its file name from when this was the workbench, so the labs and data folders made then open.
-    board = Board(data_dir / "workbench.db")
+    board = Board(data_dir / "board.db")
     name = str(config["interface"])
-    if name != "workbench":  # its tasks' conversations were `workbench:<task>` before the page was the classroom
-        board.readdress("workbench", name)
     registry = Registry(config, board, data_dir)
     trees = Worktrees(data_dir / "worktrees")
     # The students (the agents of the students module, loaded before this one), and the seats `team:` adds.
-    team = build_team(config, context.personas() if callable(getattr(context, "personas", None)) else ())
+    team = build_team(config, context.personas())
     used = sorted({candidate["provider"] for seat in team.seats.values() for candidate in (*seat.cheap, *seat.strong)})
     if demo:  # the scripted club: each provider's models answered by the demo, families kept for the reviews
         config["families"] = {**{f"demo_{name}": family_of(name) for name in used}, **dict(config.get("families") or {})}
     team.ready = {key: bool(value) for key, value in dict(board.get("ready") or {}).items()}  # as last seen
     # Each student's record (sessions landed and discarded, her level) and benchmark runs, as facts for the pages.
-    records = Records(board, team, getattr(context, "facts", None))  # (no facts when loaded without a core)
+    records = Records(board, team, context.facts)
     records.publish()
     board.subscribe(records.listen)
     chimera = Chimera(board, registry, trees, config, team)
-    prices = getattr(context, "prices", None)  # the core's price list (core.yml `prices:`)
+    prices = context.prices  # the core's price list (core.yml `prices:`)
     interfaces = []
     page = None
     if config.get("api", True) is not False:  # the Classroom's interface: its API, and the page unless `web: false`

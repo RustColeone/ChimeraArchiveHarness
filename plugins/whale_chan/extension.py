@@ -12,7 +12,7 @@ where `/voice on` asks it to, and her own first messages), her voice (`whale_cha
 defaults for its own conversations (`whale_chan:*` is MomoChat with the DeepSeek student, one thread until `/new`; in
 servers it answers mentions and replies; every write and critical action asks
 the owner first, with no exceptions, in case she misread a request or a page tried to trick her). core.yml settings
-win over all of these. Until 2026-10-27 it also had an engine of its own, `chat`: that is MomoChat's former name.
+win over all of these.
 """
 
 from __future__ import annotations
@@ -39,16 +39,6 @@ async def check_token(token: str) -> str:
     except aiohttp.ClientError as error:
         raise ValueError(f"Could not reach Discord: {type(error).__name__}")
 
-# She is the DeepSeek student (2026-10-27): her prompt, name and models are the students module's
-# (extensions/students/deepseek/), and her memory and mood the companion's, as every student's. These settings of hers
-# are read there now.
-MOVED = {"prompt": "extensions/students/deepseek/ (whale.md, prompt.md)",
-         "models": "extensions/students/deepseek/student.yml (models)",
-         "display_name": "extensions/students/deepseek/student.yml (display_name, aliases)",
-         "call_owner": "extensions/students/deepseek/student.yml (memory: call_owner, 主人 already)",
-         "memory": "extensions/students/deepseek/student.yml (memory: language zh, memory_language Chinese already)",
-         "mood": "extensions/students/config.yml (mood)",
-         "diary": "nowhere: a student's memory is the students module's"}
 # How MomoChat runs her chats: a chat app's, short and casual, at the effort in her student.yml (none: she answers at
 # once); `style: full` and `effort: high` in her settings make this a chat client, thorough and slow. Her settings of
 # these names (style, max_steps, ...) win, and the assignment's own `options` over them.
@@ -73,9 +63,6 @@ def setup(context) -> Contributions:
     config = context.config
     name = str(config.get("interface", "whale_chan"))
     persona = str(config.get("persona", "deepseek"))  # the student her bot speaks as
-    moved = {key: where for key, where in MOVED.items() if key in config}
-    if moved:
-        context.log("settings_moved", keys=sorted(moved), to=sorted(set(moved.values())))
     speech = {"folder": str(context.data_dir), **dict(config.get("voice") or {})}  # (`folder`: where her clip is)
     speaking = speech.get("enabled", True) is not False
     capabilities = [voice.capability(speech)] if speaking else []

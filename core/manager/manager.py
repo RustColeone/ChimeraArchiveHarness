@@ -1265,7 +1265,8 @@ class Manager:
         return None
 
     def _used_private(self, run_id: str) -> bool:
-        return any(getattr(self.capabilities.get(name), "private", False) for name in self.tank.action_names(run_id))
+        return any(name in self.capabilities and self.capabilities[name].private
+                   for name in self.tank.action_names(run_id))
 
     def _expire(self, approval: Mapping[str, Any], by: str) -> None:
         self.tank.decide_approval(approval["id"], "expired", by)
@@ -1275,9 +1276,7 @@ class Manager:
         """A run that used private data speaks only in its own conversation or to the control route."""
         if not self._used_private(record.id):
             return None
-        resolve = getattr(self.gateway, "target", None)
-        target = resolve(reply) if resolve is not None else reply.address
-        return None if target in (reply.address, self.control) else "private_route"
+        return None if self.gateway.target(reply) in (reply.address, self.control) else "private_route"
 
     async def _run_output(self, record: RunRecord, reply: Reply) -> Delivery:
         reason = self._closed(record) or self._private_route(record, reply)
@@ -1719,7 +1718,7 @@ class Manager:
             return self.help_text("admin", request)
         open_runs = self.tank.runs(("running", "waiting_input", "waiting_approval"), limit=200)
         pending = self.tank.approvals("pending")
-        ready = self.gateway.ready() if self.gateway is not None and hasattr(self.gateway, "ready") else {}
+        ready = self.gateway.ready()
         lines = [f"Role: {role}" + (" (view off)" if self.settings.get("view_off:" + me) else ""),
                  "Lock: " + ("🔒 on" if self.locked else "off"),
                  "Interfaces: " + (", ".join(f"{name} {'✅' if state[0] else '⚠️ ' + state[1]}"

@@ -36,9 +36,7 @@ from .workspace import system
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-# The Classroom's folder (data/workbench when only that one exists: its folder before it was Chimera's).
-DATA = ROOT / "data" / ("workbench" if (ROOT / "data" / "workbench").is_dir() and not (ROOT / "data" / "chimera").exists()
-                        else "chimera")
+DATA = ROOT / "data" / "chimera"  # the Classroom's folder
 SETTINGS = DATA / "cli.json"  # what `club install` recorded: the Classroom's address and how to start it
 LAB = "http://127.0.0.1:4157"
 REST = {"review", "approved", "answered", "failed", "landed", "discarded", "cancelled"}

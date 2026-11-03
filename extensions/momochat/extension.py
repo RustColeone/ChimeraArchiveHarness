@@ -1,10 +1,5 @@
 """MomoChat: the conversation harness. The general assistant: conversations, direct chats and group chats, tools and
-commands; the students' companion experience (each student has her memory wherever she speaks), and a plain
-assistant for an agent. Chimera is the heavy-work one.
-
-It was the assistant, the room and Whale-chan's chat engine until 2026-10-27: those engine names are its former
-names (an assignment naming one reaches it), and so are the assistant's and the room's module names (their settings
-and stores are its own).
+commands; the students, each with her memory wherever she speaks, and a plain assistant for an agent. Chimera is the heavy-work one.
 """
 
 from __future__ import annotations
@@ -15,9 +10,6 @@ from .engine import MomoChatEngine, Settings
 
 
 def setup(context) -> Contributions:
-    moved = [key for key in ("providers", "profiles", "diary") if key in context.config]
-    if moved:  # the room's characters' models are the students'; nothing of people is kept here (2026-10-27)
-        context.log("settings_moved", keys=moved, to="extensions/students/config.yml")
     return Contributions(engines=[MomoChatEngine(Settings(context.config))])
 
 

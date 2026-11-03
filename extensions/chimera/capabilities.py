@@ -448,19 +448,13 @@ class Chimera:
                              data={"task": task_id, "link": link, "project": project, "crew": crew})
 
     def _has_key(self, seat, context) -> bool:
-        """Whether the seat's models can answer: asked of the core (Models.ready), else what the last run saw."""
-        asking = getattr(getattr(context, "models", None), "ready", None)
-        if callable(asking):
-            return bool(asking(seat.profile("cheap")))
-        return self.team.ready.get(seat.persona) is not False
+        """Whether the seat's models can answer: asked of the core (Models.ready)."""
+        return bool(context.models.ready(seat.profile("cheap")))
 
     def _excerpt(self, context) -> list[dict]:
         """The latest part of the calling conversation (commands left out): what moves to the Classroom."""
-        history = getattr(context, "history", None)
-        if history is None:
-            return []
         limit = max(2, min(int(self.settings.get("bring_messages", 16)), 60))
-        items = [item for item in history.recent(limit + 10)
+        items = [item for item in context.history.recent(limit + 10)
                  if not (item.direction == "in" and item.text.strip()[:1] == "$")][-limit:]
         return [{"who": item.sender_name or ("you" if item.direction == "in" else "the club"), "text": item.text[:2000],
                  "at": item.at, "mine": item.direction == "in"} for item in items]

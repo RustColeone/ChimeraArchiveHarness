@@ -190,15 +190,15 @@ class Context:
                 raise
         return {"text": result.text, "data": result.data, "provider": result.provider, "model": result.model,
                 "input_tokens": result.input_tokens, "output_tokens": result.output_tokens,
-                "cached_input_tokens": getattr(result, "cached_input_tokens", 0),
+                "cached_input_tokens": result.cached_input_tokens,
                 "tool_calls": [{"id": call.id, "name": call.name, "arguments": dict(call.arguments)}
-                               for call in getattr(result, "tool_calls", ())],
-                "replay": dict(result.replay) if getattr(result, "replay", None) else None,
+                               for call in result.tool_calls],
+                "replay": dict(result.replay) if result.replay else None,
                 "seconds": round(result.duration_s or time.monotonic() - started, 3),
                 "fallbacks": list(result.fallbacks),
                 # priced by the core, cache hits at their price
-                "price": dict(result.price) if getattr(result, "price", None) else None,
-                "cost": getattr(result, "cost", None)}
+                "price": dict(result.price) if result.price else None,
+                "cost": result.cost}
 
     def _call_row(self, answer: dict, seat: Seat, tier: str, role: str, effort: str) -> dict:
         return {"seat": seat.persona, "role": role, "tier": seat.tier_of(tier), "effort": effort, "provider": answer["provider"],
@@ -250,12 +250,8 @@ class Context:
         return self.team.candidates(role, self.present, prefer={seat.persona for seat in self.crew()})
 
     def able(self, seat: Seat) -> bool:
-        """Whether `seat` can be expected to answer: asked of the models where they can tell (on its own), else
-        whether she was found without a key lately."""
-        ready = getattr(self.session.models, "ready", None)
-        if callable(ready):
-            return bool(ready(seat.profile("cheap")))
-        return not self.team.known_unavailable(seat.persona)
+        """Whether `seat` can be expected to answer: asked of the models."""
+        return bool(self.session.models.ready(seat.profile("cheap")))
 
     def family(self, provider: str) -> str:
         return family_of(provider, self.settings.get("families"))

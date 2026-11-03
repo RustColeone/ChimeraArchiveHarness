@@ -135,8 +135,7 @@ class WhaleChanBot(Interface):
 
     def _standing(self, user: str) -> dict:
         """What modules publish about her and this person: the companion's plans and mood."""
-        facts = getattr(self.port, "facts", None) if self.port is not None else None
-        return dict(facts(self.persona, str(user))) if callable(facts) else {}
+        return dict(self.port.facts(self.persona, str(user)))
 
     async def start(self, port) -> None:
         self.port = port

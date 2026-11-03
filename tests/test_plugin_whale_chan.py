@@ -175,14 +175,12 @@ class NativeChatTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_she_asks_by_a_call_and_keeps_no_diary(self):
         chat = await self.start([calls("", ("ask", {"question": "哪个城市？"})), calls("杭州今天晴。")],
-                                plugin={**QUIET, "diary": True})
+                                plugin=QUIET)
         for text in ("天气怎么样？", "杭州"):
             await chat.say(text)
             await settle(self.core)
         self.assertEqual(self.texts(chat), ["哪个城市？", "杭州今天晴。"])
         self.assertNotIn("remember", [tool.name for tool in self.adapter.calls[0]["tools"]])  # her memory is hers
-        moved = [event for event in self.core.audit.events if event.get("detail") == "settings_moved"]
-        self.assertEqual(moved[0]["keys"], ["diary"])
 
     async def test_her_last_step_and_a_speak_up_are_json(self):
         from contracts import Address, Request, Sender
@@ -232,19 +230,6 @@ class WhaleChanSetupTests(unittest.TestCase):
         from core.loader import import_extension
         extension, _ = import_extension(PLUGIN)
         self.assertEqual(extension.requires, ("students", "momochat"))  # her bot is a student's, on MomoChat
-
-    def test_her_old_persona_settings_are_reported_as_moved(self):
-        logged = []
-        from core.loader import import_extension
-        extension, _ = import_extension(PLUGIN)
-        context = SimpleNamespace(config={"display_name": "大肥鱼", "prompt": "…", "models": [], "call_owner": "主人"},
-                                  data_dir=Path(tempfile.mkdtemp()), log=lambda event, **fields: logged.append(
-                                      (event, fields)))
-        with patch.dict(os.environ, {"DISCORD_BOT_TOKEN_WHALE_CHAN": ""}):
-            extension.setup(context)
-        moved = dict(logged)["settings_moved"]
-        self.assertEqual(moved["keys"], ["call_owner", "display_name", "models", "prompt"])
-        self.assertIn("extensions/students/deepseek/student.yml (display_name, aliases)", moved["to"])
 
     def test_the_token_comes_from_the_environment_or_the_local_config(self):
         from_env = self.setup_with({}, {"DISCORD_BOT_TOKEN_WHALE_CHAN": "secret"})
@@ -461,13 +446,6 @@ class CompanionTests(ChatEngineTests):
                       "\n".join(m["content"] for m in later))
         self.assertNotIn("You decided on your own", later[-1]["content"])
         self.assertNotIn("Available tools:\n(none)", later[0]["content"])
-
-    async def test_her_old_memory_settings_are_reported_as_moved(self):
-        await self.start([step("ok")], plugin={**QUIET, "memory": {"lang": "zh", "language": "Chinese"},
-                                               "mood": {"luna": True}})
-        moved = [event for event in self.core.audit.events if event.get("detail") == "settings_moved"]
-        self.assertEqual(moved[0]["keys"], ["memory", "mood"])
-        self.assertIn("extensions/students/config.yml (mood)", moved[0]["to"])
 
 
 class VoiceTests(unittest.IsolatedAsyncioTestCase):

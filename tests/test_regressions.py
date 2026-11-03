@@ -795,7 +795,7 @@ class CoreRegressions(unittest.TestCase):
         # Was: only the first and last segments counted, so "Luna, Gemini, what do you think?" left Gemini out (the
         # room's rule then; MomoChat's group chats now).
         from extensions.momochat.group import participants
-        person = lambda name, shown: SimpleNamespace(name=name, display_name=shown)
+        person = lambda name, shown: SimpleNamespace(name=name, display_name=shown, aliases=())
         personas = [person("luna", "Luna"), person("gemini", "Gemini"), person("lulu", "露娜")]
         for text in ("Luna, Gemini, what do you think?", "Luna, check v1.2. Gemini, check v1.3.",
                      "Ok Luna, so Gemini, what?", "Luna.\n\nGemini, thoughts?", "露娜，Gemini，帮我看看"):

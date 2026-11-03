@@ -192,15 +192,12 @@ class WebUI(Interface):
 
     def standing(self) -> list[dict]:
         """The roster with where each student stands with you (STANDING facts; None when nothing is published)."""
-        facts = getattr(self.port, "facts", None) if self.port is not None else None
-        stamina = getattr(self.port, "stamina", None) if self.port is not None else None
         found = []
         for item in self.roster:
-            values = facts(item["name"], self.user_id) if callable(facts) else {}
+            values = self.port.facts(item["name"], self.user_id)
             found.append({**item, **{kind: next((value for key, value in values.items()
                                                  if key.rsplit(".", 1)[-1] == kind), None) for kind in STANDING},
-                          # what she spent today and her account, None from a core before it
-                          "stamina": stamina(item["name"]) if callable(stamina) else None,
+                          "stamina": self.port.stamina(item["name"]),  # what she spent today and her account
                           # her mood faces that are drawn (mood-happy, ...), for her face as she feels now
                           "faces": sorted(kind for kind in self._pictures_of(item["name"]) if kind.startswith("mood-"))})
         return found
@@ -208,12 +205,10 @@ class WebUI(Interface):
     def people(self) -> list[dict]:
         """Who each student is, for the page's cards: her one-line description, her own and strong models, and whether
         her own company's key is set (without it she answers on a classmate's model, her fallback)."""
-        ready = getattr(self.port, "models_ready", None) if self.port is not None else None
-        facts = getattr(self.port, "facts", None) if self.port is not None else None
         found = []
         for name in self.personas:
             view = self.views.get(name, {})
-            values = facts(name) if callable(facts) else {}
+            values = self.port.facts(name)
             record = next((value for key, value in values.items() if key.rsplit(".", 1)[-1] == "record"), None)
             models = view.get("models") or {}
             listed = lambda tier: [f"{item.get('provider')}/{item.get('model')}" for item in models.get(tier) or ()
@@ -223,7 +218,7 @@ class WebUI(Interface):
             found.append({"name": name, "description": str(view.get("description") or ""),
                           # (a student without a strong tier falls back to her own: then she has no strong models)
                           "own": listed("own") or listed("default")[:1], "strong": listed("strong") if "strong" in tiers else [],
-                          "own_ready": bool(ready(own)) if own and callable(ready) else self.ready.get(name, True),
+                          "own_ready": bool(self.port.models_ready(own)) if own else self.ready.get(name, True),
                           "level": record.get("level") if isinstance(record, dict) else None,
                           "stage": record.get("stage") if isinstance(record, dict) else None})
         return found
@@ -247,17 +242,15 @@ class WebUI(Interface):
             await asyncio.sleep(self.places_poll_s)
 
     def stamina_total(self):
-        """Everyone's spending today against the day's total, None from a core before it."""
-        asking = getattr(self.port, "stamina", None) if self.port is not None else None
-        return asking() if callable(asking) else None
+        """Everyone's spending today against the day's total."""
+        return self.port.stamina()
 
     # ---- lifecycle -------------------------------------------------------------------------------
     async def start(self, port) -> None:
         self.port = port
         self.store = Store(self.data_dir / "webui.db")
         self.store.ensure(DEFAULT_CONVERSATION, DEFAULT_TITLE)
-        views = {view["name"]: view for view in port.personas()} if callable(getattr(port, "personas", None)) else {}
-        self._meet(views)
+        self._meet({view["name"]: view for view in port.personas()})
         # Whoever opens the page is the creator; approvals they start come back to the page. With no other
         # interface offering one, the classroom also becomes the control route.
         port.set_owners([self.user_id], control=Address(self.name, DEFAULT_CONVERSATION), fallback=True)
@@ -293,9 +286,8 @@ class WebUI(Interface):
               + (" (passphrase required)." if self.passphrase else "."), flush=True)
         port.log("listening", address=self.address_shown, passphrase=bool(self.passphrase))
         self._spawn(self._tidy(delay=TIDY_AFTER_START_S))
-        if views:
-            self._spawn(self._watch_standing())
-        if self.map and callable(getattr(port, "publish", None)):  # a core before 1.7 has no directory: no map
+        self._spawn(self._watch_standing())
+        if self.map:
             port.publish(link=self.address_shown, status=self.place())
             self._spawn(self._watch_places())
 
@@ -563,12 +555,11 @@ class WebUI(Interface):
     def cafe(self) -> dict:
         """Who is in the cafe (every student: she is anywhere at once), whether she can answer yet (her model profile
         is named after her, as the room's are), the rooms, and the places for the places bar."""
-        ready = getattr(self.port, "models_ready", None) if self.port is not None else None
         people = {item["name"]: item for item in self.people()}
-        chats = self.store.conversations() if self.store is not None else []
+        chats = self.store.conversations()
         students = [{**item, "avatar": avatar_key(item["name"]),
-                     "ready": self.ready[item["name"]] if item["name"] in self.ready else
-                     bool(ready(item["name"])) if callable(ready) else True,
+                     "ready": self.ready[item["name"]] if item["name"] in self.ready
+                     else bool(self.port.models_ready(item["name"])),
                      "own_ready": people.get(item["name"], {}).get("own_ready", True),
                      "description": people.get(item["name"], {}).get("description", ""),
                      "pictures": sorted(self._pictures_of(item["name"])),  # her chibi walks the cafe when she has one
@@ -583,9 +574,8 @@ class WebUI(Interface):
 
     def you_name(self) -> str:
         """What the students call you, when you asked it of all of them (`$callme`), else your name here."""
-        facts = getattr(self.port, "facts", None) if self.port is not None else None
-        for item in self.roster if callable(facts) else ():
-            called = self._fact(facts(item["name"], self.user_id), "called") or {}
+        for item in self.roster:
+            called = self._fact(self.port.facts(item["name"], self.user_id), "called") or {}
             if called.get("everyone"):
                 return str(called["everyone"])
         return self.user_name
@@ -594,11 +584,10 @@ class WebUI(Interface):
         """You, for your page: the name every student calls you, what each one calls you and why (the students
         module's facts: what you asked of her, of everyone, or her `call_owner` setting), who you are to her, the
         accounts the students know as you, and your account here."""
-        facts = getattr(self.port, "facts", None) if self.port is not None else None
         account = f"{self.name}:{self.user_id}"
         students, everyone, accounts = [], None, None
         for item in self.roster:
-            values = facts(item["name"], self.user_id) if callable(facts) else {}
+            values = self.port.facts(item["name"], self.user_id)
             called, bond = self._fact(values, "called") or {}, self._fact(values, "bond") or {}
             everyone = everyone or called.get("everyone")
             accounts = accounts or self._fact(values, "accounts")
@@ -629,7 +618,7 @@ class WebUI(Interface):
             raise web.HTTPBadRequest()
         text = f"$callme {persona} {name}" if persona else f"$callme {name}"
         answer = await self._quietly(DEFAULT_CONVERSATION, text, "callme")
-        if answer.get("ok") and self.map and callable(getattr(self.port, "publish", None)):
+        if answer.get("ok") and self.map:
             self.port.publish(link=self.address_shown, status=self.place())  # your tab, on every page
         return web.json_response({"ok": bool(answer.get("ok")), "text": answer.get("text") or "", "you": self.you()})
 
@@ -644,12 +633,11 @@ class WebUI(Interface):
         """Every student for the Students page: who she is and where she stands with you (as the cafe has it), her
         models, her work (her record and benchmark runs, from any module's facts), which pictures she has, and the
         files in her folder."""
-        facts = getattr(self.port, "facts", None) if self.port is not None else None
         people = {item["name"]: item for item in self.people()}
         found = []
         for item in self.cafe()["students"]:
             name = item["name"]
-            values = facts(name, self.user_id) if callable(facts) else {}
+            values = self.port.facts(name, self.user_id)
             work = {kind: next((value for key, value in values.items() if key.rsplit(".", 1)[-1] == kind), None)
                     for kind in WORK}
             pictures = self._pictures_of(name)
@@ -798,8 +786,7 @@ class WebUI(Interface):
                 "conversations": self.store.conversations(), "progress": list(self._progress.values()),
                 "default": DEFAULT_CONVERSATION, "max_upload_mb": self.display.max_upload_mb, "here": self.here(),
                 "momochat": self.momochat,
-                "places": self._places() if self.map and self.port is not None and
-                callable(getattr(self.port, "directory", None)) else None}
+                "places": self._places() if self.map else None}
 
     async def _socket(self, request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse(heartbeat=30, max_msg_size=1 << 20)
@@ -969,7 +956,6 @@ class WebUI(Interface):
         if chat is None:
             return
         address = Address(self.name, conversation)
-        self._adopt(chat)
         await self.port.cancel(address, "chat deleted in the web UI")
         kept = {(self.data_dir / "files").resolve(), (self.data_dir / "uploads").resolve()}
         for path in self.store.delete(conversation):
@@ -999,13 +985,6 @@ class WebUI(Interface):
         if not asking and (self.port.policy(address).get("assignment") or {}).get("pattern") != str(address):
             self.store.unmark_assigned(conversation)
             self.port.log("chat_unassigned")
-
-    def _adopt(self, chat: dict) -> None:
-        """Record a picker chat's own assignment that predates the `assigned` record (an older version made it):
-        only the picker gives a chat personas, so an assignment for exactly that chat is this page's."""
-        address = Address(self.name, chat["id"])
-        if chat.get("personas") and (self.port.policy(address).get("assignment") or {}).get("pattern") == str(address):
-            self.store.mark_assigned(chat["id"])
 
     async def _repair(self, conversation: str, personas: list[str]) -> str:
         """Give a chat its classmates again if the core's assignment no longer matches (a setup cut off by a
@@ -1043,7 +1022,6 @@ class WebUI(Interface):
                 continue
             personas = picked.get(conversation)
             if personas:
-                self._adopt(self.store.conversation(conversation))
                 await self._repair(conversation, personas)
 
     async def _send(self, ws: web.WebSocketResponse, conversation: str, event: dict) -> None:

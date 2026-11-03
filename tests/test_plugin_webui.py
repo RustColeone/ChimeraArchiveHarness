@@ -462,17 +462,9 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(response.status, 404, path)
         await ws.close()
 
-    async def test_the_students_names_come_from_the_core_and_a_former_name_is_hers(self):
-        from plugins.webui.store import Store as WebStore
-        old = WebStore(self.tmp / "data" / "extensions" / "webui" / "webui.db")  # a page from before GPT was GPT
-        old.ensure("dm-luna", "Luna", ["luna"])
-        old.add("dm-luna", {"kind": "text", "text": "Hi.", "speaker": "Luna", "at": 1.0})
-        old.add("dm-luna", {"kind": "text", "text": "Hey.", "speaker": "Claude", "at": 2.0})
-        old.close()
-        web = await self.start({"personas": ["luna", "claude"]})
+    async def test_the_students_names_come_from_the_core(self):
+        web = await self.start({"personas": ["gpt", "claude"]})
         self.assertEqual((web.personas, web.classmates), (["gpt", "claude"], ["GPT", "Claude"]))
-        self.assertEqual(web.store.conversation("dm-luna")["personas"], ["gpt"])
-        self.assertEqual([item["speaker"] for item in web.store.messages("dm-luna")], ["GPT", "Claude"])
         await self.core.stop()
         self.core = None
         web = await self.start({"personas": ["gpt"], "classmates": ["Lulu"]})  # names of the page's own win
@@ -888,20 +880,6 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
         await a.close()
         await b.close()
 
-    async def test_deleting_a_chat_from_before_the_record_still_removes_its_assignment(self):
-        await self.start_room()
-        self.core.manager.set_assignment("webui:dm-old", {"engine": "momochat", "personas": ["gpt"]})  # (its old name)
-        self.web.store.ensure("dm-old", "GPT", ["gpt"])  # made by an older version: not in `assigned`
-        ws, _ = await self.socket()
-        await ws.send_json({"type": "delete", "conversation": "dm-old"})
-        await self.until(ws, lambda e: e["type"] == "deleted")
-        for _ in range(60):
-            if self.assignment("dm-old")["pattern"] == "webui:*":
-                break
-            await asyncio.sleep(0.05)
-        self.assertEqual((self.assignment("dm-old")["pattern"], self.web.store.assigned()), ("webui:*", []))
-        await ws.close()
-
     async def test_without_momochat_the_page_opens_greyed_and_says_so(self):
         paths = [path for path in make_config(self.tmp).raw["modules"]["paths"] if not path.endswith("momochat")]
         self.core = await start_core(self.tmp, {
@@ -922,7 +900,7 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
 
         class Context:
             name, data_dir = "webui", self.tmp
-            config = {"port": 0}
+            config, present = {"port": 0}, frozenset({"momochat", "students"})
 
             @staticmethod
             def log(*args, **kwargs):

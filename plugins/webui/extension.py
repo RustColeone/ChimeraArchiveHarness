@@ -42,9 +42,7 @@ def setup(context) -> Contributions:
                   "budget": {"model_calls": 40, "tool_calls": 24, "seconds": 900},
                   **custom, "options": {**OPTIONS, **dict(custom.get("options") or {})}}
     # Its chats need MomoChat and the students; without either the page still opens, greyed, and says so.
-    # (`present` is None when set up outside a core.)
-    present = getattr(context, "present", None)
-    usable = present is None or {"momochat", "students"} <= set(present)
+    usable = {"momochat", "students"} <= set(context.present)
     interface.momochat = usable
     return Contributions(interfaces=[interface], assignments={f"{name}:*": assignment} if usable else {},
                          admission={f"{name}:*": {"enabled": True, "require_mention_in_groups": False}})

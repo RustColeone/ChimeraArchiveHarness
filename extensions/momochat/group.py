@@ -20,7 +20,7 @@ CALL_END = re.compile(r"[,，:：!！?？。.;；\n]")
 
 def patterns(persona, aliases: dict[str, list[str]]) -> list[re.Pattern]:
     """Her names, the other names she is called by (Persona.aliases: "Luna" for GPT) and the engine's own."""
-    names = {persona.name, persona.display_name, *getattr(persona, "aliases", ()), *aliases.get(persona.name, [])}
+    names = {persona.name, persona.display_name, *persona.aliases, *aliases.get(persona.name, [])}
     return [re.compile(rf"(?<![A-Za-z]){re.escape(name)}(?![A-Za-z])", re.I) for name in names if name]
 
 
