@@ -10,8 +10,8 @@ import json
 import math
 import time
 
-from contracts import (Activity, Address, Context, Delivery, Display, Event, FileRef, HistoryItem, HistorySummary, ModelError,
-                       ModelRequest, ModelResult, PART_PLACES, PartContext, Persona, Request, Sender, ToolResult)
+from contracts import (Activity, Address, Context, Delivery, Display, Event, FileRef, HistoryItem, HistorySummary, ModelRequest,
+                        ModelResult, PART_PLACES, PartContext, Persona, Request, Sender, ToolResult)
 from core.manager.logbook import LogbookHandle
 from core.serialize import request_from_dict
 from core.storage.tank import RunRecord
@@ -26,9 +26,6 @@ class ModelsHandle:
 
     async def generate(self, request: ModelRequest) -> ModelResult:
         return await self._manager.generate(self._run_id, request, request.profile or self._default_profile)
-
-    def profiles(self) -> Sequence[str]:
-        return self._manager.providers.profiles()
 
     def ready(self, profile: str | None = None) -> bool:
         return self._manager.providers.profile_ready(profile or self._default_profile)
@@ -145,7 +142,6 @@ class SessionHandle:
         self._manager = manager
         self.run_id = record.id
         self.address = Address.parse(record.address)
-        self.origin = record.origin
         self.trigger: Request = request_from_dict(record.trigger)
         self.display: Display = self.trigger.display
         self.personas: tuple[Persona, ...] = tuple(manager.personas[name] for name in record.personas)
@@ -174,11 +170,7 @@ class SessionHandle:
 
     @property
     def logbook(self) -> LogbookHandle:
-        return LogbookHandle(self._manager, str(self.address), self._module, self.trigger.sender.id)
-
-    def prompt(self, persona: str, place: str = "stable") -> str:
-        match, context = self._part_context(persona, place)
-        return self._manager.render_prompt(match, place, context)
+        return LogbookHandle(self._manager, str(self.address))
 
     async def aprompt(self, persona: str, place: str = "stable", since: float = 0.0) -> str:
         match, context = self._part_context(persona, place, since)
@@ -232,7 +224,6 @@ class ToolContextHandle:
         self._manager = manager
         self.address: Address = trigger.address
         self.sender: Sender = trigger.sender
-        self.origin = record.origin
         self.run_id = record.id
         self.display: Display = trigger.display
         self.is_direct = trigger.is_direct
@@ -253,7 +244,6 @@ class ToolContextHandle:
         self.history = ReadingHistory(HistoryHandle(manager, self.address))
         self.persona = persona if persona in record.personas else \
             (record.personas[0] if not persona and len(record.personas) == 1 else "")
-        self.logbook = LogbookHandle(manager, str(self.address), extension, self.sender.id)
 
     async def progress(self, text: str) -> None:
         await self._manager.progress(self.run_id, text)
@@ -277,10 +267,6 @@ class ToolContextHandle:
         return self._manager.gateway.cancel_scheduled(self.address, scheduled_id)
 
 
-def model_error_result(error: ModelError) -> ToolResult:
-    return ToolResult.fail(str(error), error.kind)
-
-
 class WatcherModels(ModelsHandle):
     """A watcher's models: counted in the run's usage, not against its budget (the run may be over)."""
 
@@ -297,7 +283,6 @@ class WatchContextHandle:
         self.models = WatcherModels(manager, exchange.run_id, exchange.persona.profile)
         self.history = ReadingHistory(HistoryHandle(manager, exchange.address))
         self.facts = manager.facts.handle(module)
-        self.logbook = LogbookHandle(manager, str(exchange.address), module, exchange.trigger.sender.id)
 
     def store(self, *, conversation: bool = False, persona: bool = False, person: bool = False):
         exchange = self._exchange

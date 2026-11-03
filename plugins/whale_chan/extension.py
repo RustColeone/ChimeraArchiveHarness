@@ -51,14 +51,6 @@ def chat_options(config) -> dict:
     return {**OPTIONS, **{key: config[key] for key in (*OPTIONS, "effort", "tool_calls") if key in config}}
 
 
-def flag(value, default: bool = False) -> bool:
-    """An on/off setting as people write it (true/false, yes/no, on/off, 1/0); else the default."""
-    if isinstance(value, bool):
-        return value
-    text = str(value or "").strip().lower()
-    return True if text in ("true", "yes", "on", "1") else False if text in ("false", "no", "off", "0") else default
-
-
 def setup(context) -> Contributions:
     config = context.config
     name = str(config.get("interface", "whale_chan"))

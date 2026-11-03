@@ -46,7 +46,3 @@ class Guts:
         turn = self.turns.pop((exchange.persona.name, exchange.trigger.id), None)
         if turn is not None and await turn.learn(exchange.text) is None:
             context.log("gut_no_note", persona=exchange.persona.name)
-
-    def close(self) -> None:
-        for gut in self.opened.values():
-            gut.close()

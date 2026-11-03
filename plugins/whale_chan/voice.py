@@ -165,7 +165,7 @@ def capability(config: Mapping[str, Any], silenced=lambda address: False) -> Cap
         except Exception as error:
             Path(raw).unlink(missing_ok=True)
             return ToolResult.fail(f"Speaking failed ({voice.name}): {type(error).__name__}: {error}"[:500],
-                                   "speech_failed", retryable=True)
+                                   "speech_failed")
         ogg = path.suffix == ".ogg"  # Piper without ffmpeg gives WAV: an audio file, not a voice message
         file = FileRef(str(path), VOICE_NAME if ogg else "voice.wav", "audio/ogg" if ogg else "audio/wav",
                        path.stat().st_size)

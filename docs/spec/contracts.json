@@ -19,12 +19,6 @@
   "TIERS": [
    "own",
    "strong"
-  ],
-  "TIER_ORDER": [
-   "read",
-   "prepare",
-   "write",
-   "critical"
   ]
  },
  "enums": {
@@ -95,11 +89,6 @@
     },
     {
      "name": "since",
-     "type": "float",
-     "default": 0.0
-    },
-    {
-     "name": "started_at",
      "type": "float",
      "default": 0.0
     }
@@ -884,7 +873,7 @@
    ]
   },
   "Operation": {
-   "doc": "A platform-specific action (for example `login`, or playing music) run through the core. It becomes the capability `<interface>.<name>`; `command`, if set, also makes it available as `$<command> <text>` with the text passed as `command_argument`. Operations are owner-only unless `access=\"member\"`; a public operation must act only on the calling conversation (`context.address`), never on others. `risk` and the attributes (`private`, `subject`, `subject_kind`, `never_auto`, `grantable`, `confirm`) mean the same as on a Capability.",
+   "doc": "A platform-specific action (for example `login`, or playing music) run through the core. It becomes the capability `<interface>.<name>`; `command`, if set, also makes it available as `$<command> <text>` with the text passed as `command_argument`. Operations are the creator's unless `access` says otherwise; a public operation must act only on the calling conversation (`context.address`), never on others. `risk` and the attributes (`private`, `subject`, `subject_kind`, `never_auto`, `grantable`, `confirm`) mean the same as on a Capability.",
    "fields": [
     {
      "name": "name",
@@ -925,9 +914,9 @@
      "default": 120.0
     },
     {
-     "name": "owner_only",
-     "type": "bool",
-     "default": true
+     "name": "access",
+     "type": "\"member\" | \"admin\" | \"creator\"",
+     "default": "creator"
     },
     {
      "name": "private",
@@ -1374,11 +1363,6 @@
      "default": "()"
     },
     {
-     "name": "sources",
-     "type": "list[str]",
-     "default": "()"
-    },
-    {
      "name": "data",
      "type": "Mapping",
      "default": "{}"
@@ -1387,11 +1371,6 @@
      "name": "error_code",
      "type": "str | none",
      "default": null
-    },
-    {
-     "name": "retryable",
-     "type": "bool",
-     "default": false
     }
    ]
   },
@@ -1539,54 +1518,6 @@
    "doc": "Small public values a module publishes about a persona: her mood or level, or, with `person`, where she stands with one person (their bond, the name they call her). Interfaces read them with `InterfacePort.facts` to show them on a page; nothing else does, so a fact is never a module's private state. A module writes only its own keys (lowercase letters, digits and `_`); readers see them as `<module>.<key>`. `person` is `(interface, sender id)`, the person as one interface knows them (`Exchange.person`). A value is JSON, at most 4 KB once encoded; setting None deletes it. Facts last across restarts.",
    "attributes": [],
    "methods": [
-    {
-     "name": "delete",
-     "async": false,
-     "parameters": [
-      {
-       "name": "persona",
-       "type": "str",
-       "keyword_only": false
-      },
-      {
-       "name": "key",
-       "type": "str",
-       "keyword_only": false
-      },
-      {
-       "name": "person",
-       "type": "list[str] | none",
-       "keyword_only": true,
-       "default": null
-      }
-     ],
-     "returns": "none",
-     "doc": ""
-    },
-    {
-     "name": "get",
-     "async": false,
-     "parameters": [
-      {
-       "name": "persona",
-       "type": "str",
-       "keyword_only": false
-      },
-      {
-       "name": "key",
-       "type": "str",
-       "keyword_only": false
-      },
-      {
-       "name": "person",
-       "type": "list[str] | none",
-       "keyword_only": true,
-       "default": null
-      }
-     ],
-     "returns": "any",
-     "doc": ""
-    },
     {
      "name": "set",
      "async": false,
@@ -2019,7 +1950,7 @@
      "async": false,
      "parameters": [],
      "returns": "any",
-     "doc": "the core's model prices (contracts.Prices), to show them on a page."
+     "doc": "The core's model prices (contracts.stores.Prices), to show them on a page."
     },
     {
      "name": "publish",
@@ -2129,28 +2060,9 @@
    ]
   },
   "Logbook": {
-   "doc": "A conversation's log: what happened here, written by modules through the handles they already have, read by engines, and by people with `$log`. The core logs by itself every write and critical action that ran. A model never writes here directly, only through a capability a module offers. It is not the audit log, the core's own record for the owner, which models never read.",
+   "doc": "A conversation's log: what happened here, read by engines, and by people with `$log`. The core logs by itself every write and critical action that ran. It is not the audit log, the core's own record for the owner, which models never read.",
    "attributes": [],
    "methods": [
-    {
-     "name": "find",
-     "async": false,
-     "parameters": [
-      {
-       "name": "text",
-       "type": "str",
-       "keyword_only": false
-      },
-      {
-       "name": "limit",
-       "type": "int",
-       "keyword_only": false,
-       "default": 8
-      }
-     ],
-     "returns": "list[LogEntry]",
-     "doc": "The newest lines of this conversation holding words of `text`."
-    },
     {
      "name": "recent",
      "async": false,
@@ -2170,42 +2082,6 @@
      ],
      "returns": "list[LogEntry]",
      "doc": "The newest lines of this conversation, oldest of them first (`kind`: of that kind only)."
-    },
-    {
-     "name": "write",
-     "async": false,
-     "parameters": [
-      {
-       "name": "kind",
-       "type": "str",
-       "keyword_only": false
-      },
-      {
-       "name": "text",
-       "type": "str",
-       "keyword_only": false
-      },
-      {
-       "name": "person",
-       "type": "bool",
-       "keyword_only": true,
-       "default": false
-      },
-      {
-       "name": "persona",
-       "type": "str",
-       "keyword_only": true,
-       "default": ""
-      },
-      {
-       "name": "data",
-       "type": "Mapping | none",
-       "keyword_only": true,
-       "default": null
-      }
-     ],
-     "returns": "LogEntry",
-     "doc": "Add one line (`person`: about the person this run or call is for). Raises ValueError for an empty text or a kind that is not one short word."
     }
    ]
   },
@@ -2282,13 +2158,6 @@
      "doc": ""
     },
     {
-     "name": "profiles",
-     "async": false,
-     "parameters": [],
-     "returns": "Sequence",
-     "doc": ""
-    },
-    {
      "name": "ready",
      "async": false,
      "parameters": [
@@ -2304,80 +2173,6 @@
     }
    ]
   },
-  "Prices": {
-   "doc": "Model prices, as the core keeps them: a list fetched once a day (Artificial Analysis's, with a key) under the owner's own figures (core.yml `prices:`). Every ModelResult already carries its price and cost; this is for pages and engines that show prices or estimate before a call.",
-   "attributes": [],
-   "methods": [
-    {
-     "name": "cost",
-     "async": false,
-     "parameters": [
-      {
-       "name": "price",
-       "type": "Mapping | none",
-       "keyword_only": false
-      },
-      {
-       "name": "input_tokens",
-       "type": "int",
-       "keyword_only": false
-      },
-      {
-       "name": "output_tokens",
-       "type": "int",
-       "keyword_only": false
-      },
-      {
-       "name": "cached_input_tokens",
-       "type": "int",
-       "keyword_only": false,
-       "default": 0
-      }
-     ],
-     "returns": "float | none",
-     "doc": ""
-    },
-    {
-     "name": "price",
-     "async": false,
-     "parameters": [
-      {
-       "name": "provider",
-       "type": "str",
-       "keyword_only": false
-      },
-      {
-       "name": "model",
-       "type": "str",
-       "keyword_only": false
-      }
-     ],
-     "returns": "Mapping | none",
-     "doc": "Dollars per million input and output tokens (and cache hits, when listed), with where the figure came from; None when unknown (never a guess)."
-    },
-    {
-     "name": "refresh_if_stale",
-     "async": true,
-     "parameters": [],
-     "returns": "str",
-     "doc": ""
-    },
-    {
-     "name": "status",
-     "async": false,
-     "parameters": [
-      {
-       "name": "models",
-       "type": "Iterable",
-       "keyword_only": false,
-       "default": "()"
-      }
-     ],
-     "returns": "Mapping",
-     "doc": "Where prices come from (with the attribution their source asks for), how old the list is, and the price of each of `models` (`{provider, model, ...}` rows, given back with `price` and, when unknown, `candidates`)."
-    }
-   ]
-  },
   "Session": {
    "doc": "Everything an engine may use for one run. All access goes through these handles.",
    "attributes": [
@@ -2388,10 +2183,6 @@
     {
      "name": "address",
      "type": "Address"
-    },
-    {
-     "name": "origin",
-     "type": "\"person\" | \"routine\" | \"system\""
     },
     {
      "name": "display",
@@ -2477,7 +2268,7 @@
       }
      ],
      "returns": "str",
-     "doc": "`prompt`, with async parts awaited: each in turn, for at most a few seconds (one that takes longer is left out, and logged). Render once per turn: a part may cost a lookup. `since`: when the thread she is in began, which the part reads as `PartContext.since`."
+     "doc": "The prompt parts for one of the run's personas at `place` (\"stable\" or \"turn\"), rendered in order and joined (\"\" when there are none): its own parts and the modules' parts for it. Async parts are awaited, each in turn, for at most a few seconds. A part that fails or takes longer is left out (and logged); none can fail the run. Render once per turn: a part may cost a lookup. `since`: when the thread she is in began, which the part reads as `PartContext.since`."
     },
     {
      "name": "context",
@@ -2530,25 +2321,6 @@
      ],
      "returns": "none",
      "doc": ""
-    },
-    {
-     "name": "prompt",
-     "async": false,
-     "parameters": [
-      {
-       "name": "persona",
-       "type": "str",
-       "keyword_only": false
-      },
-      {
-       "name": "place",
-       "type": "str",
-       "keyword_only": false,
-       "default": "stable"
-      }
-     ],
-     "returns": "str",
-     "doc": "The prompt parts for one of the run's personas at `place` (\"stable\" or \"turn\"), rendered in order and joined (\"\" when there are none): its own parts and the modules' parts for it. A part that fails to render is left out (and logged); none can fail the run. An async part is left out too: use `aprompt`."
     },
     {
      "name": "reply",
@@ -2712,7 +2484,7 @@
    ]
   },
   "ToolContext": {
-   "doc": "Handles the core gives a capability for one call. `display` is what the calling conversation can show (for example its upload limit). `files` are the files people attached to the run's requests, oldest first; `own_files` only those the person who started the run attached (in a group, others may add messages to a run). `schedule` delivers a message to this conversation once, later; it survives restarts. Interfaces receive it as a notice with code `reminder` (`data`: `scheduled_id`, `sender_id`, `sender_name`). `history` reads the calling conversation's history (`recent`, `search`, `summary`), for capabilities that carry a conversation somewhere else or work from it; capabilities cannot change it. `logbook` is the conversation's log, for what a person may want to find later. `persona` is the persona whose turn made the call, as the engine said (`Tools.call`), or the run's only persona; \"\" when nobody in particular (a group run whose engine did not say, a typed command, a call carried out once the owner approved it).",
+   "doc": "Handles the core gives a capability for one call. `display` is what the calling conversation can show (for example its upload limit). `files` are the files people attached to the run's requests, oldest first; `own_files` only those the person who started the run attached (in a group, others may add messages to a run). `schedule` delivers a message to this conversation once, later; it survives restarts. Interfaces receive it as a notice with code `reminder` (`data`: `scheduled_id`, `sender_id`, `sender_name`). `history` reads the calling conversation's history (`recent`, `search`, `summary`), for capabilities that carry a conversation somewhere else or work from it; capabilities cannot change it. `persona` is the persona whose turn made the call, as the engine said (`Tools.call`), or the run's only persona; \"\" when nobody in particular (a group run whose engine did not say, a typed command, a call carried out once the owner approved it).",
    "attributes": [
     {
      "name": "address",
@@ -2721,10 +2493,6 @@
     {
      "name": "sender",
      "type": "Sender"
-    },
-    {
-     "name": "origin",
-     "type": "Origin"
     },
     {
      "name": "run_id",
@@ -2924,10 +2692,6 @@
     {
      "name": "facts",
      "type": "Facts"
-    },
-    {
-     "name": "logbook",
-     "type": "Logbook"
     }
    ],
    "methods": [

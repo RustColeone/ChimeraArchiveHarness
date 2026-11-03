@@ -890,34 +890,10 @@ class CoreRegressions(unittest.TestCase):
             config = CoreConfig.load(path)
         self.assertEqual(config.configured_providers, {"deepseek": {"base_url": "https://owner.example"}})
         providers = Providers(config.providers, {}, configured=config.configured_providers)
-        providers.add_provider("deepseek", {"schema_mode": "strict_tool", "base_url": "https://module.example"})
+        providers.add_provider("deepseek", {"schema_mode": "native", "base_url": "https://module.example"})
         settings = providers._settings["deepseek"]
-        self.assertEqual((settings["schema_mode"], settings["base_url"]), ("strict_tool", "https://owner.example"))
+        self.assertEqual((settings["schema_mode"], settings["base_url"]), ("native", "https://owner.example"))
         self.assertEqual(settings["api_key_env"], "DEEPSEEK_API_KEY")  # the built-in keys nobody overrode stay
-
-    def test_every_lab_schema_has_a_strict_tool_form(self):
-        # Was: the last turn's `actions` was an array without `items`; strict tool mode drops `maxItems`, and DeepSeek
-        # refused the bare array (400), so Sol took over the tester's last turn in every run that reached it.
-        from core.providers.adapters import strict_tool_schema
-        from extensions.chimera.kernel import prompts
-
-        def bad(schema, path="schema"):
-            if not isinstance(schema, dict):
-                return []
-            found = []
-            if schema.get("type") == "array" and not isinstance(schema.get("items"), dict):
-                found.append(f"{path}: an array without items")
-            if schema.get("type") == "object" and schema.get("properties") is not None and \
-                    schema.get("required") != list(schema["properties"]):
-                found.append(f"{path}: not every property required")
-            for name, value in (schema.get("properties") or {}).items():
-                found += bad(value, f"{path}.{name}")
-            return found + bad(schema.get("items"), f"{path}[]")
-        turn = prompts.turn_schema(prompts.WRITE_TOOLS)
-        schemas = {"turn": turn, "probe": prompts.turn_schema(prompts.PROBE_TOOLS, findings=True),
-                   **{name: value for name, value in vars(prompts).items() if name.endswith("_SCHEMA")}}
-        for name, schema in schemas.items():
-            self.assertEqual(bad(strict_tool_schema(schema), name), [])
 
     def test_place_keys_work_for_names_in_any_script(self):
         from extensions.chimera.places import key

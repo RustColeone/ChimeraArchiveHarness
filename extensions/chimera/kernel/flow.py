@@ -35,10 +35,6 @@ SIBLING = {"strong": "drafter", "drafter": "strong", "judge": "critic", "critic"
 PROJECT_PREFIX = re.compile(r"^\s*(?:\[([a-z0-9][a-z0-9_.-]*)\]|([a-z0-9][a-z0-9_.-]*):)\s+", re.I)
 
 
-class NoSeat(RuntimeError):
-    pass
-
-
 class Stopped(RuntimeError):
     """The task cannot go on (a worktree could not be made, no seat can answer); nothing was applied."""
 

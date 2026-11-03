@@ -244,10 +244,6 @@ class Board:
         rows = self._db.execute("select item from messages where task = ? and id > ? order by id", (task_id, after))
         return [json.loads(row["item"]) for row in rows.fetchall()]
 
-    def find_messages(self, predicate: Callable[[dict], bool], limit: int = 2000) -> list[dict]:
-        rows = self._db.execute("select item from messages order by id desc limit ?", (limit,)).fetchall()
-        return [item for item in (json.loads(row["item"]) for row in rows) if predicate(item)]
-
     # ---- projects added in the page -------------------------------------------------------------
     def added_projects(self) -> dict[str, dict]:
         return {row["name"]: json.loads(row["settings"])

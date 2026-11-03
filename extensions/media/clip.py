@@ -350,10 +350,9 @@ async def process(context, clips: list[dict], keep_dir: Path) -> ToolResult:
     if not failures:
         lines.append("✅ All clips processed")
     data = {"clips": results, "limit_mb": limit}
-    sources = tuple(dict.fromkeys(clip["url"] for clip in clips))
     if not files:
-        return ToolResult.fail("\n".join(lines), failures[0], sources=sources, data=data)
-    return ToolResult.ok("\n".join(lines), files=tuple(files), sources=sources, data=data)
+        return ToolResult.fail("\n".join(lines), failures[0], data=data)
+    return ToolResult.ok("\n".join(lines), files=tuple(files), data=data)
 
 
 async def confirm(context, keep_dir: Path, skip=(), keep_file=None) -> ToolResult:

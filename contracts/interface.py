@@ -121,7 +121,7 @@ class InterfacePort(Protocol):
         her profile can be called). Pages show the students from this rather than keeping their own list."""
 
     def prices(self) -> Any:
-        """the core's model prices (contracts.Prices), to show them on a page."""
+        """The core's model prices (contracts.stores.Prices), to show them on a page."""
 
     def spending(self, days: int = 14) -> Sequence[Mapping[str, Any]]:
         """what was spent each day (everything: chats, sessions, memories), newest last, for the last

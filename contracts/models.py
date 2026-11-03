@@ -108,8 +108,6 @@ class ModelError(RuntimeError):
 class Models(Protocol):
     async def generate(self, request: ModelRequest) -> ModelResult: ...
 
-    def profiles(self) -> Sequence[str]: ...
-
     def ready(self, profile: str | None = None) -> bool:
         """Whether some candidate of `profile` (default: the run's first persona's) has its provider configured, so
         a call can be tried. Engines use it to pick who works before trying; a call can still fail."""

@@ -7,7 +7,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 from contracts import Event, FileRef, HistoryItem, LogEntry
 from core.storage.sqlite import Database, ScopedStore, dumps, fold, loads
@@ -44,7 +44,6 @@ CREATE INDEX IF NOT EXISTS log_address ON log(address, id);
 CREATE INDEX IF NOT EXISTS log_person ON log(address, subject, persona);
 """
 
-ACTIVE = ("running", "waiting_input")
 OPEN = ("running", "waiting_input", "waiting_approval")
 
 
@@ -136,32 +135,19 @@ class Tank:
                        "DESC LIMIT ?)", (address, address, keep))
             return self._entry(db.one("SELECT * FROM log WHERE id=?", (cursor.lastrowid,)))
 
-    def log_lines(self, address: str, limit: int = 20, offset: int = 0, *, kind: str = "", subject: str | None = None,
-                  persona: str | None = None, terms: Sequence[str] = ()) -> list[LogEntry]:
-        """This conversation's lines, newest first; `terms`: those holding any of these words."""
+    def log_lines(self, address: str, limit: int = 20, offset: int = 0, *, kind: str = "",
+                  subject: str | None = None) -> list[LogEntry]:
+        """This conversation's lines, newest first."""
         sql, parameters = "SELECT * FROM log WHERE address=?", [address]
-        for column, value in (("kind", kind or None), ("subject", subject), ("persona", persona)):
+        for column, value in (("kind", kind or None), ("subject", subject)):
             if value is not None:
                 sql, parameters = f"{sql} AND {column}=?", [*parameters, value]
-        if terms:
-            sql += " AND (" + " OR ".join("instr(lower(text), ?) > 0" for _ in terms) + ")"
-            parameters += [term.lower() for term in terms]
         return [self._entry(row) for row in self.db.query(f"{sql} ORDER BY id DESC LIMIT ? OFFSET ?",
                                                           (*parameters, limit, offset))]
 
-    def log_counts(self, address: str, subject: str | None = None, kind: str = "") -> dict[str, int]:
-        """How many lines each persona has here (about `subject`, of `kind`, when given)."""
-        sql, parameters = "SELECT persona, COUNT(*) AS n FROM log WHERE address=?", [address]
-        for column, value in (("subject", subject), ("kind", kind or None)):
-            if value is not None:
-                sql, parameters = f"{sql} AND {column}=?", [*parameters, value]
-        return {row["persona"]: row["n"] for row in self.db.query(f"{sql} GROUP BY persona ORDER BY persona",
-                                                                  parameters)}
-
-    def delete_log(self, address: str, subject: str | None = None, *, persona: str | None = None,
-                   entry_id: int | None = None, kind: str = "") -> int:
+    def delete_log(self, address: str, subject: str | None = None, *, entry_id: int | None = None) -> int:
         sql, parameters = "DELETE FROM log WHERE address=?", [address]
-        for column, value in (("subject", subject), ("persona", persona), ("id", entry_id), ("kind", kind or None)):
+        for column, value in (("subject", subject), ("id", entry_id)):
             if value is not None:
                 sql, parameters = f"{sql} AND {column}=?", [*parameters, value]
         return self.db.execute(sql, parameters).rowcount
@@ -213,11 +199,6 @@ class Tank:
                              "ORDER BY created_at DESC", (lane,))
         return [self._run(row) for row in rows]
 
-    def active_run(self, lane: str) -> RunRecord | None:
-        rows = self.db.query("SELECT * FROM runs WHERE lane=? AND status IN ('running','waiting_input') "
-                             "ORDER BY created_at DESC LIMIT 1", (lane,))
-        return self._run(rows[0]) if rows else None
-
     def append_event(self, run_id: str, kind: str, data: dict[str, Any] | None = None) -> Event:
         with self.db.transaction():
             row = self.db.one("SELECT COALESCE(MAX(idx), -1) + 1 AS next FROM run_events WHERE run_id=?", (run_id,))
@@ -248,9 +229,6 @@ class Tank:
     def finish_action(self, run_id: str, call_key: str, result: dict) -> None:
         self.db.execute("UPDATE actions SET status='done', result=?, finished_at=? WHERE run_id=? AND call_key=?",
                         (dumps(result), time.time(), run_id, call_key))
-
-    def count_actions(self, run_id: str) -> int:
-        return self.db.one("SELECT COUNT(*) AS n FROM actions WHERE run_id=?", (run_id,))["n"]
 
     def create_approval(self, approval_id: str, run_id: str, call_key: str, name: str,
                         arguments: dict, address: str) -> None:

@@ -32,7 +32,7 @@ from core.manager.routines import Caller, RoutineDesk
 from core.manager.policy import Assignment, Owners, Permissions, most_specific
 from core.manager.secrets import Secrets
 from core.manager.stamina import Paused, Stamina, money
-from core.prompts import FileText, arender, conversation_of, parts_for, render, with_parts
+from core.prompts import FileText, arender, conversation_of, parts_for, with_parts
 from core.providers.registry import Providers
 from core.serialize import request_from_dict, request_to_dict
 from core.storage.tank import RunRecord, Tank
@@ -49,9 +49,8 @@ BUILTIN_COMMANDS = (
     Command("cancel", "Cancel your open work here, or a run by ID",
             (Option("target", "A run ID (or, for the owner, a conversation address)"),)),
     Command("tools", "List the tools available here"),
-    Command("memory", "Read, forget or clear the notes kept about you here",
-            (Option("args", "[persona] [page] | forget <note-id> | clear [persona]"),),
-            examples=("", "forget 12", "clear")),
+    Command("memory", "Read this chat's summary, or remove it", (Option("args", "nothing, or clear"),),
+            examples=("", "clear")),
     Command("log", "Read this chat's log, or remove lines of it",
             (Option("args", "[page] | forget <id> | clear"),), examples=("", "forget 12", "clear")),
     Command("call", "Run any capability directly with JSON arguments (owner)",
@@ -235,14 +234,9 @@ class Manager:
         self.prompt_parts.append(part)
         self._part_origin[id(part)] = extension
 
-    def render_prompt(self, persona: Persona, place: str, context: PartContext) -> str:
-        """Session.prompt: the persona's parts and the modules' parts for it at `place`, rendered, secrets scrubbed.
-        A part that cannot be rendered is left out, and audited once until it renders again."""
-        parts, report, done = self._rendering(persona, place)
-        return done(render(parts, context, place, report))
-
     async def arender_prompt(self, persona: Persona, place: str, context: PartContext) -> str:
-        """Session.aprompt: `render_prompt` with the async parts awaited."""
+        """Session.aprompt: the persona's parts and the modules' parts for it at `place`, rendered, secrets scrubbed.
+        A part that cannot be rendered is left out, and audited once until it renders again."""
         parts, report, done = self._rendering(persona, place)
         return done(await arender(parts, context, place, report))
 
@@ -569,8 +563,7 @@ class Manager:
             result.append({"run_id": other.id, "status": "working" if working else other.status,
                            "sender_id": trigger.sender.id, "sender_name": trigger.sender.name,
                            "request": trigger.text[:300], "doing": working[-1][0] if working else "",
-                           "since": working[-1][1] if working else other.updated_at,
-                           "started_at": other.created_at})
+                           "since": working[-1][1] if working else other.updated_at})
         return result
 
     def _create_run(self, request: Request, inbox: list[Request] = ()) -> str | None:
@@ -894,9 +887,8 @@ class Manager:
                     result = ToolResult.from_dict(prior["result"])
                     if call_id is None:
                         result = ToolResult(result.status, "This exact action already ran in this run and was "
-                                            "not repeated.\n" + result.summary, result.files, result.sources,
-                                            {**result.data, "already_completed": True}, result.error_code,
-                                            result.retryable)
+                                            "not repeated.\n" + result.summary, result.files,
+                                            {**result.data, "already_completed": True}, result.error_code)
                     return result
             elif tier is not Risk.READ:
                 result = ToolResult.fail("An earlier attempt of this action was interrupted by a restart and may "
@@ -928,9 +920,7 @@ class Manager:
         except ModelError as error:
             result = ToolResult.fail(str(error), error.kind)
         except Exception as error:
-            transient = isinstance(error, (TimeoutError, ConnectionError, asyncio.TimeoutError))
-            result = ToolResult.fail(f"{name} failed: {type(error).__name__}: {error}"[:1500], type(error).__name__,
-                                     retryable=transient and tier is Risk.READ)
+            result = ToolResult.fail(f"{name} failed: {type(error).__name__}: {error}"[:1500], type(error).__name__)
         result = self.secrets.scrub_result(result)
         self.tank.finish_action(run_id, key, result.to_dict())
         self.audit.record("tool_call", run=run_id, tool=name, risk=tier.value, status=result.status,
@@ -1727,78 +1717,24 @@ class Manager:
         return "\n".join(lines)
 
     def memory_command(self, text: str, request: Request) -> str:
-        """`$memory`: the notes personas keep about the sender here; only theirs. Also this chat's rolling summary
-        (`summary`, `clear summary`)."""
-        conversation, subject = str(request.address), request.sender.id
+        """`$memory`: this chat's rolling summary, to read or (`clear`) remove."""
+        conversation = str(request.address)
         code = (lambda value: f"`{value}`") if request.display.markdown else str
-        usage = (f"Personas keep short notes about you here.\n"
-                 f"{code('$memory [persona] [page]')} read them\n"
-                 f"{code('$memory forget <note-id>')} remove one note\n"
-                 f"{code('$memory clear [persona]')} remove all notes about you here, or one persona's\n"
-                 f"{code('$memory summary')} read this chat's summary; {code('$memory clear summary')} remove it")
         summaries = self.tank.store(SUMMARIES)
-        counts = self.tank.log_counts(conversation, subject, kind="note")
-
-        def persona_named(name: str) -> str | None:
-            name = name.lower()
-            return next((key for key, persona in self.personas.items()
-                         if name in (key.lower(), persona.display_name.lower())), None)
-
-        def label(persona: str) -> str:
-            return self.personas[persona].display_name if persona in self.personas else persona
-
-        parts = text.split()
-        action = parts[0].lower() if parts else ""
-        if action == "summary" and len(parts) == 1:
+        parts = text.lower().split()
+        if parts in ([], ["summary"]):
             summary = summaries.get(conversation)
             if not summary:
                 return "No summary of this chat yet (it is written once the chat is long enough)."
-            day = local_time(summary["upto"])
-            return f"This chat's summary (up to {day}):\n{summary['text']}"
-        if action == "clear" and parts[1:] == ["summary"]:
-            # The summary is the whole chat's: an admin's to clear, or yours in a direct chat.
-            if not (request.is_direct or LEVELS[self.access_of(request)] >= LEVELS["admin"]):
-                return "Only admins can clear the summary of a shared chat."
-            summaries.delete(conversation)
-            self.audit.record("summary_clear", address=conversation)
-            return "This chat's summary was removed; it is written again as the chat goes on."
-        if action == "forget":
-            if len(parts) != 2 or not parts[1].lstrip("#").isdecimal() or len(parts[1]) > 18:
-                return usage
-            removed = self.tank.delete_log(conversation, subject, entry_id=int(parts[1].lstrip("#")), kind="note")
-            self.audit.record("log_forget", address=conversation, removed=removed)
-            return "Note removed." if removed else "No note with that ID about you here."
-        if action == "clear":
-            persona = persona_named(parts[1]) if len(parts) == 2 else None
-            if len(parts) > 2 or (len(parts) == 2 and persona is None):
-                return usage
-            removed = self.tank.delete_log(conversation, subject, persona=persona, kind="note")
-            self.audit.record("log_clear", address=conversation, persona=persona or "*", removed=removed)
-            return f"Removed {removed} note(s) about you here" + (f" from {label(persona)}." if persona else ".")
-        page_text = parts[-1] if parts and parts[-1].isdecimal() else "1"
-        names = parts[:-1] if parts and parts[-1].isdecimal() else parts
-        if not names and len(counts) != 1:
-            if not counts:
-                return "Nobody keeps notes about you here.\n" + usage
-            return "\n".join([*(f"{label(name)}: {count} note(s)" for name, count in counts.items()), usage])
-        persona = persona_named(" ".join(names)) if names else next(iter(counts))
-        if persona is None or len(page_text) > 6:
-            return usage
-        count = counts.get(persona, 0)
-        if not count:
-            return f"{label(persona)} keeps no notes about you here."
-        pages = (count + 19) // 20
-        page = int(page_text)
-        if not 1 <= page <= pages:
-            return f"Page {page} not found; pages 1-{pages}."
-        lines = [f"{label(persona)}'s notes about you (page {page}/{pages})"]
-        for note in self.tank.log_lines(conversation, 20, (page - 1) * 20, kind="note", subject=subject,
-                                        persona=persona):
-            day = dt.datetime.fromtimestamp(note.at).astimezone().strftime("%Y-%m-%d")
-            lines.append(f"{code('#' + str(note.id))} {day} · {note.text}")
-        if page < pages:
-            lines.append(f"Next: {code(f'$memory {persona} {page + 1}')}")
-        return "\n".join(lines)
+            return f"This chat's summary (up to {local_time(summary['upto'])}):\n{summary['text']}"
+        if parts not in (["clear"], ["clear", "summary"]):
+            return f"{code('$memory')} read this chat's summary; {code('$memory clear')} remove it"
+        # The summary is the whole chat's: an admin's to clear, or yours in a direct chat.
+        if not (request.is_direct or LEVELS[self.access_of(request)] >= LEVELS["admin"]):
+            return "Only admins can clear the summary of a shared chat."
+        summaries.delete(conversation)
+        self.audit.record("summary_clear", address=conversation)
+        return "This chat's summary was removed; it is written again as the chat goes on."
 
     def log_command(self, text: str, request: Request) -> str:
         """`$log`: what happened in this conversation, from the core and the modules. A member sees the lines about

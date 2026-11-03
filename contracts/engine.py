@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Any, Awaitable, Callable, Literal, Mapping, Protocol, Sequence, Union
 
 from contracts.capability import ToolResult
-from contracts.messages import Address, Delivery, Display, FileRef, Origin, Request
+from contracts.messages import Address, Delivery, Display, FileRef, Request
 from contracts.models import Models
 from contracts.stores import Store
 
@@ -218,7 +218,6 @@ class Activity:
     request: str
     doing: str = ""
     since: float = 0.0
-    started_at: float = 0.0
 
 
 class Tools(Protocol):
@@ -282,21 +281,11 @@ class LogEntry:
 
 
 class Logbook(Protocol):
-    """A conversation's log: what happened here, written by modules through the handles they already have, read by engines, and by people with
-    `$log`. The core logs by itself every write and critical action that ran. A model never writes here directly, only
-    through a capability a module offers. It is not the audit log, the core's own record for the owner, which models
-    never read."""
-
-    def write(self, kind: str, text: str, *, person: bool = False, persona: str = "",
-              data: Mapping[str, Any] | None = None) -> LogEntry:
-        """Add one line (`person`: about the person this run or call is for). Raises ValueError for an empty text or
-        a kind that is not one short word."""
+    """A conversation's log: what happened here, read by engines, and by people with `$log`. The core logs by itself every write and
+    critical action that ran. It is not the audit log, the core's own record for the owner, which models never read."""
 
     def recent(self, limit: int = 8, kind: str = "") -> list[LogEntry]:
         """The newest lines of this conversation, oldest of them first (`kind`: of that kind only)."""
-
-    def find(self, text: str, limit: int = 8) -> list[LogEntry]:
-        """The newest lines of this conversation holding words of `text`."""
 
 
 class Session(Protocol):
@@ -304,7 +293,6 @@ class Session(Protocol):
 
     run_id: str
     address: Address
-    origin: Origin
     display: Display
     personas: Sequence[Persona]
     trigger: Request
@@ -329,16 +317,12 @@ class Session(Protocol):
         """The persona's private key-value store, shared by all its conversations (older: prefer
         `store(persona=...)`, which is the module's own)."""
 
-    def prompt(self, persona: str, place: str = "stable") -> str:
-        """The prompt parts for one of the run's personas at `place` ("stable" or "turn"), rendered in order and
-        joined ("" when there are none): its own parts and the modules' parts for it. A part that fails to render
-        is left out (and logged); none can fail the run. An async part is left out too: use `aprompt`."""
-        ...
-
     async def aprompt(self, persona: str, place: str = "stable", since: float = 0.0) -> str:
-        """`prompt`, with async parts awaited: each in turn, for at most a few seconds (one that takes
-        longer is left out, and logged). Render once per turn: a part may cost a lookup. `since`: when
-        the thread she is in began, which the part reads as `PartContext.since`."""
+        """The prompt parts for one of the run's personas at `place` ("stable" or "turn"), rendered in order and
+        joined ("" when there are none): its own parts and the modules' parts for it. Async parts are awaited, each in
+        turn, for at most a few seconds. A part that fails or takes longer is left out (and logged); none can fail the
+        run. Render once per turn: a part may cost a lookup. `since`: when the thread she is in began, which the part
+        reads as `PartContext.since`."""
         ...
 
     def context(self, persona: str, since: float = 0.0) -> Context | None:

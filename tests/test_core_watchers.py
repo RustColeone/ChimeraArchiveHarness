@@ -157,8 +157,6 @@ class FactsAndPersonasTests(Base):
         handle.set("p", "bond", {"closeness": 90}, person=("owner", "alice"))
         self.assertEqual(port.facts("p", "alice"), {"watchmod.seen": 1, "watchmod.bond": {"closeness": 40}})
         self.assertEqual(iface(core, "owner").port.facts("p", "alice")["watchmod.bond"], {"closeness": 90})
-        self.assertEqual(handle.get("p", "bond", person=("chat", "alice")), {"closeness": 40})
-        self.assertIsNone(core.manager.facts.handle("other").get("p", "bond", person=("chat", "alice")))
         handle.set("p", "bond", None, person=("chat", "alice"))
         self.assertNotIn("watchmod.bond", port.facts("p", "alice"))
         for bad in (("p", "Bad-Key", 1, None), ("p", "big", "x" * 5000, None), ("", "k", 1, None),

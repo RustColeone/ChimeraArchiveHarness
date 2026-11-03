@@ -1,8 +1,7 @@
 """Prompt parts: the pieces of a persona's prompt that engines place for it (see contracts.PromptPart).
 
 A persona's own parts come from its module or from core.yml (`agents: <name>: parts:`); modules may add parts
-for every persona or for those they name. `Session.prompt` renders them for one persona at one place, and
-`Session.aprompt` awaits the async ones too."""
+for every persona or for those they name. `Session.aprompt` renders them for one persona at one place."""
 
 from __future__ import annotations
 
@@ -133,30 +132,12 @@ def conversation_of(parts: Iterable[PromptPart], context: PartContext,
     return None
 
 
-def render(parts: Iterable[PromptPart], context: PartContext, place: str,
-           report: Callable[[PromptPart, str, str], None]) -> str:
-    """The parts at `place`, in order (ties keep the order given), each stripped and joined by a blank line, at most
-    PLACE_LIMIT characters. A part whose text fails or is not text is left out, and `report(part, kind, detail)`
-    is called with kind `failed`; one cut to fit is reported `cut`, those after it `left_out`. An async part is
-    left out (`arender` awaits it)."""
-    found = []
-    for part in _ordered(parts, place):
-        try:
-            text = part.text if isinstance(part.text, str) else part.text(context)
-            if inspect.isawaitable(text):
-                if inspect.iscoroutine(text):
-                    text.close()
-                raise TypeError("its text function is async: it is rendered with Session.aprompt")
-            found.append((part, _text(text)))
-        except Exception as error:  # a module's or a file's problem must not fail the run
-            report(part, "failed", "left out: " + describe(error))
-    return _join(found, place, report)
-
-
 async def arender(parts: Iterable[PromptPart], context: PartContext, place: str,
                   report: Callable[[PromptPart, str, str], None]) -> str:
-    """`render`, with each async part awaited in turn for at most PART_WAIT_S seconds (one that takes longer is
-    left out and reported `failed`)."""
+    """The parts at `place`, in order (ties keep the order given), each stripped and joined by a blank line, at most
+    PLACE_LIMIT characters. An async part is awaited in turn for at most PART_WAIT_S seconds. A part whose text fails,
+    is not text or takes longer is left out, and `report(part, kind, detail)` is called with kind `failed`; one cut to
+    fit is reported `cut`, those after it `left_out`."""
     found = []
     for part in _ordered(parts, place):
         try:

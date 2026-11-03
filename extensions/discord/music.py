@@ -316,7 +316,7 @@ class MusicPlayer:
             await self._connect(session, voice_channel)
         except (discord.ClientException, RuntimeError, asyncio.TimeoutError, discord.HTTPException) as error:
             return ToolResult.fail(f"Could not join {getattr(voice_channel, 'name', 'the voice channel')}: "
-                                   f"{type(error).__name__}: {error}"[:300], "voice_connect_failed", retryable=True)
+                                   f"{type(error).__name__}: {error}"[:300], "voice_connect_failed")
         return None
 
     async def _run(self, command: MusicCommand, session: Session, voice_channel) -> ToolResult:

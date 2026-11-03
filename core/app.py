@@ -193,7 +193,7 @@ class Core:
     def _register(self, loaded: LoadedExtension) -> None:
         name, contributions = loaded.extension.name, loaded.contributions
         for interface in contributions.interfaces:
-            self.gateway.register_interface(interface, name)
+            self.gateway.register_interface(interface)
         for engine in contributions.engines:
             self.manager.register_engine(engine, name)
             self._owners[("engine", engine.spec.name)] = name
@@ -211,7 +211,7 @@ class Core:
         """The registries a module adds to, copied, so a module that fails halfway can be taken out again."""
         gateway, manager = self.gateway, self.manager
         return [(store, type(store)(store)) for store in (
-            gateway.interfaces, gateway._origin, manager.engines, manager._origin, manager.capabilities, manager.personas, manager.prompt_parts, manager._part_origin, manager.watchers, self._owners)]
+            gateway.interfaces, manager.engines, manager._origin, manager.capabilities, manager.personas, manager.prompt_parts, manager._part_origin, manager.watchers, self._owners)]
 
     @staticmethod
     def _restore(saved: list) -> None:

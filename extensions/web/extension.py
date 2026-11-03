@@ -162,7 +162,7 @@ def setup(context) -> Contributions:
             found = await asyncio.to_thread(searcher.search, query, limit)
         except SearchUnavailable as error:
             context.log("search_failed", error=str(error))
-            return ToolResult.fail(f"Search is unavailable right now: {error}", "unavailable", retryable=True)
+            return ToolResult.fail(f"Search is unavailable right now: {error}", "unavailable")
         lines = []
         if found["skipped"]:  # a switch is never silent: say which backend answered, and why the others did not
             label = LABELS.get(found["backend"], found["backend"])
@@ -170,8 +170,7 @@ def setup(context) -> Contributions:
         lines += [found["answer"]] if found["answer"] else []
         lines += [f"- {item['title']}: {item['url']}" + (f"\n  {item['snippet']}" if item.get("snippet") else "")
                   for item in found["results"]]
-        return ToolResult.ok("\n".join(lines) or "No results.", sources=tuple(item["url"] for item in found["results"]),
-                             data=found)
+        return ToolResult.ok("\n".join(lines) or "No results.", data=found)
 
     async def read_page(arguments, tool) -> ToolResult:
         url = arguments["url"].strip().strip("<>")
@@ -181,14 +180,13 @@ def setup(context) -> Contributions:
         except PageUnavailable as error:
             return ToolResult.fail(f"Could not read {url}: {error}", "unavailable")
         except requests.RequestException as error:
-            return ToolResult.fail(f"Could not read {url}: {error}", "unavailable", retryable=True)
+            return ToolResult.fail(f"Could not read {url}: {error}", "unavailable")
         links = page["links"][:int(arguments.get("max_links") or 0)] if arguments.get("max_links") else []
         summary = f"# {page['title']}\n{page['url']}\n\n{page['text']}"
         if links:
             summary += "\n\nLinks:\n" + "\n".join(f"- {link['title']}: {link['url']}" for link in links)
-        return ToolResult.ok(summary, sources=(page["url"],), data={"url": page["url"], "title": page["title"],
-                                                                     "content_type": page["content_type"],
-                                                                     "links": page["links"]})
+        return ToolResult.ok(summary, data={"url": page["url"], "title": page["title"],
+                                            "content_type": page["content_type"], "links": page["links"]})
 
     async def image_search(arguments, tool) -> ToolResult:
         query = arguments["query"].strip()
@@ -200,10 +198,9 @@ def setup(context) -> Contributions:
                                             int(tool.display.max_upload_mb * 1024 * 1024))
         except ImageUnavailable as error:
             context.log("image_search_failed", error=str(error))
-            return ToolResult.fail(str(error), "unavailable", retryable=True)
+            return ToolResult.fail(str(error), "unavailable")
         return ToolResult.ok(f"Supplementary image: {found['title']}\nSource: {found['source_url']}",
                              files=(FileRef(found["path"], found["name"], found["mime"], found["size"]),),
-                             sources=(found["source_url"],),
                              data={key: found[key] for key in ("title", "source_url", "image_url")})
 
     async def maps(arguments, tool) -> ToolResult:
@@ -216,12 +213,11 @@ def setup(context) -> Contributions:
             text, sources = await asyncio.to_thread(searcher.ground, query, "google_maps")
         except Exception as error:
             context.log("maps_failed", error=str(error))
-            return ToolResult.fail(f"Google Maps is unavailable right now: {error}", "unavailable", retryable=True)
+            return ToolResult.fail(f"Google Maps is unavailable right now: {error}", "unavailable")
         if not text.strip():
             return ToolResult.fail("Google Maps returned no grounded evidence.", "no_result")
         lines = [text.strip()] + [f"- {item['title']}: {item['url']}" for item in sources]
-        return ToolResult.ok("\n".join(lines), sources=tuple(item["url"] for item in sources),
-                             data={"answer": text.strip(), "results": sources})
+        return ToolResult.ok("\n".join(lines), data={"answer": text.strip(), "results": sources})
 
     async def wolfram_query(arguments, tool) -> ToolResult:
         query = wolfram.command_input(arguments["query"])
@@ -239,7 +235,7 @@ def setup(context) -> Contributions:
             return ToolResult.fail(f"Wolfram|Alpha is not configured correctly: {error}", "not_configured")
         except wolfram.WolframUnavailable as error:
             context.log("wolfram_failed", error=str(error))
-            return ToolResult.fail(f"Wolfram|Alpha is unavailable right now: {error}", "unavailable", retryable=True)
+            return ToolResult.fail(f"Wolfram|Alpha is unavailable right now: {error}", "unavailable")
         summary = "\n\n".join(f"## {pod['title']}\n{pod['text']}".rstrip() for pod in pods)
         return ToolResult.ok(summary, data={"query": query, "pods": pods})
 

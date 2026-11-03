@@ -140,10 +140,9 @@ class Secrets:
     def scrub_result(self, result: ToolResult) -> ToolResult:
         summary = self.scrub(result.summary)
         data = self.scrub_value(dict(result.data))
-        sources = tuple(self.scrub(item) for item in result.sources)
-        if summary == result.summary and data == dict(result.data) and sources == result.sources:
+        if summary == result.summary and data == dict(result.data):
             return result
-        return dataclasses.replace(result, summary=summary, data=data, sources=sources)
+        return dataclasses.replace(result, summary=summary, data=data)
 
     # ---- paths ------------------------------------------------------------------------------------
     def is_secret_path(self, path: str) -> bool:

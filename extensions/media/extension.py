@@ -68,7 +68,7 @@ async def download_video(arguments, context) -> ToolResult:
         method = "reencode"
     return ToolResult.ok(
         f"Prepared \"{title}\" ({site}): {duration:g}s, {size_mb:.2f} MB, {settings}; budget {budget:g} MB ({source}).",
-        files=(FileRef(str(output), output.name, "video/mp4", output.stat().st_size),), sources=(url,),
+        files=(FileRef(str(output), output.name, "video/mp4", output.stat().st_size),),
         data={"method": method, "duration_s": duration, "size_mb": round(size_mb, 2), "budget_mb": budget})
 
 

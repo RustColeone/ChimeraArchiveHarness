@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Protocol
 
-from contracts.engine import History, Logbook, Persona
+from contracts.engine import History, Persona
 from contracts.messages import Address, Request
 from contracts.models import Models
 from contracts.stores import Facts, Store
@@ -48,7 +48,6 @@ class WatchContext(Protocol):
     models: Models
     history: History
     facts: Facts
-    logbook: Logbook
 
     def store(self, *, conversation: bool = False, persona: bool = False, person: bool = False) -> Store: ...
 

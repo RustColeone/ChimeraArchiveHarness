@@ -349,12 +349,6 @@ class Book:
             self.toolboxes[key] = Toolbox(memory)
         return self.toolboxes[key]
 
-    def close(self) -> None:
-        for memory in self.opened.values():
-            memory.close()
-        self.opened.clear()
-        self.toolboxes.clear()
-
 
 def no_notes(person: str, language: str) -> str:
     """Her notes when there are none yet: said all the same, so she knows her memory is kept for her (left out, a

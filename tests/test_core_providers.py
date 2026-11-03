@@ -210,45 +210,6 @@ class AdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(REQUEST.messages[0]["content"], "sys")
         self.assertEqual(REQUEST.messages[-1]["content"], "hi")
 
-    async def test_strict_tool_mode_sends_the_schema_as_one_strict_tool_and_reads_its_arguments(self):
-        schema = {"type": "object", "properties": {
-            "note": {"type": "string", "maxLength": 9},
-            "actions": {"type": "array", "maxItems": 6, "items": {"type": "object", "properties": {
-                "tool": {"type": "string", "enum": ["run"]}, "arguments": {"type": "object"}},
-                "required": ["tool", "arguments"], "additionalProperties": False}}},
-            "required": [], "additionalProperties": False}
-        arguments = json.dumps({"note": "", "actions": [{"tool": "run", "arguments": json.dumps({"command": "ls"})}]})
-        call = SimpleNamespace(function=SimpleNamespace(name="turn", arguments=arguments))
-
-        class Client(FakeOpenAIClient):
-            async def create(self, **params):
-                self.calls.append(params)
-                message = SimpleNamespace(content="", tool_calls=[call] if len(self.calls) > 1 else [])
-                return SimpleNamespace(choices=[SimpleNamespace(finish_reason="tool_calls", message=message)],
-                                       usage=SimpleNamespace(prompt_tokens=3, completion_tokens=2))
-        client = Client()
-        result = await OpenAICompatible({"schema_mode": "strict_tool"}, client).complete(
-            "ds", REQUEST.messages, schema, "turn", "high", 100, 30)
-        tool = client.calls[0]["tools"][0]["function"]
-        self.assertEqual((tool["name"], tool["strict"], client.calls[0]["tool_choice"]), ("turn", True, "auto"))
-        sent = tool["parameters"]
-        self.assertEqual(sent["required"], ["note", "actions"])  # every property, as strict mode demands
-        self.assertNotIn("maxLength", sent["properties"]["note"])
-        self.assertNotIn("maxItems", sent["properties"]["actions"])
-        self.assertEqual(sent["properties"]["actions"]["items"]["properties"]["arguments"]["type"], "string")
-        self.assertNotIn("response_format", client.calls[0])
-        self.assertTrue(client.calls[0]["messages"][-1]["content"].endswith("(Answer by calling turn.)"))
-        self.assertEqual(REQUEST.messages[-1]["content"], "hi")
-        self.assertEqual(len(client.calls), 2)  # no tool call and no text: asked once more, as JSON mode is
-        self.assertEqual(json.loads(result.text), {"note": "", "actions": [{"tool": "run", "arguments": {"command": "ls"}}]})
-        self.assertEqual((result.schema_mode, result.output_tokens), ("strict_tool", 4))
-        from core.providers.adapters import from_strict_tool
-        loose = schema["properties"]["actions"]
-        self.assertEqual(from_strict_tool([{"tool": "run", "arguments": '{"command": "ls"}]'}], loose),
-                         [{"tool": "run", "arguments": {"command": "ls"}}])  # a stray bracket after the object
-        self.assertEqual(from_strict_tool([{"tool": "run", "arguments": '["ls"]'}], loose),
-                         [{"tool": "run", "arguments": '["ls"]'}])  # not an object: left for the registry to refuse
-
     async def test_rejected_effort_parameter_is_retried_without_it_once_and_remembered(self):
         client = FakeOpenAIClient(fail_effort=True)
         adapter = OpenAICompatible({"effort_param": True}, client)

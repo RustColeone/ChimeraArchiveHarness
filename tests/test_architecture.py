@@ -28,9 +28,9 @@ class ArchitecturePageTests(unittest.TestCase):
         defined = {node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
         listed = {item["id"]: item for item in data["files"][path]["symbols"]}
         self.assertLessEqual(defined, set(listed))
-        render = listed["render"]
+        render = listed["arender"]
         lines = data["files"][path]["text"].splitlines()[render["line"] - 1:render["end"]]
-        self.assertTrue(lines[0].startswith("def render("))  # the pane shows exactly this function
+        self.assertTrue(lines[0].startswith("async def arender("))  # the pane shows exactly this function
 
     def test_the_top_map_points_at_real_places_and_reads_the_slots_from_the_modules(self):
         data = load()

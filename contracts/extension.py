@@ -26,7 +26,7 @@ class ExtensionContext(Protocol):
     data_dir: Path
     facts: Facts  # what this module publishes about personas, for interfaces (any time after setup)
     present: frozenset  # which of the modules it `uses` are loaded (they were set up before it)
-    prices: Any  # the core's model prices (contracts.Prices)
+    prices: Any  # the core's model prices (contracts.stores.Prices)
 
     def log(self, event: str, **fields: Any) -> None: ...
 

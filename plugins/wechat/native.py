@@ -79,10 +79,6 @@ def mention_targets(source):
             for entry in (node.text or '').split(',') if entry.strip()]
 
 
-def mentions_account(source, username):
-    return username in mention_targets(source)
-
-
 def quoted_text(content):
     if not content.lstrip().startswith('<'):
         return None

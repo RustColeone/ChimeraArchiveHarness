@@ -151,8 +151,8 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
                                 FakeAdapter([]), clock=lambda: now[0])
         self.cores.append(core)
         HistoryHandle(core.manager, Address("chat", "group")).summarize("Long shared history.", upto=1.0)
-        core.tank.add_log("chat:group", "core", "note", "Boss likes tea", subject="boss", persona="p")
-        for text in ("$memory clear summary", "$memory clear", "$memory forget 1"):
+        core.tank.add_log("chat:group", "core", "action", "Boss likes tea", subject="boss", persona="p")
+        for text in ("$memory clear", "$log clear", "$log forget 1"):
             await iface(core).say(f'tool core.add_routine {{"schedule": "every 1h", "text": "{text}"}}', sender="boss",
                                   conversation="group", is_direct=False, mentions_me=True, name="Boss")
             await settle(core)
@@ -162,7 +162,7 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
         refused = [text for text in iface(core).texts("group") if "A routine set up through a tool cannot use" in text]
         self.assertEqual(len(refused), 3)
         self.assertIsNotNone(HistoryHandle(core.manager, Address("chat", "group")).summary())
-        self.assertEqual(len(core.tank.log_lines("chat:group", kind="note", subject="boss")), 1)
+        self.assertIn("Boss likes tea", [line.text for line in core.tank.log_lines("chat:group", subject="boss")])
 
 
 if __name__ == "__main__":

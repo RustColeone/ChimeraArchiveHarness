@@ -78,10 +78,3 @@ class FactsHandle:
 
     def set(self, persona: str, key: str, value: Any, *, person: tuple[str, str] | None = None) -> None:
         self._desk.write(self._module, persona, key, value, person)
-
-    def get(self, persona: str, key: str, *, person: tuple[str, str] | None = None) -> Any:
-        where = slot(persona, check_person(person))
-        return (self._desk.store.get(where) or {}).get(f"{self._module}.{key}")
-
-    def delete(self, persona: str, key: str, *, person: tuple[str, str] | None = None) -> None:
-        self._desk.write(self._module, persona, key, None, person)

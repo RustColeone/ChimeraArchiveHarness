@@ -31,10 +31,6 @@ class Facts(Protocol):
 
     def set(self, persona: str, key: str, value: Any, *, person: tuple[str, str] | None = None) -> None: ...
 
-    def get(self, persona: str, key: str, *, person: tuple[str, str] | None = None) -> Any: ...
-
-    def delete(self, persona: str, key: str, *, person: tuple[str, str] | None = None) -> None: ...
-
 
 class Prices(Protocol):
     """Model prices, as the core keeps them: a list fetched once a day (Artificial Analysis's, with a

@@ -130,7 +130,7 @@ def setup(context) -> Contributions:
             return ToolResult.fail(str(error), "not_configured")
         except Exception as error:
             return ToolResult.fail(f"{provider} image generation failed: {type(error).__name__}: {error}"[:800],
-                                   "generation_failed", retryable=True)
+                                   "generation_failed")
         files = tuple(FileRef(str(path), path.name, "image/" + path.suffix.lstrip(".").replace("jpg", "jpeg"),
                               path.stat().st_size) for path in paths)
         summary = f"Generated {len(files)} image(s) with {provider} ({generator.models[provider]})."

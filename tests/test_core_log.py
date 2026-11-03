@@ -1,12 +1,13 @@
-"""The log (contracts 1.15, core/manager/logbook.py): what happened in a conversation, written by modules and by the
-core after each write that ran, read by engines and by people with `$log`. Before it, the diary: its notes carry over."""
+"""The log (core/manager/logbook.py): what happened in a conversation, written by the core after each write that ran,
+read by engines and by people with `$log`."""
 
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
-from core.manager.logbook import LINES_KEPT, LogbookHandle, search_terms
+from contracts import Address
+from core.manager.handles import HistoryHandle
+from core.manager.logbook import LINES_KEPT, LogbookHandle
 from core.storage.tank import Tank
 from tests.core_support import FakeAdapter, iface, settle, start_core, turn_context
 
@@ -31,8 +32,8 @@ class LogTests(unittest.IsolatedAsyncioTestCase):
         self.cores.append(core)
         return core, adapter
 
-    def book(self, core, address="chat:room", module="reminders", subject="alice"):
-        return LogbookHandle(core.manager, address, module, subject)
+    def line(self, core, kind, text, subject="", module="reminders", address="chat:room"):
+        return core.tank.add_log(address, module, kind, text, subject=subject)
 
     async def say(self, core, text, sender="alice", conversation="room", **options):
         chat = iface(core)
@@ -40,33 +41,14 @@ class LogTests(unittest.IsolatedAsyncioTestCase):
         await settle(core)
         return chat.texts(conversation)[-1]
 
-    async def test_lines_are_written_read_in_order_and_found_by_their_words(self):
+    async def test_lines_are_read_in_order_and_by_conversation(self):
         core, _ = await self.core()
-        book = self.book(core)
-        first = book.write("reminder", "Set a reminder  for the dentist", person=True, persona="p", data={"at": 5})
-        book.write("landed", "飞机票已经改到周三", data={"session": "t-1"})
-        self.assertEqual((first.module, first.kind, first.text, first.subject, first.persona, first.data),
-                         ("reminders", "reminder", "Set a reminder for the dentist", "alice", "p", {"at": 5}))
+        self.line(core, "reminder", "Set a reminder for the dentist")
+        self.line(core, "landed", "飞机票已经改到周三")
+        book = LogbookHandle(core.manager, "chat:room")
         self.assertEqual([line.kind for line in book.recent()], ["reminder", "landed"])  # the older first
         self.assertEqual([line.kind for line in book.recent(kind="landed")], ["landed"])
-        self.assertEqual([line.kind for line in book.find("the dentist")], ["reminder"])
-        self.assertEqual([line.kind for line in book.find("改到哪天了")], ["landed"])
-        self.assertEqual(book.find("the"), [])  # (only words too common to search by)
-        self.assertEqual(self.book(core, "chat:other").recent(), [])  # filed by conversation
-
-    async def test_a_line_must_make_sense_and_keeps_no_secret(self):
-        core, _ = await self.core()
-        book = self.book(core)
-        for kind, text in (("", "x"), ("Two Words", "x"), ("note", "   "), (5, "x")):
-            with self.assertRaises(ValueError):
-                book.write(kind, text)
-        with self.assertRaises(ValueError):
-            book.write("note", "x", data={"big": "y" * 3000})
-        secret = "sk-abcdefghijklmnopqrstuvwxyz"
-        written = book.write("note", f"the key is {secret}", data={"key": secret})
-        self.assertEqual((written.text, written.data), ("the key is [secret api key]", {"key": "[secret api key]"}))
-        long = book.write("note", "z" * 900)
-        self.assertEqual(len(long.text), 500)
+        self.assertEqual(LogbookHandle(core.manager, "chat:other").recent(), [])  # filed by conversation
 
     async def test_the_oldest_lines_go_past_the_limit(self):
         tank = Tank(self.tmp / "tank.db")
@@ -87,7 +69,7 @@ class LogTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_what_people_typed_is_in_their_log_but_never_shown_to_a_model(self):
         core, adapter = await self.core(MOMOCHAT, [ANSWER])
-        self.book(core).write("action", "A thing she did")
+        self.line(core, "action", "A thing she did")
         await self.say(core, "$remember the secret nickname", sender="boss")
         await self.say(core, "hello")
         context = turn_context(adapter.calls[-1])
@@ -96,14 +78,13 @@ class LogTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_her_turn_shows_the_last_lines_and_a_setting_turns_it_off(self):
         core, adapter = await self.core(MOMOCHAT, [ANSWER, ANSWER])
-        book = self.book(core, module="reminders")
-        book.write("note", "a note of someone, not for this")
-        book.write("reminder", "Set a reminder for the dentist")
+        self.line(core, "command", "what someone typed, not for this")
+        self.line(core, "reminder", "Set a reminder for the dentist")
         await self.say(core, "hello")
         context = turn_context(adapter.calls[-1])
         self.assertIn("Done here lately", context)
         self.assertIn("Set a reminder for the dentist", context)
-        self.assertNotIn("a note of someone", context)
+        self.assertNotIn("what someone typed", context)
         await core.stop()
         self.cores.remove(core)
         quiet = {"assignments": {"*": {"engine": "momochat", "personas": ["p"], "options": {"log_lines": 0}}}}
@@ -113,16 +94,16 @@ class LogTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_day_old_line_is_not_shown(self):
         core, adapter = await self.core(MOMOCHAT, [ANSWER])
-        line = self.book(core).write("reminder", "Long ago")
+        line = self.line(core, "reminder", "Long ago")
         core.tank.db.execute("UPDATE log SET at=at-90000 WHERE id=?", (line.id,))
         await self.say(core, "hello")
         self.assertNotIn("Long ago", turn_context(adapter.calls[-1]))
 
     async def test_people_read_their_lines_and_admins_all_of_them_and_each_removes_what_they_see(self):
         core, _ = await self.core({"owners": {"chat": ["boss"]}})
-        mine = self.book(core, subject="alice").write("note", "About Alice", person=True)
-        self.book(core, subject="bob").write("note", "About Bob", person=True)
-        everyone = self.book(core).write("landed", "A session landed")
+        mine = self.line(core, "action", "About Alice", subject="alice")
+        self.line(core, "action", "About Bob", subject="bob")
+        everyone = self.line(core, "landed", "A session landed")
         answer = await self.say(core, "$log")
         self.assertIn("About Alice", answer)
         self.assertNotIn("About Bob", answer)
@@ -137,24 +118,14 @@ class LogTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("$log forget", await self.say(core, "$log forget two"))
         self.assertIn("empty", await self.say(core, "$log 3", sender="boss"))
 
-    async def test_memory_reads_and_removes_notes_about_you(self):
+    async def test_memory_reads_and_removes_this_chats_summary(self):
         core, _ = await self.core()
-        tank = core.tank
-        one = tank.add_log("chat:room", "core", "note", "Likes tea", subject="alice", persona="p")
-        tank.add_log("chat:room", "core", "note", "Plays go", subject="alice", persona="p")
-        tank.add_log("chat:room", "core", "note", "Bob's own", subject="bob", persona="p")
-        tank.add_log("chat:room", "core", "action", "Not a note", subject="alice", persona="p")
-        answer = await self.say(core, "$memory")
-        self.assertIn("Likes tea", answer)
-        self.assertNotIn("Bob's own", answer)
-        self.assertNotIn("Not a note", answer)
-        self.assertIn("Note removed", await self.say(core, f"$memory forget {one.id}"))
-        self.assertIn("Removed 1", await self.say(core, "$memory clear"))
-        self.assertEqual(tank.log_counts("chat:room", "bob", kind="note"), {"p": 1})
-        self.assertEqual([line.kind for line in tank.log_lines("chat:room", subject="alice")], ["action"])
-
-    def test_search_terms_take_words_and_pieces_of_chinese(self):
-        self.assertEqual(search_terms("the dentist 改到周三"), ["dentist", "改到", "到周", "周三"])
+        self.assertIn("No summary of this chat yet", await self.say(core, "$memory", is_direct=True))
+        HistoryHandle(core.manager, Address("chat", "room")).summarize("They planned a trip.", upto=1.0)
+        self.assertIn("They planned a trip.", await self.say(core, "$memory", is_direct=True))
+        self.assertIn("$memory clear", await self.say(core, "$memory forget 1", is_direct=True))
+        self.assertIn("was removed", await self.say(core, "$memory clear", is_direct=True))
+        self.assertIsNone(HistoryHandle(core.manager, Address("chat", "room")).summary())
 
 
 if __name__ == "__main__":

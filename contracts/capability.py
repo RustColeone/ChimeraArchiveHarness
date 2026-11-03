@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, Mapping, Protocol
 
 from contracts.commands import Access, Command, derive
-from contracts.messages import Address, Display, FileRef, Origin, Sender
+from contracts.messages import Address, Display, FileRef, Sender
 from contracts.models import Models
 from contracts.stores import Store
 
@@ -40,7 +40,6 @@ class Risk(str, Enum):
     CRITICAL = "critical"
 
 
-TIER_ORDER = (Risk.READ, Risk.PREPARE, Risk.WRITE, Risk.CRITICAL)
 SubjectKind = Literal["value", "path"]
 
 
@@ -51,22 +50,19 @@ class ToolResult:
     status: ResultStatus
     summary: str
     files: tuple[FileRef, ...] = ()
-    sources: tuple[str, ...] = ()
     data: Mapping[str, Any] = field(default_factory=dict)
     error_code: str | None = None
-    retryable: bool = False
 
     def __post_init__(self):
         object.__setattr__(self, "files", tuple(self.files))
-        object.__setattr__(self, "sources", tuple(self.sources))
 
     @classmethod
     def ok(cls, summary: str, **fields) -> "ToolResult":
         return cls("success", summary, **fields)
 
     @classmethod
-    def fail(cls, summary: str, error_code: str = "failed", retryable: bool = False, **fields) -> "ToolResult":
-        return cls("failed", summary, error_code=error_code, retryable=retryable, **fields)
+    def fail(cls, summary: str, error_code: str = "failed", **fields) -> "ToolResult":
+        return cls("failed", summary, error_code=error_code, **fields)
 
     @classmethod
     def ask(cls, question: str, **fields) -> "ToolResult":
@@ -74,15 +70,14 @@ class ToolResult:
 
     def to_dict(self) -> dict:
         return {"status": self.status, "summary": self.summary,
-                "files": [file.__dict__ for file in self.files], "sources": list(self.sources),
-                "data": dict(self.data), "error_code": self.error_code, "retryable": self.retryable}
+                "files": [file.__dict__ for file in self.files], "data": dict(self.data),
+                "error_code": self.error_code}
 
     @classmethod
     def from_dict(cls, value: Mapping) -> "ToolResult":
         return cls(value["status"], value["summary"],
-                   files=tuple(FileRef(**file) for file in value.get("files", ())),
-                   sources=tuple(value.get("sources", ())), data=dict(value.get("data") or {}),
-                   error_code=value.get("error_code"), retryable=bool(value.get("retryable")))
+                   files=tuple(FileRef(**file) for file in value.get("files", ())), data=dict(value.get("data") or {}),
+                   error_code=value.get("error_code"))
 
 
 class ToolContext(Protocol):
@@ -95,7 +90,6 @@ class ToolContext(Protocol):
     receive it as a notice with code `reminder` (`data`: `scheduled_id`, `sender_id`, `sender_name`).
     `history` reads the calling conversation's history (`recent`, `search`, `summary`), for
     capabilities that carry a conversation somewhere else or work from it; capabilities cannot change it.
-    `logbook` is the conversation's log, for what a person may want to find later.
     `persona` is the persona whose turn made the call, as the engine said (`Tools.call`), or the
     run's only persona; "" when nobody in particular (a group run whose engine did not say, a typed command, a
     call carried out once the owner approved it).
@@ -103,7 +97,6 @@ class ToolContext(Protocol):
 
     address: Address
     sender: Sender
-    origin: Origin
     run_id: str
     display: Display
     is_direct: bool
@@ -244,7 +237,7 @@ class Capability:
         if raised is None:
             return self.risk
         raised = Risk(raised)
-        return raised if TIER_ORDER.index(raised) > TIER_ORDER.index(self.risk) else self.risk
+        return raised if list(Risk).index(raised) > list(Risk).index(self.risk) else self.risk
 
     def subject_of(self, arguments: Mapping[str, Any]) -> str | None:
         if self.subject is None or arguments.get(self.subject) is None:

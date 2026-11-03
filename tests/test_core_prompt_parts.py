@@ -13,7 +13,7 @@ from contracts import Address, Engine, EngineSpec, PartContext, Persona, PromptP
 from core.config import ConfigError, CoreConfig
 from core.manager.secrets import Secrets
 from core import prompts as prompts_module
-from core.prompts import PLACE_LIMIT, FileText, arender, parts_for, render, with_parts
+from core.prompts import PLACE_LIMIT, FileText, arender, parts_for, with_parts
 from tests.core_support import ROOT, FakeAdapter, iface, make_config, settle, start_core, turn_context
 from tests.test_momochat import NAMES, Script
 from tests.test_momochat import turn as room_turn
@@ -135,8 +135,8 @@ class ContractTests(unittest.TestCase):
 class RenderTests(Temporary):
     def render(self, parts, place="stable", owner=False):
         problems = []
-        text = render(parts, context(owner=owner), place,
-                      lambda part, kind, detail: problems.append((part.name, kind, detail)))
+        text = asyncio.run(arender(parts, context(owner=owner), place,
+                                   lambda part, kind, detail: problems.append((part.name, kind, detail))))
         return text, problems
 
     def test_parts_come_in_order_at_their_place_and_ties_keep_their_order(self):
@@ -167,15 +167,6 @@ class RenderTests(Temporary):
         self.assertEqual(problems, [("boom", "failed", "left out: RuntimeError: no database"),
                                     ("number", "failed", "left out: TypeError: gave int, not text"),
                                     ("odd", "failed", "left out: Unprintable")])
-
-    def test_an_async_part_is_left_out_without_a_warning(self):
-        async def later(_):
-            return "never"
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            text, problems = self.render([PromptPart("later", later)])
-        self.assertEqual(text, "")
-        self.assertIn("aprompt", problems[0][2])
 
     def test_aprompt_awaits_an_async_part_and_leaves_out_one_that_takes_too_long(self):
         async def later(context):
@@ -239,7 +230,7 @@ class RenderTests(Temporary):
 
 
 class PartsProbe(Engine):
-    """Records what `Session.prompt` gives, and whether it refuses a persona that is not the run's."""
+    """Records what `Session.aprompt` gives, and whether it refuses a persona that is not the run's."""
 
     spec = EngineSpec("parts_probe", "test engine", "one")
     seen: list = []
@@ -247,11 +238,11 @@ class PartsProbe(Engine):
     async def run(self, session):
         persona = session.personas[0].name
         try:
-            session.prompt("someone_else")
+            await session.aprompt("someone_else")
             refused = False
         except ValueError:
             refused = True
-        self.seen.append((session.prompt(persona), session.prompt(persona, "turn"), refused))
+        self.seen.append((await session.aprompt(persona), await session.aprompt(persona, "turn"), refused))
         return RunYield.DONE
 
 

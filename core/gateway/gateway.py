@@ -130,7 +130,6 @@ class Gateway:
         self.bottle, self.manager = bottle, manager
         self.audit = audit or Audit()
         self.interfaces: dict[str, Interface] = {}
-        self._origin: dict[str, str] = {}
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self._tasks: set[asyncio.Task] = set()
         self._timer: asyncio.Task | None = None
@@ -151,14 +150,13 @@ class Gateway:
             self._admin.set_routine(name, routine, keep_next=existing)
 
     # ---- registration and lifecycle ----------------------------------------------------------------
-    def register_interface(self, interface: Interface, extension: str) -> None:
+    def register_interface(self, interface: Interface) -> None:
         name = interface.name
         if name == ROUTINE or not name or ":" in name:
             raise ValueError(f"Interface name {name!r} is reserved or invalid")
         if name in self.interfaces:
             raise ValueError(f"Interface {name!r} is already registered")
         self.interfaces[name] = interface
-        self._origin[name] = extension
 
     async def start(self) -> None:
         for name, interface in self.interfaces.items():

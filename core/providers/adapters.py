@@ -84,62 +84,6 @@ def function_names(tools) -> dict[str, str]:
     return names
 
 
-STRICT_UNSUPPORTED = {"maxItems", "minItems", "uniqueItems", "minimum", "maximum", "exclusiveMinimum",
-                      "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "pattern", "format"}
-
-
-def strict_tool_schema(schema: Any) -> Any:
-    """A schema as strict tool calls take it (`schema_mode: strict_tool`; DeepSeek's beta): every property
-    required, an object without properties sent as a JSON string (`from_strict_tool` decodes it), limits dropped.
-    The registry still validates the reply against the full schema."""
-    if not isinstance(schema, Mapping):
-        return schema
-    if schema.get("type") == "object" and not schema.get("properties"):
-        return {"type": "string", "description": "a JSON object, written as a string"}
-    result = {key: value for key, value in schema.items() if key not in STRICT_UNSUPPORTED}
-    if isinstance(schema.get("items"), Mapping):
-        result["items"] = strict_tool_schema(schema["items"])
-    for key in ("anyOf", "oneOf"):
-        if key in schema:
-            result[key] = [strict_tool_schema(item) for item in schema[key]]
-    if "properties" in schema:
-        result["properties"] = {name: strict_tool_schema(value) for name, value in schema["properties"].items()}
-        result["required"] = list(schema["properties"])
-        result["additionalProperties"] = False
-    return result
-
-
-def from_strict_tool(value: Any, schema: Any) -> Any:
-    """A strict tool call's arguments as the schema wants them: the strings standing for objects decoded again."""
-    if not isinstance(schema, Mapping):
-        return value
-    if schema.get("type") == "object" and not schema.get("properties"):
-        if not isinstance(value, str):
-            return value
-        try:  # the first JSON value in it: models sometimes leave a stray bracket after the object
-            decoded, _ = json.JSONDecoder().raw_decode(value.strip())
-        except ValueError:
-            return value  # left as it is: the registry reports it, and the caller asks again
-        return decoded if isinstance(decoded, dict) else value
-    if isinstance(value, dict) and isinstance(schema.get("properties"), Mapping):
-        return {key: from_strict_tool(item, schema["properties"].get(key)) for key, item in value.items()}
-    if isinstance(value, list) and isinstance(schema.get("items"), Mapping):
-        return [from_strict_tool(item, schema["items"]) for item in value]
-    return value
-
-
-def tool_answer(message: Any, name: str, schema: Mapping[str, Any]) -> str:
-    """The JSON text of a strict tool call named `name`, else the message's own text (some replies come as text)."""
-    for call in getattr(message, "tool_calls", None) or ():
-        function = getattr(call, "function", None)
-        if getattr(function, "name", "") == name:
-            try:
-                return json.dumps(from_strict_tool(json.loads(function.arguments), schema), ensure_ascii=False)
-            except (TypeError, ValueError):
-                return str(getattr(function, "arguments", "") or "")
-    return getattr(message, "content", None) or ""
-
-
 def openai_messages(messages: Sequence[Mapping[str, Any]], names: Mapping[str, str] | None = None) -> list[dict]:
     """The core's tool-call messages in OpenAI's form: an assistant message's `tool_calls` as function calls (under
     their API `names`), with its `replay` keys (DeepSeek's reasoning_content) beside them, and `tool` messages
@@ -250,14 +194,6 @@ class OpenAICompatible:
         elif schema and mode == "native":
             params["response_format"] = {"type": "json_schema", "json_schema": {
                 "name": schema_name, "strict": bool(self.settings.get("strict_schema", False)), "schema": schema}}
-        elif schema and mode == "strict_tool":  # the answer as the arguments of one tool, held to the schema
-            params["tools"] = [{"type": "function", "function": {
-                "name": schema_name, "strict": True, "parameters": strict_tool_schema(schema),
-                "description": "Your answer: call this exactly once, with every field."}}]
-            params["tool_choice"] = "auto"  # thinking models refuse a forced choice (DeepSeek: 400)
-            params["messages"] = [dict(message) for message in params["messages"]]
-            if params["messages"][-1].get("role") == "user":
-                params["messages"][-1]["content"] += f"\n\n(Answer by calling {schema_name}.)"
         elif schema:
             params["messages"] = with_schema_instruction(messages, schema)
             params["response_format"] = {"type": "json_object"}
@@ -294,11 +230,10 @@ class OpenAICompatible:
         output_tokens = getattr(usage, "completion_tokens", 0) or 0
         cached = cached_tokens(usage)
         charged = charge(usage)
-        text = lambda reply: tool_answer(reply.choices[0].message, schema_name, schema) if mode == "strict_tool" \
-            else reply.choices[0].message.content or ""
+        text = lambda reply: reply.choices[0].message.content or ""
         blank = lambda reply: not text(reply).strip() and not (
             mode == "tools" and openai_calls(reply.choices[0].message, back))
-        if mode in ("json_object", "strict_tool", "tools") and blank(response):
+        if mode in ("json_object", "tools") and blank(response):
             # JSON mode sometimes answers only whitespace (DeepSeek); a blank answer is never usable, so ask once more.
             response = await client.chat.completions.create(**params)
             usage = getattr(response, "usage", None)
