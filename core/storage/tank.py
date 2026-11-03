@@ -70,14 +70,6 @@ class RunRecord:
 class Tank:
     def __init__(self, path: str | Path):
         self.db = Database(path, SCHEMA)
-        if "files" not in {row[1] for row in self.db.query("PRAGMA table_info(messages)")}:
-            self.db.execute("ALTER TABLE messages ADD COLUMN files TEXT")
-        if self.db.one("SELECT 1 FROM sqlite_master WHERE type='table' AND name='diary'"):  # the log's name before
-            with self.db.transaction() as db:
-                db.execute("INSERT INTO log(at,module,kind,text,address,subject,persona,data) SELECT updated_at,'core',"
-                           "'note',note,address,subject,persona,json_object('key',key,'kind',kind,'importance',importance)"
-                           " FROM diary")
-                db.execute("DROP TABLE diary")
 
     def close(self) -> None:
         self.db.close()

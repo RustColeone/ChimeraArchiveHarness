@@ -33,16 +33,16 @@ class ExtensionContextImpl:
     config: Mapping[str, Any]
     data_dir: Path
     _log: Callable[..., None]
-    facts: Any = None  # contracts.Facts for this module (contracts 1.9); None when loaded without a core
-    present: frozenset = frozenset()  # the modules it `uses` that are loaded (contracts 1.10)
-    _personas: Callable[[], list] | None = None  # the agents loaded so far (contracts 1.11)
-    prices: Any = None  # the core's model prices (contracts 1.12); None when loaded without a core
+    facts: Any  # contracts.Facts for this module
+    present: frozenset  # the modules it `uses` that are loaded
+    _personas: Callable[[], list]  # the agents loaded so far
+    prices: Any  # contracts.Prices
 
     def log(self, event: str, **fields: Any) -> None:
         self._log("extension", extension=self.name, detail=event, **fields)
 
     def personas(self) -> list[dict]:
-        return list(self._personas()) if self._personas is not None else []
+        return list(self._personas())
 
 
 @dataclass
@@ -105,18 +105,17 @@ def local_config(path: str | Path) -> dict:
 
 
 async def load_extension(path: str | Path, config_for: Callable[[str], Mapping[str, Any]], data_root: Path,
-                         log: Callable[..., None], facts_for: Callable[[str], Any] | None = None,
-                         present: frozenset = frozenset(), imported: tuple[Extension, ModuleType] | None = None,
-                         personas: Callable[[], list] | None = None, prices: Any = None) -> LoadedExtension:
-    """Imports the module (unless `imported` already has it) and runs its setup; `present` is which of the modules
-    it uses are loaded, `personas` lists the agents loaded so far."""
-    extension, module = imported or import_extension(path)
+                         log: Callable[..., None], facts_for: Callable[[str], Any], present: frozenset,
+                         imported: tuple[Extension, ModuleType], personas: Callable[[], list], prices: Any
+                         ) -> LoadedExtension:
+    """Runs the module's setup; `present` is which of the modules it uses are loaded, `personas` lists the agents
+    loaded so far."""
+    extension, module = imported
     data_dir = data_root / extension.name
     data_dir.mkdir(parents=True, exist_ok=True)
     config = merge(local_config(Path(path).resolve()), dict(config_for(extension.name) or {}))
-    context = ExtensionContextImpl(extension.name, config, data_dir, log,
-                                   facts_for(extension.name) if facts_for is not None else None, frozenset(present),
-                                   personas, prices)
+    context = ExtensionContextImpl(extension.name, config, data_dir, log, facts_for(extension.name), present, personas,
+                                   prices)
     try:
         contributions = extension.setup(context)
         if inspect.isawaitable(contributions):

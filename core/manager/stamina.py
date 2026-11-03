@@ -70,7 +70,7 @@ class Stamina:
         else for everyone, else her own default (Persona.allowance), else $0.50."""
         found = self.personas().get(persona)
         given = (self.store.get(f"setting:allowance:{persona}"), dict(self.settings.get("personas") or {}).get(persona),
-                 self.store.get("setting:allowance"), self.settings.get("allowance"), getattr(found, "allowance", None))
+                 self.store.get("setting:allowance"), self.settings.get("allowance"), found.allowance if found else None)
         value = next((item for item in given if item is not None), DEFAULT_ALLOWANCE)
         try:
             return max(0.0, float(value))
@@ -185,8 +185,7 @@ class Stamina:
         found = self.personas().get(persona)
         if found is None:
             return ""
-        profile = found.tier("own") if hasattr(found, "tier") else found.profile
-        candidates = self.providers.candidates(profile) or self.providers.candidates(found.profile)
+        candidates = self.providers.candidates(found.tier("own")) or self.providers.candidates(found.profile)
         return str(candidates[0]["provider"]) if candidates else ""
 
     def account(self, provider: str) -> dict | None:
@@ -255,7 +254,7 @@ class Stamina:
     # ---- what the pages read -----------------------------------------------------------------------------------
     def name(self, persona: str) -> str:
         found = self.personas().get(persona)
-        return getattr(found, "display_name", "") or persona
+        return found.display_name if found else persona
 
     def view_total(self) -> dict:
         """Everyone's day against the total (InterfacePort.stamina with no persona)."""

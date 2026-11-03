@@ -116,7 +116,7 @@ def make_config(tmp: Path, overrides: dict | None = None) -> CoreConfig:
         "control": "owner:dm",
         "providers": {},
         "profiles": {"default": [{"provider": "fake", "model": "fake-model"}]},
-        "personas": {"p": {"display_name": "Pat", "prompt": "You are Pat.", "profile": "default"}},
+        "agents": {"p": {"display_name": "Pat", "prompt": "You are Pat.", "profile": "default"}},
         "assignments": {"*": {"engine": "probe", "personas": ["p"]}},
     }
     raw = merge(raw, overrides or {})

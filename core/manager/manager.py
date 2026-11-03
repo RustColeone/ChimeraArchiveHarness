@@ -207,18 +207,6 @@ class Manager:
             merged[pattern] = Assignment.from_dict(self._overrides.get(pattern))
         return merged
 
-    def legacy_use(self) -> dict[str, dict]:
-        """Runtime assignments saved before permissions moved out of assignments kept `allow`/`deny`;
-        carry those restrictions over as the pattern's `use` list instead of silently dropping them."""
-        layer = {}
-        for pattern in self._overrides.keys():
-            stored = self._overrides.get(pattern) or {}
-            allow, deny = list(stored.get("allow") or ["*"]), list(stored.get("deny") or [])
-            if allow != ["*"] or deny:
-                layer[pattern] = {"use": [*allow, *(f"!{item}" for item in deny)]}
-                self.audit.record("legacy_assignment_access", pattern=pattern)
-        return layer
-
     def default_assignment(self, pattern: str, value: Mapping[str, Any]) -> None:
         """An extension's suggested assignment; configured ones of the same pattern win."""
         if pattern not in self._config_assignments:
@@ -426,13 +414,9 @@ class Manager:
             return
         events = self.tank.events(record.id, ("tool_result", "approval_denied"))
         reported = {event.data.get("approval_id") for event in events}
-        # Reports written before they named their approval: matched by call and time instead.
-        unnamed = [event for event in events if "approval_id" not in event.data]
         for approval in sorted(decided, key=lambda item: item["created_at"]):
             lock = self._approval_locks.get(approval["id"])
-            if (approval["id"] in reported or (lock is not None and lock.locked())  # being decided right now
-                    or any(event.data.get("call_key") == approval["call_key"] and event.at >= approval["created_at"]
-                           for event in unnamed)):
+            if approval["id"] in reported or (lock is not None and lock.locked()):  # (being decided right now)
                 continue
             arguments = self.secrets.scrub_value(approval["arguments"])
             self.tank.redact_approval(approval["id"], arguments)

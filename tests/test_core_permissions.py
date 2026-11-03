@@ -60,16 +60,12 @@ class PolicyTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 Permissions([("core.yml", {"*": section})])
 
-    def test_old_assignment_keys_are_explained_but_old_runs_still_load(self):
+    def test_an_assignment_has_no_access_keys_and_critical_is_never_auto(self):
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaises(ConfigError) as caught:
+            with self.assertRaisesRegex(ConfigError, "Unknown assignment keys"):
                 make_config(Path(directory), {"assignments": {"*": {"preapprove": ["tools.write_value"]}}})
-            self.assertIn("permissions", str(caught.exception))
             with self.assertRaises(ConfigError):
                 make_config(Path(directory), {"permissions": {"*": {"tiers": {"critical": "auto"}}}})
-        stored = Assignment.from_dict({"pattern": "*", "engine": "probe", "personas": ["p"], "allow": ["*"],
-                                       "deny": [], "preapprove": ["x.y"]})
-        self.assertEqual(stored.engine, "probe")
 
     def test_secret_paths_include_process_environments(self):
         from core.manager.secrets import Secrets
@@ -245,16 +241,6 @@ class PermissionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(notice.data["always"], "false")
         await self.say('tool guarded.restart {"unit": "nd"}', sender="boss", conversation="q")
         self.assertEqual(self.chat.texts("q"), ["success: restarted nd"])
-
-    async def test_runtime_assignments_saved_with_allow_and_deny_keep_those_limits(self):
-        await self.start()
-        self.core.manager._overrides.set("chat:old", {"pattern": "chat:old", "engine": "probe", "personas": ["p"],
-                                                      "allow": ["guarded.*"], "deny": ["guarded.leak"],
-                                                      "preapprove": [], "since": 0})
-        await self.start()
-        allows = lambda name: self.core.manager.permissions.allows(Address("chat", "old"), name)
-        self.assertEqual((allows("guarded.fetch"), allows("guarded.leak"), allows("basic.now")),
-                         (True, False, False))
 
     # ---- grants ---------------------------------------------------------------------------------
     async def test_always_allow_needs_one_hand_approval_and_covers_one_subject_in_one_conversation(self):

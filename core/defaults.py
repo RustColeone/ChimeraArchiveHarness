@@ -62,7 +62,7 @@ def default_config() -> dict:
         # Candidates without an API key are skipped, so any one configured provider works. Modules ship their
         # own profiles (the room: one per character).
         "profiles": {"default": DEFAULT_CHAIN},
-        "personas": {"assistant": {"display_name": "Assistant", "profile": "default", "prompt": DEFAULT_PROMPT}},
+        "agents": {"assistant": {"display_name": "Assistant", "profile": "default", "prompt": DEFAULT_PROMPT}},
         # The core's own agent, answering in MomoChat (extensions/momochat) wherever nothing else is assigned.
         "assignments": {
             "*": {"engine": "momochat", "personas": ["assistant"]},

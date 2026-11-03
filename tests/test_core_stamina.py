@@ -133,7 +133,7 @@ class StaminaTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stamina.total(), 3.0)
 
     async def test_her_own_default_allowance_comes_after_what_you_set(self):
-        self.core = await start_core(self.tmp, {"prices": PRICES, "personas": {"p": {"allowance": 0.04}}},
+        self.core = await start_core(self.tmp, {"prices": PRICES, "agents": {"p": {"allowance": 0.04}}},
                                      adapter=FakeAdapter(handler=lambda messages, schema: "ok"))
         stamina = self.core.manager.stamina
         self.assertEqual(self.core.manager.personas["p"].allowance, 0.04)

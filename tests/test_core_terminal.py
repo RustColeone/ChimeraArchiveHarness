@@ -99,7 +99,7 @@ class TerminalCoreTests(unittest.IsolatedAsyncioTestCase):
         self.core = await start_core(Path(self._tmp.name), {
             "extensions": [str(FIXTURES / "fake"), str(FIXTURES / "probe"), str(ROOT / "extensions" / "terminal")],
             "extension_config": {"terminal": {**FAST, "cwd": self._tmp.name}},
-            "assignments": {"chat:term": {"engine": "terminal", "persona": "terminal"}}})
+            "assignments": {"chat:term": {"engine": "terminal", "personas": ["terminal"]}}})
         self.chat = iface(self.core)
 
     async def asyncTearDown(self):

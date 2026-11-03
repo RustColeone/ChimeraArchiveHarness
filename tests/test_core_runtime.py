@@ -549,17 +549,6 @@ class CoreRuntimeTests(unittest.IsolatedAsyncioTestCase):
         return [(event.data.get("approval_id"), event.data["result"]["summary"])
                 for event in core.tank.events(run_id, ("tool_result",))]
 
-    async def test_a_report_from_before_reports_named_their_approval_still_counts(self):
-        core = await self.core()
-        await iface(core).say('tool tools.write_value {"key": "k", "value": "v"}')
-        await settle(core)
-        approval = core.tank.approval(iface(core, "owner").notices("approval_request")[0].data["approval_id"])
-        core.tank.decide_approval(approval["id"], "approved", "owner:dm")
-        core.tank.append_event(approval["run_id"], "tool_result", {"call_key": approval["call_key"], "result": {
-            "status": "success", "summary": "wrote k"}})  # as decide() reported before it named the approval
-        core.manager._record_decisions(core.tank.run(approval["run_id"]))
-        self.assertEqual(self.outcomes(core, approval["run_id"]), [(None, "wrote k")])  # not reported twice
-
     async def test_a_decision_still_being_carried_out_is_left_to_it(self):
         core, first = await self.asked_twice()
         core.tank.decide_approval("again", "approved", "owner:dm")
@@ -673,7 +662,7 @@ class CoreRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_engine_can_speak_as_its_personas_and_history_records_the_speaker(self):
         from core.manager.handles import SessionHandle
-        core = await self.core({"personas": {"q": {"display_name": "Quinn", "prompt": "You are Quinn."}}})
+        core = await self.core({"agents": {"q": {"display_name": "Quinn", "prompt": "You are Quinn."}}})
         await iface(core).say("echo hi")
         await settle(core)
         record = core.tank.runs(("done",))[0]
@@ -687,23 +676,13 @@ class CoreRuntimeTests(unittest.IsolatedAsyncioTestCase):
         latest = core.tank.recent_messages("chat:room")[-1]
         self.assertEqual((latest.sender_name, latest.kind), ("Pat", "note"))
 
-    def test_history_keeps_attachments_and_older_databases_are_upgraded(self):
-        import sqlite3
+    def test_history_keeps_attachments(self):
         from contracts import FileRef
         from core.storage.tank import Tank
-        path = self.tmp / "old.db"
-        connection = sqlite3.connect(path)
-        connection.execute("CREATE TABLE messages (seq INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT NOT NULL, "
-                           "direction TEXT NOT NULL, message_id TEXT, sender_id TEXT, sender_name TEXT, text TEXT "
-                           "NOT NULL, kind TEXT NOT NULL, run_id TEXT, reply_to TEXT, quoted_text TEXT, at REAL NOT NULL)")
-        connection.execute("INSERT INTO messages(address,direction,text,kind,at) VALUES('a:b','in','old','text',1)")
-        connection.commit()
-        connection.close()
-        tank = Tank(path)
+        tank = Tank(self.tmp / "tank.db")
         tank.record_message("a:b", "in", "[Image]", kind="image", files=(FileRef("/x/p.png", "p.png", "image/png", 3),))
-        items = tank.recent_messages("a:b")
-        self.assertEqual([(item.text, item.files) for item in items],
-                         [("old", ()), ("[Image]", (FileRef("/x/p.png", "p.png", "image/png", 3),))])
+        self.assertEqual([item.files for item in tank.recent_messages("a:b")],
+                         [(FileRef("/x/p.png", "p.png", "image/png", 3),)])
         tank.close()
 
     # ---- scheduled messages ------------------------------------------------------------------------

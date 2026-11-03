@@ -58,7 +58,7 @@ class Temporary(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
 
     def config(self, personas):
-        return make_config(self.tmp, {"personas": personas})
+        return make_config(self.tmp, {"agents": personas})
 
 
 class ConfigTests(Temporary):
@@ -105,7 +105,7 @@ class ConfigTests(Temporary):
         from core.defaults import DEFAULT_PROMPT
         path = self.tmp / "core.yml"
         # env_files: [] keeps the repository's own .env out of this process.
-        path.write_text("env_files: []\npersonas:\n  assistant:\n    parts:\n"
+        path.write_text("env_files: []\nagents:\n  assistant:\n    parts:\n"
                         "      - {name: personality, text: Cheerful.}\n", encoding="utf-8")
         persona = CoreConfig.load(path).personas["assistant"]
         self.assertEqual(persona.prompt, DEFAULT_PROMPT)
@@ -269,7 +269,7 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
     async def core(self, parts, responses=None, overrides=None):
         adapter = FakeAdapter(responses or [reply()] * 6)
         persona = {"display_name": "Pat", "prompt": "You are Pat.", "parts": parts}
-        core = await start_core(self.tmp, {**ASSISTANT, "personas": {"p": persona}, **(overrides or {})}, adapter)
+        core = await start_core(self.tmp, {**ASSISTANT, "agents": {"p": persona}, **(overrides or {})}, adapter)
         self.cores.append(core)
         return core, adapter
 
@@ -333,7 +333,7 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
         extensions = [*make_config(self.tmp).raw["modules"]["paths"], str(module)]
         core, adapter = await self.core([], overrides={
             "extensions": extensions,
-            "personas": {"p": {"display_name": "Pat", "prompt": "You are Pat."},
+            "agents": {"p": {"display_name": "Pat", "prompt": "You are Pat."},
                          "ivy": {"parts": [{"name": "style", "text": "core.yml's style for Ivy."},
                                            {"name": "extra", "text": "Ivy likes tea."}]}},
             "assignments": {"*": {"engine": "momochat", "personas": ["p"]},
@@ -437,7 +437,7 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_parts_for_a_persona_no_module_has_are_refused_at_start(self):
         with self.assertRaises(ConfigError) as caught:
-            await self.core([], overrides={"personas": {"p": {"prompt": "You are Pat."},
+            await self.core([], overrides={"agents": {"p": {"prompt": "You are Pat."},
                                                         "nobody": {"parts": [{"text": "x"}]}}})
         self.assertIn("'nobody'", str(caught.exception))
 
@@ -464,7 +464,7 @@ class RoomTests(unittest.IsolatedAsyncioTestCase):
     async def start(self, script, personas=None):
         extensions = [*make_config(self.tmp).raw["modules"]["paths"], str(ROOT / "extensions" / "students")]
         self.core = await start_core(self.tmp, {
-            "extensions": extensions, "personas": personas or {},
+            "extensions": extensions, "agents": personas or {},
             "profiles": {name: [{"provider": "fake", "model": name}] for name in (*NAMES, "grok")},
             "assignments": {"*": {"engine": "momochat", "personas": list(NAMES)}}}, FakeAdapter(handler=script))
         return iface(self.core)
@@ -519,7 +519,7 @@ class WhaleChanTests(unittest.IsolatedAsyncioTestCase):
         self.core = await start_core(self.tmp, {
             "extensions": extensions, "profiles": PROFILES,
             "extension_config": {"whale_chan": QUIET},
-            "personas": {"deepseek": {"parts": [{"name": "personality", "text": "Teases gently."},
+            "agents": {"deepseek": {"parts": [{"name": "personality", "text": "Teases gently."},
                                                   {"name": "season", "text": "It is autumn.", "place": "turn"}]}},
             "assignments": {"*": {"engine": "momochat", "personas": ["deepseek"]}}}, adapter)
         await iface(self.core).say("你好")

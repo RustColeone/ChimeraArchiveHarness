@@ -133,13 +133,13 @@ class ExtensionApiTests(CoreCase):
     async def test_runtime_assignments_start_from_now_and_carry_options(self):
         core = await self.core()
         chat = iface(core)
-        core.manager.set_assignment("chat:special", {"engine": "probe", "persona": "toolbot",
+        core.manager.set_assignment("chat:special", {"engine": "probe", "personas": ["toolbot"],
                                                      "options": {"instructions": "be brief"}})
         await chat.say("options", conversation="special", received_at=time.time() - 60)
         await chat.say("options", conversation="special")
         await settle(core)
         self.assertEqual(chat.texts("special"), ['{"instructions": "be brief"}|toolbot'])
-        core.manager.set_assignment("chat:special", {"engine": "probe", "persona": "p", "enabled": False})
+        core.manager.set_assignment("chat:special", {"engine": "probe", "personas": ["p"], "enabled": False})
         await chat.say("echo silent", conversation="special")
         await settle(core)
         self.assertEqual(len(chat.texts("special")), 1)
@@ -171,7 +171,7 @@ class ExtensionApiTests(CoreCase):
         probe.RELEASE = asyncio.Event()
         await chat.say("hold", conversation="b")
         await asyncio.sleep(0.02)
-        core.manager.set_assignment("chat:b", {"engine": "probe", "persona": "p", "enabled": False})
+        core.manager.set_assignment("chat:b", {"engine": "probe", "personas": ["p"], "enabled": False})
         probe.RELEASE.set()
         await settle(core)
         self.assertEqual(chat.texts("b"), [])
@@ -282,7 +282,7 @@ class ReviewTwoTests(CoreCase):
         await iface(core).say('tool tools.write_value {"key": "k", "value": "v"}', conversation="w")
         await settle(core)
         approval_id = iface(core, "owner").notices("approval_request")[0].data["approval_id"]
-        core.manager.set_assignment("chat:w", {"engine": "probe", "persona": "p", "enabled": False})
+        core.manager.set_assignment("chat:w", {"engine": "probe", "personas": ["p"], "enabled": False})
         await settle(core)
         self.assertEqual(core.tank.runs(("cancelled",), address="chat:w")[0].error, "conversation_disabled")
         await iface(core, "owner").say(f"$approve {approval_id}", conversation="dm", sender="boss")

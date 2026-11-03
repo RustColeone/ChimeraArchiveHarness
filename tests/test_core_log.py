@@ -153,22 +153,6 @@ class LogTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tank.log_counts("chat:room", "bob", kind="note"), {"p": 1})
         self.assertEqual([line.kind for line in tank.log_lines("chat:room", subject="alice")], ["action"])
 
-    def test_the_diarys_notes_carry_over_as_notes(self):
-        path = self.tmp / "old.db"
-        Tank(path).close()
-        with sqlite3.connect(path) as db:
-            db.execute("CREATE TABLE diary (id INTEGER PRIMARY KEY AUTOINCREMENT, persona TEXT NOT NULL, address TEXT NOT "
-                       "NULL, subject TEXT NOT NULL, key TEXT NOT NULL, kind TEXT NOT NULL, note TEXT NOT NULL, importance "
-                       "INTEGER NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL)")
-            db.execute("INSERT INTO diary(persona,address,subject,key,kind,note,importance,created_at,updated_at) "
-                       "VALUES('p','chat:room','alice','tea','fact','Likes tea',4,1,2)")
-        tank = Tank(path)
-        self.addCleanup(tank.close)
-        line = tank.log_lines("chat:room")[0]
-        self.assertEqual((line.kind, line.text, line.subject, line.persona, line.at), ("note", "Likes tea", "alice", "p", 2))
-        self.assertEqual((line.module, line.data["key"], line.data["importance"]), ("core", "tea", 4))
-        self.assertIsNone(tank.db.one("SELECT 1 FROM sqlite_master WHERE name='diary'"))
-
     def test_search_terms_take_words_and_pieces_of_chinese(self):
         self.assertEqual(search_terms("the dentist 改到周三"), ["dentist", "改到", "到周", "周三"])
 

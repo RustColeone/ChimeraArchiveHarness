@@ -25,9 +25,6 @@ class Budget:
                    float(value.get("seconds", cls.seconds)))
 
 
-LEGACY_KEYS = frozenset({"allow", "deny", "preapprove"})
-
-
 @dataclass(frozen=True)
 class Assignment:
     """How one conversation (or routine) is handled: which engine and personas, with what budget.
@@ -50,27 +47,18 @@ class Assignment:
     options: Mapping[str, Any] = field(default_factory=dict)
     since: float = 0.0
 
-    KEYS = frozenset({"engine", "persona", "personas", "budget", "trusted", "lane", "enabled", "options", "since",
-                      "pattern"})
+    KEYS = frozenset({"engine", "personas", "budget", "trusted", "lane", "enabled", "options", "since", "pattern"})
 
     @classmethod
-    def from_config(cls, pattern: str, value: Mapping[str, Any], *, stored: bool = False) -> "Assignment":
+    def from_config(cls, pattern: str, value: Mapping[str, Any]) -> "Assignment":
         value = dict(value)
-        legacy = LEGACY_KEYS & set(value)
-        if legacy and not stored:
-            raise ValueError(f"Assignment {pattern!r}: {sorted(legacy)} moved to `permissions:` "
-                             f"(allow/deny → use: [\"*\", \"!name\"], preapprove → rules: {{name: auto}}); "
-                             "see docs/core/ARCHITECTURE.md, Permissions")
-        for key in legacy:
-            value.pop(key)  # runs recorded before permissions moved out of assignments
         unknown = set(value) - cls.KEYS
         if unknown:
             raise ValueError(f"Unknown assignment keys {sorted(unknown)}")
-        personas = value.get("personas") or ([value["persona"]] if value.get("persona") else [])
         lane = str(value.get("lane", "conversation"))
         if lane not in ("conversation", "sender"):
             raise ValueError("lane must be conversation or sender")
-        return cls(pattern=pattern, engine=str(value["engine"]), personas=tuple(personas),
+        return cls(pattern=pattern, engine=str(value["engine"]), personas=tuple(value.get("personas") or ()),
                    budget=Budget.from_config(value.get("budget")), trusted=bool(value.get("trusted", False)),
                    lane=lane, enabled=bool(value.get("enabled", True)), options=dict(value.get("options") or {}),
                    since=float(value.get("since", 0.0)))
@@ -88,7 +76,7 @@ class Assignment:
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "Assignment":
-        return cls.from_config(value["pattern"], value, stored=True)
+        return cls.from_config(value["pattern"], value)
 
 
 def matches(patterns, name: str) -> bool:

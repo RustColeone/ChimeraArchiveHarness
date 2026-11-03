@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 
 from contracts import Address, Persona
+from core.defaults import ROOT, default_config, merge
 from core.manager.policy import Assignment, Owners, Permissions
 from core.prompts import parts_from_config
 
@@ -61,11 +62,6 @@ class CoreConfig:
         self.file: Path | None = None
         self.env_file: Path = base_dir / ".env"
         self.env_files: list[Path] = [base_dir / ".env"]
-        for legacy in ("extensions", "plugin_dirs"):
-            if legacy in raw:
-                raise ConfigError(f"`{legacy}:` is no longer used: every module in extensions/ and plugins/ loads. "
-                                  "Remove it; list modules not to load under `modules: {exclude: [...]}` and folders "
-                                  "elsewhere under `modules: {paths: [...]}`.")
         modules = raw.get("modules") or {}
         if not isinstance(modules, dict) or set(modules) - self.MODULE_KEYS:
             raise ConfigError(f"`modules:` takes only {sorted(self.MODULE_KEYS)}")
@@ -90,15 +86,14 @@ class CoreConfig:
         if isinstance(secrets, str) or not all(isinstance(item, str) for item in secrets):
             raise ConfigError("`secrets:` must be a list of file paths or patterns")
         self.secret_paths = list(secrets)
-        # An agent is a persona with her models (no memory: a student is a module's agent with one). `agents:` (or
-        # `personas:`, its name before; merged, `agents:` winning key by key) defines core.yml's own: an entry with a
-        # `prompt` is an agent, with her models as `models:` (a profile of her name) or a `profile:` (her day's spending
-        # as `allowance:`, by default, and how hard she thinks in a conversation as `effort:`); one without only adds its `parts` to a module's persona (a student's).
+        # An agent is a persona with her models (no memory: a student is a module's agent with one). `agents:` defines
+        # core.yml's own: an entry with a `prompt` is an agent, with her models as `models:` (a profile of her name) or a
+        # `profile:` (her day's spending as `allowance:`, by default, and how hard she thinks in a conversation as
+        # `effort:`); one without only adds its `parts` to a module's persona (a student's).
         self.personas: dict[str, Persona] = {}
         self.persona_parts: dict[str, tuple] = {}
         try:
-            from core.defaults import merge
-            for name, value in merge(dict(raw.get("personas") or {}), dict(raw.get("agents") or {})).items():
+            for name, value in dict(raw.get("agents") or {}).items():
                 if not isinstance(value, dict):
                     raise ConfigError(f"agent {name!r} is a mapping (prompt, display_name, models or profile, parts)")
                 parts = parts_from_config(name, value.get("parts"), self.path)
@@ -128,7 +123,6 @@ class CoreConfig:
                                 for pattern, value in (raw.get("assignments") or {}).items()}
             # The core's own defaults, where core.yml left them as they are: they apply only while what they name is
             # loaded, while an assignment the owner wrote that names something missing stops the core.
-            from core.defaults import default_config
             builtin = default_config().get("assignments") or {}
             self.builtin_assignments = [pattern for pattern, value in builtin.items()
                                         if (raw.get("assignments") or {}).get(pattern) == value]
@@ -170,7 +164,6 @@ class CoreConfig:
     @staticmethod
     def builtin(path: Path) -> bool:
         """Built-in modules are the ones shipped in this repository's `extensions/`."""
-        from core.defaults import ROOT
         return path.resolve().parent == ROOT / "extensions"
 
     def path(self, value: str) -> Path:
@@ -180,7 +173,6 @@ class CoreConfig:
     @classmethod
     def load(cls, path: str | Path | None = None) -> "CoreConfig":
         """Built-in defaults, with `path` (if it exists) merged over them. Env files load first."""
-        from core.defaults import ROOT, default_config, merge
         raw: dict = {}
         base = ROOT
         if path is not None and Path(path).is_file():

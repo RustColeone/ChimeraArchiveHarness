@@ -488,8 +488,8 @@ class DefaultConfigurationTests(unittest.TestCase):
         self.assertIsNone(config.control)
         with tempfile.TemporaryDirectory() as directory:
             override = Path(directory) / "core.yml"
-            override.write_text("data_dir: data\nenv_files: []\npersonas:\n  assistant: {display_name: Pal, prompt: hi}\n"
-                                "assignments:\n  'discord:123': {engine: assistant, persona: assistant, enabled: false}\n")
+            override.write_text("data_dir: data\nenv_files: []\nagents:\n  assistant: {display_name: Pal, prompt: hi}\n"
+                                "assignments:\n  'discord:123': {engine: momochat, personas: [assistant], enabled: false}\n")
             with patch.dict(os.environ, {"DISCORD_OWNER_ID": "77"}):
                 config = CoreConfig.load(override)
         self.assertEqual(config.data_dir, (Path(directory) / "data").resolve())
@@ -498,7 +498,7 @@ class DefaultConfigurationTests(unittest.TestCase):
         self.assertFalse(config.assignments["discord:123"].enabled)
         self.assertEqual(str(config.control), "discord:dm:77")
 
-    def test_modules_are_excluded_by_name_or_path_added_by_path_and_old_keys_explain_themselves(self):
+    def test_modules_are_excluded_by_name_or_path_and_added_by_path(self):
         from core.config import ConfigError, CoreConfig
         with tempfile.TemporaryDirectory() as directory:
             extra = Path(directory) / "elsewhere" / "mine"
@@ -513,9 +513,6 @@ class DefaultConfigurationTests(unittest.TestCase):
             self.assertIn("discord", names)
             self.assertEqual(names[-1], "mine")
             self.assertFalse(config.builtin(config.modules()[-1]))
-            override.write_text("env_files: []\nextensions: [extensions/discord]\n")
-            with self.assertRaisesRegex(ConfigError, "no longer used"):
-                CoreConfig.load(override)
 
 
 if __name__ == "__main__":

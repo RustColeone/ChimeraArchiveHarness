@@ -253,9 +253,6 @@ class Core:
                     raise ConfigError(f"{source}: {error}") from error
                 layers.append((source, layer))
         layers.append(("core.yml", self.config.permissions))
-        legacy = self.manager.legacy_use()
-        if legacy:
-            layers.append(("runtime assignment (allow/deny)", legacy))
         try:
             return Permissions(layers)
         except ValueError as error:

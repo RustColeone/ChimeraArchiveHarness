@@ -115,7 +115,7 @@
 # Most specific pattern wins: "interface:conversation", then "interface:*", then "*".
 # assignments:
 #   "*":
-#     engine: momochat        # (engine: assistant, room or chat, its names before, still reach it)
+#     engine: momochat
 #     personas: [assistant]
 #     budget: {model_calls: 24, tool_calls: 24, seconds: 900}
 #     lane: conversation      # or sender: members of a group are handled independently
@@ -123,7 +123,7 @@
 #     # owner_instructions: private text added only when an owner speaks; max_steps: per-speaker step limit
 #   "discord:123456789012345678":   # a server channel
 #     engine: momochat
-#     persona: assistant
+#     personas: [assistant]
 #     enabled: false          # record messages, never answer
 #   "discord:234567890123456789":   # a group chat with the five students
 #     engine: momochat

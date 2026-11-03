@@ -1,6 +1,6 @@
 """Prompt parts: the pieces of a persona's prompt that engines place for it (see contracts.PromptPart).
 
-A persona's own parts come from its module or from core.yml (`personas: <name>: parts:`); modules may add parts
+A persona's own parts come from its module or from core.yml (`agents: <name>: parts:`); modules may add parts
 for every persona or for those they name. `Session.prompt` renders them for one persona at one place, and
 `Session.aprompt` awaits the async ones too."""
 

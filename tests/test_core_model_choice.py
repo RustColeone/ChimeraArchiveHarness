@@ -121,7 +121,7 @@ class SharedProfileTests(unittest.IsolatedAsyncioTestCase):
         self.fake = ListingAdapter(["fake-model"], handler=lambda messages, schema: "from fake")
         self.other = ListingAdapter(["m2"], handler=lambda messages, schema: "from other")
         config = make_config(Path(self._tmp.name), {
-            "personas": {"q": {"display_name": "Quinn", "prompt": "You are Quinn.", "profile": "default"},
+            "agents": {"q": {"display_name": "Quinn", "prompt": "You are Quinn.", "profile": "default"},
                          "r": {"display_name": "Pat", "prompt": "You are the other Pat.", "profile": "default"}},
             "assignments": {"*": {"engine": "probe_many", "personas": ["p", "q"]}, "chat:solo": {"engine": "probe",
                                                                                          "personas": ["p"]},
