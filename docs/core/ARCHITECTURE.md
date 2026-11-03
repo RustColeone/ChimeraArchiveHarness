@@ -386,7 +386,7 @@ to the unit to keep a core that keeps crashing down until it is fixed.
 
 | Path | Contents |
 | --- | --- |
-| [`contracts/`](../../contracts) | Public types and protocols |
+| [`contracts/`](../../contracts) | Public types and protocols, the small helpers every side shares (`shared.py`), and what every Discord bot here shares (`discord_bot/`) |
 | [`core/gateway/gateway.py`](../../core/gateway/gateway.py) | Gateway, ports, admission, routes, routines |
 | [`core/manager/manager.py`](../../core/manager/manager.py) | Registries, runs, permission decisions, approvals, grants, commands |
 | [`core/manager/policy.py`](../../core/manager/policy.py) | Assignments, budgets, owners and the permissions model (`use`, tiers, rules, layers) |

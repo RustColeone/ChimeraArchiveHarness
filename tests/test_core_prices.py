@@ -1,4 +1,4 @@
-"""Model prices (core/providers/prices.py, contracts 1.12): the list against a stand-in for Artificial Analysis's free
+"""Model prices (core/providers/prices.py): the list against a stand-in for Artificial Analysis's free
 models list, and every answer priced by the core."""
 
 import os

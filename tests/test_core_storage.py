@@ -1,4 +1,4 @@
-"""Storage the core keeps for modules (contracts 1.5): scoped stores, history search and summaries, diary scopes."""
+"""Storage the core keeps for modules: scoped stores, history search and summaries, diary scopes."""
 
 import tempfile
 import unittest

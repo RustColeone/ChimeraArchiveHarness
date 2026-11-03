@@ -387,7 +387,7 @@ class Manager:
         self._stopping = False
         self.stamina.start()
         self._clean_workspaces()
-        # Decisions the stop cut off are reported first, for running runs too (a room keeps running while one job
+        # Decisions the stop cut off are reported first, for running runs too (a group keeps running while one job
         # waits for its approval): without awaiting, as the gateway already takes `$approve`, and before any run
         # starts, so each finds its outcomes. Then the running runs go on, then the waiting ones are resumed.
         running = self.tank.runs(("running",), limit=1000)

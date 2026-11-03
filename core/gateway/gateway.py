@@ -214,11 +214,11 @@ class Gateway:
             raise ValueError(f"Interface {interface!r} cannot submit for {request.address.interface!r}")
         if request.origin != "person":
             raise ValueError("Interfaces submit person requests only")
-        if request.text.startswith(IMPULSE) and not impulse(request):  # (typed by a person: it is only text)
-            request = dataclasses.replace(request, text=request.text[len(IMPULSE):])
         return await self._submit(request)
 
     async def _submit(self, request: Request) -> SubmitResult:
+        if request.text.startswith(IMPULSE) and not impulse(request):  # (typed by someone: it is only text)
+            request = dataclasses.replace(request, text=request.text[len(IMPULSE):])
         key = f"{request.address.interface}:{request.id}"
         async with self._locks[str(request.address)]:
             if not self.bottle.mark_seen(key):

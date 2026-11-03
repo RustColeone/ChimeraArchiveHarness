@@ -81,7 +81,7 @@ class Club:
                "modules": {"dirs": [], "paths": [str(ROOT / "extensions" / "students"),
                                                  str(ROOT / "extensions" / "chimera")]},
                "extension_config": {"chimera": lab, "students": {"learn": False}}}
-        if "prices" in lab:  # model prices are the core's (contracts 1.12)
+        if "prices" in lab:  # model prices are the core's
             raw["prices"] = {"models": lab.pop("prices")}
         names = {*PROVIDERS, *dict(self.config.get("providers") or {})}
         self.core = Core(CoreConfig(raw, self.tmp), provider_adapters={name: self.adapter for name in names},
@@ -867,7 +867,7 @@ class CoreTests(unittest.IsolatedAsyncioTestCase):
                 await core.stop()
 
     async def test_classmates_without_a_key_are_passed_over_quietly_in_the_core(self):
-        """The core says which profiles have a key (Models.ready, contracts 1.6), so nobody is announced who can't come."""
+        """The core says which profiles have a key (Models.ready), so nobody is announced who can't come."""
         with tempfile.TemporaryDirectory() as folder:
             tmp = Path(folder)
             team = {"team": {"gpt": False, "claude": False, "gemini": False, "grok": False, "deepseek": False,

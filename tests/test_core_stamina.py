@@ -1,4 +1,4 @@
-"""Stamina (core/manager/stamina.py, contracts 1.12): what each persona may spend a day and the account she spends from;
+"""Stamina (core/manager/stamina.py): what each persona may spend a day and the account she spends from;
 a run that reaches her allowance, or its own budget, waits for the owner's card instead of spending more."""
 
 import tempfile

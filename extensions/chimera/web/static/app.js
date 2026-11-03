@@ -1375,7 +1375,7 @@
     meta.replaceChildren(...parts);
   }
 
-  // ---- places: this Classroom and the others that published one (contracts 1.7) ------------------------------
+  // ---- places: this Classroom and the others that published one ------------------------------
   const placeOf = (address) => (state.places?.others || []).find((place) => place.interface === String(address || "").split(":")[0]);
   const placeName = (address) => placeOf(address) ? `the ${placeOf(address).place.name.toLowerCase()}`
     : String(address || "").startsWith("discord:") ? "Discord" : "where it came from";

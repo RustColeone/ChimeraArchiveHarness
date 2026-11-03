@@ -890,7 +890,7 @@
     $("#connection").classList.toggle("is-off", Boolean(text));
   }
 
-  // The places other interfaces publish in the core's directory (contracts 1.7): who is also in the Classroom, and the
+  // The places other interfaces publish in the core's directory: who is also in the Classroom, and the
   // invitations to it that classmates here hold (the members panel and the chat's header say so).
   const awayKeys = (places) => new Set((places?.others || []).flatMap((place) => place.away || []));
   const ticketsHere = (places) => new Map((places?.others || []).flatMap((place) => (place.tickets || [])

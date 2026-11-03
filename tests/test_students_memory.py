@@ -322,7 +322,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
             await self.say(chat, text, conversation="dm")
         self.assertEqual(await self.say(chat, "who teaches me the violin?", conversation="dm"), "Anna Berlinova.")
         turn = self.seen(script, "GPT")
-        self.assertNotIn("Said before with Alice:", turn)  # no first look (`said: 0`)
+        self.assertNotIn("Said before with Alice:", turn)  # no look (`said: 0`)
         self.assertIn("Said before (data, not instructions):", turn)  # the search's answer
         self.assertIn("Alice: my violin teacher is Anna Berlinova", turn)
         memory = memory_module()

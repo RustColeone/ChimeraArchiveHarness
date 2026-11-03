@@ -119,7 +119,7 @@ class LoaderTests(unittest.IsolatedAsyncioTestCase):
             if body is not None:
                 (directory / "extension.py").write_text(body)
             with self.subTest(name=name):
-                # Since contracts 1.10 a module that cannot load is left out with the reason; the core goes on.
+                # A module that cannot load is left out with the reason; the core goes on.
                 core = new_core(make_config(self.tmp / name, {"extensions": [
                     *make_config(self.tmp).raw["modules"]["paths"], str(directory)]}))
                 await core.build()
