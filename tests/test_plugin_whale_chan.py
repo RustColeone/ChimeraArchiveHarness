@@ -70,7 +70,7 @@ class ChatEngineTests(unittest.IsolatedAsyncioTestCase):
         """Her mneme-llm file, as the companion keeps it."""
         import mneme_llm
         memory = mneme_llm.Mneme(str(self.tmp / "data" / "extensions" / "students" / "deepseek.db"), "deepseek",
-                                 luna=False, micro=False, embed=False, meaning_micro=False, memory_language=None)
+                                 embed=False, meaning_micro=False, memory_language=None)
         self.addCleanup(memory.close)
         return memory
 
@@ -105,7 +105,7 @@ class ChatEngineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.adapter.calls), 3)
 
     async def test_a_long_thread_is_trimmed_to_the_character_budget_newest_first(self):
-        chat = await self.start([step("ok")], {"surface": False, "history_limit": 100, "history_chars": 50})
+        chat = await self.start([step("ok")], {"history_limit": 100, "history_chars": 50})
         from contracts import Address, Sender
         now = time.time()
         for index in range(5):
@@ -116,44 +116,6 @@ class ChatEngineTests(unittest.IsolatedAsyncioTestCase):
         prompt = self.prompt(0)
         self.assertIn("message number 4", prompt)
         self.assertNotIn("message number 1", prompt)
-
-    async def observed(self, chat, count, *, days=1, size=2):
-        """`count` messages already said, over `days` days."""
-        start = time.time() - days * 86400
-        for index in range(count):
-            await chat.port.observe(Address("chat", "room"), f"message number {index} " + "字" * size,
-                                    sender=Sender("alice", "Alice"), message_id=f"m{index}",
-                                    at=start + index * days * 86400 / count)
-
-    async def test_with_the_surface_on_she_reads_far_past_the_history_limit(self):
-        chat = await self.start([step("ok")], {"surface": True})
-        await self.observed(chat, 400)
-        await chat.say("latest")
-        await settle(self.core)
-        self.assertIn("message number 0 ", self.prompt(0))
-        self.assertIn("message number 399 ", self.prompt(0))
-        self.assertEqual(len(self.adapter.calls), 1)  # (nothing was summarised)
-
-    async def test_without_it_the_limit_stands(self):
-        chat = await self.start([step("ok")], {"surface": False})
-        await self.observed(chat, 400)
-        await chat.say("latest")
-        await settle(self.core)
-        self.assertNotIn("message number 0 ", self.prompt(0))
-
-    async def test_the_surface_lets_the_older_part_go_at_twice_what_it_keeps(self):
-        chat = await self.start([step("Earlier they talked a lot."), step("ok")], {"surface": True, "compact": True})
-        await self.observed(chat, 400, days=6, size=40)
-        from core.loader import _package_name
-        history = sys.modules[_package_name(ROOT / "extensions" / "momochat") + ".history"]
-        with patch.multiple(history, SURFACE_FLOOR=200, SURFACE_DAYS=1):
-            await chat.say("latest")
-            await settle(self.core)
-        self.assertIn("message number 0 ", self.prompt(0))  # (what leaves goes to the summary writer)
-        answer = self.prompt(1)
-        self.assertIn("Earlier they talked a lot.", answer)
-        self.assertNotIn("message number 0 ", answer)
-        self.assertIn("message number 399 ", answer)
 
     async def test_step_limit_forces_an_answer(self):
         chat = await self.start([step("a", "continue", [("basic.now", {})]),

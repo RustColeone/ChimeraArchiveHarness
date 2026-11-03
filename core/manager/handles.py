@@ -10,7 +10,7 @@ import json
 import math
 import time
 
-from contracts import (Activity, Address, Delivery, Display, Event, FileRef, HistoryItem, HistorySummary, ModelError,
+from contracts import (Activity, Address, Context, Delivery, Display, Event, FileRef, HistoryItem, HistorySummary, ModelError,
                        ModelRequest, ModelResult, PART_PLACES, PartContext, Persona, Request, Sender, ToolResult)
 from core.manager.logbook import LogbookHandle
 from core.serialize import request_from_dict
@@ -47,7 +47,6 @@ class ToolsHandle:
 
 
 SUMMARY_CHARS = 8000
-READS_MOST = 200  # messages a capability reads at once
 
 
 class HistoryHandle:
@@ -92,7 +91,7 @@ class ReadingHistory:
         self._history = history
 
     def recent(self, limit: int = 30) -> list[HistoryItem]:
-        return self._history.recent(min(limit, READS_MOST))
+        return self._history.recent(limit)
 
     def search(self, text: str, limit: int = 20) -> list[HistoryItem]:
         return self._history.search(text, limit)
@@ -184,6 +183,10 @@ class SessionHandle:
     async def aprompt(self, persona: str, place: str = "stable", since: float = 0.0) -> str:
         match, context = self._part_context(persona, place, since)
         return await self._manager.arender_prompt(match, place, context)
+
+    def context(self, persona: str, since: float = 0.0) -> Context | None:
+        match, context = self._part_context(persona, "context", since)
+        return self._manager.context_of(match, context)
 
     def _part_context(self, persona: str, place: str, since: float = 0.0):
         match = next((item for item in self.personas if item.name == persona), None)

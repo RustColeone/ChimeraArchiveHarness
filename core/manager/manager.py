@@ -20,7 +20,7 @@ from typing import Any, Mapping, Protocol
 
 import jsonschema
 
-from contracts import (SHUTDOWN, TIERS, Action, Address, Capability, Command, Delivery, Display, Engine, Exchange,
+from contracts import (SHUTDOWN, TIERS, Action, Address, Capability, Command, Context, Delivery, Display, Engine, Exchange,
                        FileRef, ModelError, ModelRequest, ModelResult, Operation, Option, PartContext, Persona,
                        PromptPart, Reply, Request, Risk, RunYield, Sender, ToolResult, Watcher)
 from core.audit import Audit
@@ -32,7 +32,7 @@ from core.manager.routines import Caller, RoutineDesk
 from core.manager.policy import Assignment, Owners, Permissions, most_specific
 from core.manager.secrets import Secrets
 from core.manager.stamina import Paused, Stamina, money
-from core.prompts import FileText, arender, parts_for, render, with_parts
+from core.prompts import FileText, arender, conversation_of, parts_for, render, with_parts
 from core.providers.registry import Providers
 from core.serialize import request_from_dict, request_to_dict
 from core.storage.tank import RunRecord, Tank
@@ -260,6 +260,11 @@ class Manager:
         """Session.aprompt: `render_prompt` with the async parts awaited."""
         parts, report, done = self._rendering(persona, place)
         return done(await arender(parts, context, place, report))
+
+    def context_of(self, persona: Persona, context: PartContext) -> Context | None:
+        """Session.context: what a module keeps of this conversation for her."""
+        parts, report, _ = self._rendering(persona, "context")
+        return conversation_of(parts, context, report)
 
     def _rendering(self, persona: Persona, place: str):
         """The parts to render, how a problem is reported, and what finishes the text (scrubbed, and the problems

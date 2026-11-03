@@ -67,9 +67,6 @@ class RunRecord:
     updated_at: float = 0.0
 
 
-RECENT_MOST = 30000  # messages one read of a conversation may return (an engine with a long context)
-
-
 class Tank:
     def __init__(self, path: str | Path):
         self.db = Database(path, SCHEMA)
@@ -164,7 +161,7 @@ class Tank:
 
     def recent_messages(self, address: str, limit: int = 30) -> list[HistoryItem]:
         rows = self.db.query("SELECT * FROM messages WHERE address=? ORDER BY seq DESC LIMIT ?",
-                             (address, max(1, min(int(limit), RECENT_MOST))))
+                             (address, max(1, min(int(limit), 200))))
         return [self._history_item(row) for row in reversed(rows)]
 
     def search_messages(self, address: str, text: str, limit: int = 20, before: str | None = None) -> list[HistoryItem]:

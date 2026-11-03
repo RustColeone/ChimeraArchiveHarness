@@ -53,7 +53,17 @@ class EngineSpec:
             raise ValueError(f"engine {self.name!r}: formerly lists its own name")
 
 
-PART_PLACES = ("stable", "turn")
+PART_PLACES = ("stable", "turn", "context")
+
+
+@dataclass(frozen=True)
+class Context:
+    """What a `context` part gives: the conversation as chat messages, oldest first, up to the moment `upto`. An engine
+    reads these in place of its own window and summary, and of its thread only what came after `upto`. So a module that
+    keeps a conversation decides how much of it she reads, and compacts it. Added in 1.17."""
+
+    messages: tuple[Mapping[str, str], ...]
+    upto: float
 
 
 @dataclass(frozen=True)
@@ -82,7 +92,9 @@ class PromptPart:
     be async (a part that looks something up), and engines render it with `Session.aprompt` (`Session.prompt` leaves
     an async part out). `place` says where an
     engine puts it: `stable` in the system prompt (the same every turn, so the provider's prompt cache keeps
-    serving it), `turn` in the turn's context after the history (it may change every turn). Parts come in `order`
+    serving it), `turn` in the turn's context after the history (it may change every turn), `context` (added in 1.17)
+    in place of the history: its function returns a `Context`, or None to leave it to the engine (`Session.context`
+    gives the first). Parts come in `order`
     (lower first). A module's part is for the personas it names (`personas`), or for every persona when it names
     none; a persona's own parts are its own. Engines get them rendered with `Session.prompt`."""
 
@@ -349,8 +361,13 @@ class Session(Protocol):
 
     async def aprompt(self, persona: str, place: str = "stable", since: float = 0.0) -> str:
         """`prompt`, with async parts awaited (added in 1.14): each in turn, for at most a few seconds (one that takes
-        longer is left out, and logged). Render once per turn: a part may cost a lookup."""
+        longer is left out, and logged). Render once per turn: a part may cost a lookup. `since` (added in 1.17): when
+        the thread she is in began, which the part reads as `PartContext.since`."""
         ...
+
+    def context(self, persona: str, since: float = 0.0) -> Context | None:
+        """What a module keeps of this conversation for her, if one does (added in 1.17). She reads it in place of the
+        engine's own window; it may change between her steps, so an engine asks each time it builds a request."""
 
     def inbox(self) -> list[Request]:
         """Requests for this run's lane that arrived while this run was thinking. Each is returned once.

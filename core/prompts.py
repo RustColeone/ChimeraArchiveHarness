@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
-from contracts import PART_PLACES, PartContext, Persona, PromptPart
+from contracts import PART_PLACES, Context, PartContext, Persona, PromptPart
 
 PLACE_LIMIT = 40_000  # characters per persona and place: the part that crosses it is cut, those after are left out
 FILE_LIMIT = 1_000_000  # characters read from a part's file (comments included)
@@ -115,6 +115,22 @@ def _text(text) -> str:
     if not isinstance(text, str):
         raise TypeError(f"gave {type(text).__name__}, not text")
     return text
+
+
+def conversation_of(parts: Iterable[PromptPart], context: PartContext,
+                    report: Callable[[PromptPart, str, str], None]) -> Context | None:
+    """The first `context` part's `Context`, in order. One that fails is left out and reported `failed`, and the next is
+    asked: the engine's own window is always there to fall back on."""
+    for part in _ordered(parts, "context"):
+        try:
+            found = part.text(context)
+            if isinstance(found, Context):
+                return found
+            if found is not None:
+                raise TypeError(f"gave {type(found).__name__}, not a Context")
+        except Exception as error:
+            report(part, "failed", "left out: " + describe(error))
+    return None
 
 
 def render(parts: Iterable[PromptPart], context: PartContext, place: str,

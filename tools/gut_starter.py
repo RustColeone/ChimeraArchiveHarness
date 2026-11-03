@@ -61,7 +61,7 @@ def main() -> int:
     sys.path.insert(0, str(ROOT))
     from openai import OpenAI
     from extensions.students.extension import read_students
-    from extensions.students.gut import mine, note_messages, written
+    from mneme_llm.gut import mine, note_messages, written
     student = next((data for data in read_students() if data["name"] == arguments.student), None)
     if student is None:
         raise SystemExit(f"no student called {arguments.student}")

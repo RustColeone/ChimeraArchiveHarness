@@ -66,72 +66,6 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         await self.core.manager.idle()  # and what the watchers do after
         return chat.texts(conversation)[-1]
 
-    def asked_memory(self, recall=0.9):
-        """A memory with one look, three search hits and two notes, its calls recorded."""
-        episode = lambda id, said: SimpleNamespace(id=id, at=float(id), lines=(("Alice", said), ("Her", "ok")))
-        searched = []
-
-        async def alook(subject, query, **options):
-            return [episode(1, "the look's own")]
-
-        async def asearch(subject, query, limit, seen):
-            searched.append(query)
-            found = [episode(1, "the look's own"), episode(2, "my car is a white Dolphin"),
-                     episode(3, "what car do I drive?")]
-            return [item for item in found if item.id not in seen]
-
-        async def find(notes, query):
-            return SimpleNamespace(similarities={7: 0.33, 8: 0.20}, floor=0.41)  # both under the floor
-
-        async def adecide(text, questions):
-            return {"recall": SimpleNamespace(probability=recall)}
-        notes = [SimpleNamespace(id=7, text="Alice drives a white Dolphin."), SimpleNamespace(id=8, text="Alice likes tea.")]
-        return SimpleNamespace(
-            said_cut=(0.08, 0.16), decider=SimpleNamespace(tiers=[object()], adecide=adecide),
-            episodes=SimpleNamespace(alook=alook, asearch=asearch, space="s", who=lambda subject: subject,
-                                     render=lambda found, **_: " | ".join(item.lines[0][1] for item in found)),
-            store=SimpleNamespace(rows=lambda sql, parameters: []),
-            memory=SimpleNamespace(meaning=SimpleNamespace(find=find), notes=lambda subject: notes)), searched
-
-    async def test_asked_about_the_past_she_gets_a_search_and_her_closest_notes(self):
-        module = memory_module()
-        own = module.Settings({"language": "en"}, self.tmp)
-        module.SURFACE, surface = False, module.SURFACE  # (what a file of mneme-llm 0.3 still does)
-        self.addCleanup(setattr, module, "SURFACE", surface)
-        memory, searched = self.asked_memory()
-        text = await module.first_look(memory, "chat:alice", "what car do I drive?", "Alice", "chat:dm", own)
-        self.assertEqual(searched, ["what car do I drive?"])  # we search for her: she need not choose to
-        self.assertIn("my car is a white Dolphin", text)
-        self.assertNotIn(" | what car do I drive?", text)  # the same question asked before: "I don't remember" again
-        self.assertEqual(text.count("the look's own"), 1)
-        self.assertIn("Alice drives a white Dolphin.", text)  # under the floor, and the closest there is
-
-    async def test_ordinary_chat_costs_no_search(self):
-        module = memory_module()
-        own = module.Settings({"language": "en"}, self.tmp)
-        module.SURFACE, surface = False, module.SURFACE
-        self.addCleanup(setattr, module, "SURFACE", surface)
-        memory, searched = self.asked_memory(recall=0.02)
-        self.assertEqual(await module.first_look(memory, "chat:alice", "long day", "Alice", "chat:dm", own), "the look's own")
-        self.assertEqual(searched, [])
-        memory.decider.tiers = []  # (`decisions: core`: nobody to ask)
-        self.assertFalse(await module.asks_back(memory, "what car do I drive?"))
-
-        async def broken(text, questions):
-            raise RuntimeError("down")
-
-        async def unsure(text, questions):
-            return {}
-        for decide in (broken, unsure):  # (with no answer she is searched for: without it she made things up)
-            memory.decider = SimpleNamespace(tiers=[object()], adecide=decide)
-            self.assertTrue(await module.asks_back(memory, "what car do I drive?"))
-        self.assertEqual(await module.closest_notes(SimpleNamespace(memory=SimpleNamespace(meaning=None)), "s", "q"), [])
-
-    def test_luna_judges_by_default_so_the_local_model_learns(self):
-        module = memory_module()
-        self.assertEqual(module.Settings({}, self.tmp).decisions, "luna")
-        self.assertEqual(module.Settings({"decisions": "core"}, self.tmp).decisions, "core")
-
     async def test_she_hears_how_her_classmates_seem_today(self):
         memory = memory_module()
         settings = memory.Settings({"language": "en"}, self.tmp)
@@ -153,7 +87,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         persona, trigger = SimpleNamespace(name="gpt", display_name="GPT"), SimpleNamespace(
             origin="person", sender=SimpleNamespace(id="alice", name="Alice"),
             text="hello", extra={}, is_direct=True)
-        context = SimpleNamespace(persona=persona, trigger=trigger, address=SimpleNamespace(interface="chat",
+        context = SimpleNamespace(persona=persona, since=0.0, trigger=trigger, address=SimpleNamespace(interface="chat",
                                   conversation="dm"), owner=False, engine="momochat")
         self.assertIn("Gemini seems in high spirits today", await memory.make_part(book, settings)(context))
         quiet = memory.Settings({"classmates": False}, self.tmp)
@@ -318,16 +252,16 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         script = room.Script(GPT=[room.turn("Noted.")], Gemini=[room.turn("Noted too.")])
         mind = Mind(script)
         chat = await self.start(mind, {"students": {"gemini": {"learn": False, "language": "zh"},
-                                                    "gpt": {"decisions": "nonsense", "memory_language": "English"}}})
+                                                    "gpt": {"memory_language": "English"}}})
         await self.say(chat, "GPT, I love oolong tea")
         await self.say(chat, "Gemini, I love oolong tea")
         self.assertEqual(mind.judged, 1)  # GPT learns; Gemini does not
         self.assertNotIn("students.bond", self.facts("gemini"))
         from core.loader import import_extension
         module = memory_module()
-        settings = module.Settings({"decisions": "LUNA", "config": "whale.toml",
-                                    "students": {"gpt": {"call_owner": "主人", "personas": ["x"]}}}, self.tmp)
-        self.assertEqual((settings.decisions, settings.config_file), ("luna", str(self.tmp / "whale.toml")))
+        settings = module.Settings({"config": "whale.toml", "students": {"gpt": {"call_owner": "主人", "personas": ["x"]}}},
+                                   self.tmp)
+        self.assertEqual(settings.config_file, str(self.tmp / "whale.toml"))
         self.assertEqual((settings.of("gpt").call_owner, settings.of("gpt").personas, settings.of("gemini").call_owner),
                          ("主人", (), ""))  # (`personas` is not a student's own setting)
 
@@ -349,7 +283,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         import mneme_llm
         folder = self.tmp / "data" / "extensions" / "students"
         folder.mkdir(parents=True)
-        with mneme_llm.Mneme(str(folder / "gpt.db"), "gpt", luna=False, micro=False, embed=False,
+        with mneme_llm.Mneme(str(folder / "gpt.db"), "gpt", embed=False,
                              meaning_micro=False, memory_language=None) as memory:
             memory.alias("chat:alice", "Lulu")
             memory.relate("chat:alice", "friend")
@@ -365,13 +299,12 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
                                  "chat:dm2": {"engine": "room", "personas": ["gemini"]}})
         await self.say(chat, "GPT, my violin teacher is Anna Berlinova")  # no note: only the words keep it
         await self.say(chat, "GPT, who teaches me the violin?")
-        surface = memory_module().SURFACE  # (mneme-llm's surface: a file of 0.3 still leaves out what is on screen)
-        (self.assertIn if surface else self.assertNotIn)("Said before with Alice", self.seen(script, "GPT"))
+        self.assertIn("Said before with Alice", self.seen(script, "GPT"))  # on screen too: a search finds it
         await self.say(chat, "who teaches me the violin?", conversation="dm")
         turn = self.seen(script, "GPT")
         self.assertIn("Said before with Alice", turn)
         self.assertIn("Alice: GPT, my violin teacher is Anna Berlinova\nGPT: Anna, noted.", turn)
-        (self.assertNotIn if surface else self.assertIn)("same person and this same thing", turn)  # no label: their own
+        self.assertNotIn("same person and this same thing", turn)  # their own conversation: no data label
         self.assertIn("search for it", turn)  # she has the tools
         await self.say(chat, "who teaches me the violin?", conversation="dm2")
         self.assertIn("Anna Berlinova", self.seen(script, "Gemini"))  # a group chat: she heard it too
@@ -426,7 +359,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("No student called 'pat'", await self.say(chat, "$alias pat Patty"))
         from core.loader import import_extension
         extension, _ = import_extension(ROOT / "extensions" / "students")
-        self.assertEqual((extension.requires, extension.formerly), (("package:mneme-llm>=0.2",), ("companion",)))
+        self.assertEqual((extension.requires, extension.formerly), (("package:mneme-llm>=0.4",), ("companion",)))
 
 
 if __name__ == "__main__":

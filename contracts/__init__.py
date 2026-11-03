@@ -3,7 +3,7 @@
 from contracts.capability import TIER_ORDER, Capability, Handler, Risk, ToolContext, ToolResult
 from contracts.commands import Command, Option
 from contracts.engine import (PART_PLACES, Activity, Engine, EngineSpec, Event, History, LogEntry, Logbook,
-                              HistoryItem, HistorySummary, PartContext, Persona, PromptPart, RunYield, SHUTDOWN, Session,
+                              HistoryItem, HistorySummary, Context, PartContext, Persona, PromptPart, RunYield, SHUTDOWN, Session,
                               TIERS, Tools)
 from contracts.extension import Contributions, Extension, ExtensionContext, Setting
 from contracts.interface import PLACE_STATUS, Interface, InterfacePort, Operation
@@ -31,13 +31,14 @@ from contracts.watchers import Exchange, WatchContext, Watcher
 #       AdapterResult.cost, what the provider says it charged; the log (Session.logbook, ToolContext.logbook,
 #       WatchContext.logbook) in place of Session.diary, which no engine used
 # 1.16: 1.15 plus PartContext.models and PartContext.history, for a prompt part that asks her model before she answers
-# 1.17: 1.16 plus PartContext.since (Session.aprompt takes it), when the thread a part is written for began, and
-# ToolContext.memory, a persona's own store, for a command that changes what her engine reads
+# 1.17: 1.16 plus a `context` place for prompt parts (Context, Session.context): a module keeps the conversation for
+#       her; PartContext.since (Session.aprompt takes it), when her thread began; and ToolContext.memory, a persona's
+#       own store, for a command that changes what her engine reads
 CONTRACTS_VERSION = "1.17"
 
 __all__ = [
     "AdapterFactory", "AdapterResult", "Image", "ModelAdapter", "NotConfigured",
-    "Action", "Activity", "Address", "Command", "Option", "Capability", "Contributions", "CONTRACTS_VERSION", "Delivery",
+    "Action", "Activity", "Address", "Command", "Option", "Capability", "Context", "Contributions", "CONTRACTS_VERSION", "Delivery",
     "Display", "Engine",
     "EngineSpec", "Event", "Exchange", "Extension", "ExtensionContext", "Facts", "FileRef", "Handler", "History",
     "HistoryItem",
