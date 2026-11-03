@@ -287,7 +287,7 @@ class Book:
         language = own.memory_language or (mneme_llm.STORED if own.config_file else None)
         memory = mneme_llm.Mneme(str(path), persona, config=own.config_file, companion_name=self.shown(persona),
                                  display_language=own.language or mneme_llm.STORED, embed=own.embed,
-                                 meaning_micro=False, memory_language=language, **own.surface_limits)
+                                 memory_language=language, **own.surface_limits)
         self.link(memory)
         for subject, role in self.roles.items():
             memory.relate(subject, role)  # (the same role again changes nothing)

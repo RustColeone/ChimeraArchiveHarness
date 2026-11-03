@@ -284,7 +284,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         folder = self.tmp / "data" / "extensions" / "students"
         folder.mkdir(parents=True)
         with mneme_llm.Mneme(str(folder / "gpt.db"), "gpt", embed=False,
-                             meaning_micro=False, memory_language=None) as memory:
+                             memory_language=None) as memory:
             memory.alias("chat:alice", "Lulu")
             memory.relate("chat:alice", "friend")
         await self.start(room.Script())
@@ -329,7 +329,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(book, memory.Book)
         db = book.open("gpt")
         self.assertEqual(db.episodes.count("chat:alice"), 7)  # one exchange for each of her messages
-        first = db.episodes.newest("chat:alice", 10)[-1]
+        first = db.episodes.after("chat:alice", 0)[-1]
         self.assertEqual((first.recalls, first.conversation), (1, "chat:dm"))  # found: it fades slower now
 
     async def test_the_tools_are_hers_alone_and_the_words_can_be_left_out(self):

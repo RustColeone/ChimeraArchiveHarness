@@ -8,6 +8,9 @@ data/
 temp/
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
+mneme.db
 *.log
 
 # Personal integrations from before the core (kept locally, never committed)

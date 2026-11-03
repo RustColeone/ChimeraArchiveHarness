@@ -70,7 +70,7 @@ class ChatEngineTests(unittest.IsolatedAsyncioTestCase):
         """Her mneme-llm file, as the companion keeps it."""
         import mneme_llm
         memory = mneme_llm.Mneme(str(self.tmp / "data" / "extensions" / "students" / "deepseek.db"), "deepseek",
-                                 embed=False, meaning_micro=False, memory_language=None)
+                                 embed=False, memory_language=None)
         self.addCleanup(memory.close)
         return memory
 
