@@ -806,7 +806,7 @@ class CoreRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(("out", "hey"), [(item.direction, item.text) for item in core.tank.recent_messages("owner:dm")])
 
     async def test_interface_can_cancel_the_run_it_is_delivering_for(self):
-        core = await self.core({"assignments": {"*": {"engine": "assistant", "personas": ["p"]}}},
+        core = await self.core({"assignments": {"*": {"engine": "momochat", "personas": ["p"]}}},
                                FakeAdapter([{"message": "hi", "status": "complete", "actions": []}]))
         chat = iface(core)
         original, cancelled = chat.deliver, []

@@ -86,7 +86,7 @@ class ShippedStudentsTests(unittest.TestCase):
         self.assertEqual([persona.profile for persona in contributions.personas],
                          ["gpt", "gemini", "claude", "deepseek", "grok"])
         gpt, claude = contributions.personas[0], contributions.personas[2]
-        self.assertEqual((gpt.display_name, gpt.aliases, gpt.formerly), ("GPT", ("Luna",), ("luna",)))
+        self.assertEqual((gpt.display_name, gpt.aliases), ("GPT", ("Luna",)))
         self.assertTrue(all(persona.description for persona in contributions.personas))  # for Chimera's prompts
         self.assertEqual((gpt.tier("strong"), contributions.profiles["gpt_strong"]),
                          ("gpt_strong", [{"provider": "openai", "model": "gpt-6.1-sol"},
@@ -121,7 +121,6 @@ class ShippedStudentsTests(unittest.TestCase):
 
     def test_momochat_runs_them_and_notes_models_left_in_the_rooms_config(self):
         extension, momochat = load("momochat")
-        self.assertIn("room", extension.formerly)  # the room's config.yml is read as MomoChat's
         context = Context({"providers": {"grok": {"models_exclude": ["imagine"]}}})
         contributions = momochat.setup(context)
         self.assertEqual((contributions.personas, contributions.providers, contributions.profiles), ((), {}, {}))

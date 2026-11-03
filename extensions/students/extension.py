@@ -141,8 +141,7 @@ def setup(context) -> Contributions:
     from . import memory  # (mneme-llm, which `requires` has made sure of)
     config = context.config
     personas = [Persona(data["name"], data["display_name"], data["prompt"], profile=data["name"],
-                        aliases=tuple(data.get("aliases") or ()), formerly=tuple(data.get("formerly") or ()),
-                        pictures=data["pictures"], description=str(data.get("description") or ""),
+                        aliases=tuple(data.get("aliases") or ()), pictures=data["pictures"], description=str(data.get("description") or ""),
                         profiles=tiers(data), allowance=data.get("allowance"),
                         effort=str(data.get("effort") or "")) for data in STUDENTS]
     # The students' own providers and profiles; this module's config.yml `providers:` (key by key) and `profiles:`
@@ -162,8 +161,7 @@ def setup(context) -> Contributions:
                          profiles={**profiles(STUDENTS), **dict(config.get("profiles") or {})}, **remembered)
 
 
-EXTENSION = Extension("students", setup, contracts="1", version="2", requires=("package:mneme-llm>=0.4",),
-                      formerly=("companion",),
+EXTENSION = Extension("students", setup, contracts="1", version="2", requires=("package:mneme-llm>=0.4.0",),
                       description="The students: one folder each with her prompt, models and pictures, and her memory "
                                   "of each person (mneme-llm)",
                       settings=tuple(key_setting(*item) for item in KEYS))

@@ -35,11 +35,8 @@ DAY = 86400
 NAME_MAX = 40  # what the students call you
 CODE_S = 600  # a `$link` code lasts ten minutes
 CODE_LETTERS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # (no 0/O, 1/I/L)
-# The engines whose messages are conversation (Chimera's are reports on work, which teach her nothing of you), and
-# MomoChat's names before (the room, the assistant, the chat engine of a student's own Discord bot), for settings
-# that still name them.
+# The engines whose messages are conversation (Chimera's are reports on work, which teach her nothing of you).
 ENGINES = ("momochat",)
-FORMER = {"room": "momochat", "assistant": "momochat", "chat": "momochat"}
 # What `students: <persona>:` (or her student.yml `memory:`, under it) may set for one student, over the settings for
 # all.
 OWN = ("learn", "notes", "mood", "classmates", "met_role", "owner_role", "writer_profile", "reflect_after_notes", "language",
@@ -54,8 +51,8 @@ PLATFORMS = {"whale_chan": "discord"}
 
 
 def conversation(engine: str, settings: "Settings") -> bool:
-    """Whether messages in this engine are conversation she learns from (an older core names none: yes)."""
-    return not engine or FORMER.get(engine, engine) in settings.engines
+    """Whether messages in this engine are conversation she learns from."""
+    return engine in settings.engines
 
 
 def key(text: str) -> str:
@@ -81,7 +78,7 @@ class Settings:
     def __init__(self, config, folder: Path | None = None):
         self.raw, self.folder = dict(config), folder
         self.personas = tuple(config.get("personas") or ())
-        self.engines = tuple(FORMER.get(str(name), str(name)) for name in config.get("engines") or ENGINES)
+        self.engines = tuple(str(name) for name in config.get("engines") or ENGINES)
         self.learn = flag(config.get("learn"), True)
         self.notes = flag(config.get("notes"), True)
         self.mood = flag(config.get("mood"), True)

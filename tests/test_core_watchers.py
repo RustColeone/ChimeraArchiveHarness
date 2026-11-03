@@ -1,4 +1,4 @@
-"""Contracts 1.9: watchers, facts, InterfacePort.personas, and a persona's former names (Persona.formerly)."""
+"""Watchers, facts and InterfacePort.personas."""
 
 import asyncio
 import tempfile
@@ -171,92 +171,15 @@ class FactsAndPersonasTests(Base):
         views = {view["name"]: view for view in iface(core).port.personas()}
         self.assertEqual([name for name in views if name in ("p", "ivy")], ["p", "ivy"])
         ivy = views["ivy"]
-        self.assertEqual((ivy["display_name"], ivy["aliases"], ivy["formerly"]), ("Ivy", ["Ives"], []))
+        self.assertEqual((ivy["display_name"], ivy["aliases"]), ("Ivy", ["Ives"]))
         self.assertTrue(Path(ivy["pictures"]["avatar"]).is_absolute())
         self.assertTrue(views["p"]["ready"])
 
     def test_a_persona_checks_her_names_and_pictures(self):
         self.assertEqual(Persona("a", "A", "", aliases="Ay").aliases, ("Ay",))
-        for bad in ({"aliases": [""]}, {"formerly": ["a"]}, {"formerly": [3]}, {"pictures": {"avatar": ""}},
-                    {"pictures": ["a.png"]}):
+        for bad in ({"aliases": [""]}, {"aliases": [3]}, {"pictures": {"avatar": ""}}, {"pictures": ["a.png"]}):
             with self.assertRaises(ValueError):
                 Persona("a", "A", "", **bad)
-
-
-class FormerNameTests(Base):
-    """A persona renamed (luna → gpt) keeps everything the core filed under her old name."""
-
-    MODULE = '''
-from contracts import Contributions, Extension, Persona
-
-NAME = {name!r}
-FORMERLY = {formerly!r}
-
-
-def setup(context):
-    return Contributions(personas=[Persona(NAME, NAME.upper(), "You are " + NAME + ".", formerly=FORMERLY)])
-
-
-EXTENSION = Extension("watchmod", setup, contracts="1")
-SEEN = []
-'''
-
-    OVERRIDES = {"assignments": {"*": {"engine": "probe", "personas": ["luna"]}},
-                 "personas": {"luna": {"parts": [{"name": "habit", "text": "She hums."}]}}}
-
-    async def test_her_data_moves_to_her_new_name_once(self):
-        core = await self.core({"assignments": {"*": {"engine": "probe", "personas": ["luna"]}}},
-                               module=self.MODULE.format(name="luna", formerly=()), folder="luna")
-        await self.say(core, "echo before")
-        manager, tank = core.manager, core.tank
-        tank.record_message("chat:room", "out", "I hum.", sender_name="Luna")
-        tank.store("persona:luna").set("rotation", 3)
-        tank.store('extension:seats {"persona": "luna"}').set("seat", "front")
-        tank.store('extension:seats {"persona": "gpt"}').set("seat", "back")  # hers already: it wins
-        tank.add_log("chat:room", "core", "note", "Alice likes tea.", subject="alice", persona="luna")
-        manager.model_choices.set("chat:room", "luna", "fake/strong")
-        manager._overrides.set("chat:side", {"pattern": "chat:side", "engine": "probe", "personas": ["luna"]})
-        manager.facts.handle("watchmod").set("luna", "mood", "calm", person=("chat", "alice"))
-        await core.stop()
-        self.cores.remove(core)
-
-        core = await self.core(self.OVERRIDES, module=self.MODULE.format(name="gpt", formerly=("luna",)),
-                               folder="gpt")
-        manager, tank = core.manager, core.tank
-        self.assertEqual(manager.assignments["*"].personas, ("gpt",))
-        self.assertEqual(manager.assignments["chat:side"].personas, ("gpt",))
-        self.assertEqual([part.name for part in manager.personas["gpt"].parts], ["habit"])
-        self.assertEqual(tank.store("persona:gpt").get("rotation"), 3)
-        self.assertEqual(tank.store('extension:seats {"persona": "gpt"}').get("seat"), "back")
-        self.assertEqual(tank.store("persona:luna").keys(), [])
-        self.assertEqual([line.text for line in tank.log_lines("chat:room", persona="gpt")], ["Alice likes tea."])
-        self.assertEqual(manager.model_choices.get("chat:room", "gpt"), "fake/strong")
-        self.assertEqual(iface(core).port.facts("gpt", "alice"), {"watchmod.mood": "calm"})
-        self.assertEqual([run.personas for run in tank.runs(("done",))], [["gpt"]])
-        said = [(item.sender_name, item.text) for item in tank.recent_messages("chat:room") if item.direction == "out"]
-        self.assertEqual(said, [("", "before"), ("GPT", "I hum.")])
-        moved = [event for event in core.audit.events if event["event"] == "persona_data_moved"]
-        self.assertEqual((moved[0]["stores"], moved[0]["notes"], moved[0]["runs"], moved[0]["messages"],
-                          moved[0]["facts"]), (2, 1, 1, 1, 1))
-        self.assertTrue(any(event["event"] == "persona_renamed_in_config" for event in core.audit.events))
-        await self.say(core, "echo after")
-        self.assertEqual(iface(core).texts()[-1], "after")
-        await core.stop()
-        self.cores.remove(core)
-
-        core = await self.core(self.OVERRIDES, module=self.MODULE.format(name="gpt", formerly=("luna",)),
-                               folder="gpt")
-        self.assertFalse(any(event["event"] == "persona_data_moved" for event in core.audit.events))
-
-    async def test_a_former_name_another_persona_has_now_is_left_alone(self):
-        source = self.MODULE.format(name="gpt", formerly=("p",))
-        core = await self.core(module=source)
-        self.assertEqual(core.manager.assignments["*"].personas, ("p",))
-
-    async def test_an_old_name_nobody_had_is_still_an_error(self):
-        with self.assertRaises(ConfigError):
-            await self.core({"assignments": {"*": {"engine": "probe", "personas": ["sol"]}}},
-                            module=self.MODULE.format(name="gpt", formerly=("luna",)), folder="gpt")
 
 
 if __name__ == "__main__":

@@ -294,7 +294,7 @@ class ReadingTests(WeChatCase):
 
     async def test_a_burst_is_gathered_into_one_run(self):
         adapter = FakeAdapter([{"message": "收到三条", "status": "complete", "actions": []}])
-        await self.start({"assignments": {"wechat:*": {"engine": "assistant", "personas": ["wechat"]},
+        await self.start({"assignments": {"wechat:*": {"engine": "momochat", "personas": ["wechat"]},
                                           "*": {"engine": "probe", "personas": ["p"]}}},
                          wechat={"coalesce_seconds": 0.05}, adapter=adapter)
         for text in ("一", "二", "三"):
@@ -570,7 +570,7 @@ class ProductionPolicyTests(WeChatCase):
             "admission": {"*": {"enabled": True, "require_mention_in_groups": True}, "wechat:*": {"enabled": False},
                           ROOM: {"enabled": True, "max_age_s": 900}, FRIEND: {"enabled": True, "max_age_s": 900}},
             "assignments": {"*": {"engine": "probe", "personas": ["p"]},
-                            "wechat:*": {"engine": "assistant", "personas": ["wechat"],
+                            "wechat:*": {"engine": "momochat", "personas": ["wechat"],
                                          "budget": {"model_calls": 24, "tool_calls": 24, "seconds": 1800},
                                          "lane": "sender",
                                          "options": {"history_scope": "sender", "quote": "trigger", "diary": False,

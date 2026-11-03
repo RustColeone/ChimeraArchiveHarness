@@ -56,7 +56,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.core = await start_core(self.tmp, {
             "extensions": extensions, "extension_config": {"students": {"learn": True, **(settings or {})}},
             "profiles": {name: [{"provider": "fake", "model": name}] for name in (*NAMES, "grok")},
-            "assignments": {**(assignments or {}), "*": {"engine": "room", "personas": list(NAMES)}}},
+            "assignments": {**(assignments or {}), "*": {"engine": "momochat", "personas": list(NAMES)}}},
             FakeAdapter(handler=handler))
         return iface(self.core)
 
@@ -173,7 +173,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
     async def test_a_direct_chat_stays_between_the_two(self):
         script = room.Script(GPT=[room.turn("Oolong, noted.")], Gemini=[room.turn("Hm.")])
         chat = await self.start(Mind(script), {"language": "en"},
-                                {"chat:dm": {"engine": "room", "personas": ["gpt"]}})
+                                {"chat:dm": {"engine": "momochat", "personas": ["gpt"]}})
         await self.say(chat, "GPT, I love oolong tea", conversation="dm")
         folder = self.tmp / "data" / "extensions" / "students"
         self.assertEqual(sorted(path.name for path in folder.glob("*.db")), ["gpt.db"])  # nobody else heard it
@@ -295,8 +295,8 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         script = room.Script(GPT=[room.turn("Anna, noted."), room.turn("x"), room.turn("Anna Berlinova!")],
                              Gemini=[room.turn("Hm."), room.turn("Anna, from the group.")])
         chat = await self.start(Mind(script, worth=0.0), {"language": "en", "embed": False},
-                                {"chat:dm": {"engine": "room", "personas": ["gpt"]},
-                                 "chat:dm2": {"engine": "room", "personas": ["gemini"]}})
+                                {"chat:dm": {"engine": "momochat", "personas": ["gpt"]},
+                                 "chat:dm2": {"engine": "momochat", "personas": ["gemini"]}})
         await self.say(chat, "GPT, my violin teacher is Anna Berlinova")  # no note: only the words keep it
         await self.say(chat, "GPT, who teaches me the violin?")
         self.assertIn("Said before with Alice", self.seen(script, "GPT"))  # on screen too: a search finds it
@@ -314,7 +314,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
             room.turn("Let me look.", "continue", [("students.search_memory", {"query": "violin teacher"})]),
             room.turn("Anna Berlinova.")])
         chat = await self.start(Mind(script, worth=0.0), {"language": "en", "embed": False, "said": 0},
-                                {"chat:dm": {"engine": "room", "personas": ["gpt"]}})
+                                {"chat:dm": {"engine": "momochat", "personas": ["gpt"]}})
         await self.say(chat, "my violin teacher is Anna Berlinova", conversation="dm")
         await self.say(chat, "I had pasta today", conversation="dm")
         for text in ("one", "two", "three"):
@@ -336,8 +336,8 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         script = room.Script(Pat=[room.turn("Hi, I'm Pat.")], GPT=[room.turn("Noted."), room.turn("Hm.")])
         chat = await self.start(Mind(script, worth=0.0), {"language": "en", "embed": False,
                                                           "students": {"gpt": {"episodes": False}}},
-                                {"chat:pat": {"engine": "room", "personas": ["p"]},
-                                 "chat:dm": {"engine": "room", "personas": ["gpt"]}})
+                                {"chat:pat": {"engine": "momochat", "personas": ["p"]},
+                                 "chat:dm": {"engine": "momochat", "personas": ["gpt"]}})
         manager = self.core.manager
         capability = manager.capabilities["students.search_memory"]
         self.assertEqual(set(capability.personas), {*NAMES, "grok"})  # the students, not Pat (an agent)
@@ -352,14 +352,14 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
     async def test_agents_keep_nothing_and_without_mneme_llm_there_are_no_students(self):
         script = room.Script(Pat=[room.turn("Hi, I'm Pat.")])
         mind = Mind(script)
-        chat = await self.start(mind, {"language": "en"}, {"chat:pat": {"engine": "room", "personas": ["p"]}})
+        chat = await self.start(mind, {"language": "en"}, {"chat:pat": {"engine": "momochat", "personas": ["p"]}})
         await self.say(chat, "I love oolong tea", conversation="pat")
         self.assertEqual(mind.judged, 0)  # Pat is an agent (core.yml's): no memory
         self.assertNotIn("Notes about", self.seen(script, "Pat"))
         self.assertIn("No student called 'pat'", await self.say(chat, "$alias pat Patty"))
         from core.loader import import_extension
         extension, _ = import_extension(ROOT / "extensions" / "students")
-        self.assertEqual((extension.requires, extension.formerly), (("package:mneme-llm>=0.4",), ("companion",)))
+        self.assertEqual(extension.requires, ("package:mneme-llm>=0.4.0",))
 
 
 if __name__ == "__main__":

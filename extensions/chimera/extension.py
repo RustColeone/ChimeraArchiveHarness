@@ -5,7 +5,7 @@ Each task is routed to the simplest workflow likely to be enough (one model, a c
 a draft reviewed by another model family and revised once), worked in its own git worktree, tested, and shown to you
 as one change set. Nothing reaches your branch until you have checked it and approved it.
 
-It contributes the `chimera` engine (formerly `workbench`), the `chimera.*` capabilities (creator only), the
+It contributes the `chimera` engine, the `chimera.*` capabilities (creator only), the
 Classroom page (the `classroom` interface, on port 4157), a model profile per classmate and tier, and defaults for its
 own conversations. Its seats are the students (`uses=("students",)`: each on her own and strong models), changed or
 added to by `team:`; seats of its own are agents it adds. `python -m extensions.chimera` runs the core with only this
@@ -109,7 +109,7 @@ def setup(context) -> Contributions:
     return assemble(context)[0]
 
 
-EXTENSION = Extension("chimera", setup, contracts="1", version="2", uses=("students",), formerly=("workbench",),
+EXTENSION = Extension("chimera", setup, contracts="1", version="2", uses=("students",),
                       description="The students work on your code together: routed, reviewed, tested, landed on your "
                                   "approval",
                       settings=(

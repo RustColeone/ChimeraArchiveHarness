@@ -16,8 +16,7 @@ from .kernel.context import Context, SeatUnavailable, Suspend
 
 class ChimeraEngine(Engine):
     spec = EngineSpec("chimera", "The students on a coding task together: routed to one model, a cascade or a "
-                      "critique, worked in its own git worktree, tested, and landed only after your approval.", "many",
-                      formerly=("workbench",))
+                      "critique, worked in its own git worktree, tested, and landed only after your approval.", "many")
 
     def __init__(self, board, registry, team, settings, link=None, prices=None):
         self.board, self.registry, self.team, self.settings = board, registry, team, settings

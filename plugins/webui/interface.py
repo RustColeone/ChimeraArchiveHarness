@@ -174,10 +174,7 @@ class WebUI(Interface):
 
     # ---- the students, as the core describes them -------------------------------------------------------
     def _meet(self, views: dict[str, dict]) -> None:
-        """Names, pictures and readiness from the core's personas (contracts 1.9); a persona named by a former name of
-        hers (Persona.formerly) is read as her."""
-        former = {old: view["name"] for view in views.values() for old in view.get("formerly") or ()}
-        self.personas = list(dict.fromkeys(name if name in views else former.get(name, name) for name in self.personas))
+        """Names, pictures and readiness from the core's personas."""
         shown = self.shown_names
         self.classmates = [shown[index] if index < len(shown) else
                            views.get(name, {}).get("display_name") or name.capitalize()
@@ -261,11 +258,6 @@ class WebUI(Interface):
         self.store.ensure(DEFAULT_CONVERSATION, DEFAULT_TITLE)
         views = {view["name"]: view for view in port.personas()} if callable(getattr(port, "personas", None)) else {}
         self._meet(views)
-        for view in views.values():  # a student renamed: her old bubbles and chats are hers
-            if view.get("formerly"):
-                moved = self.store.rename_persona(view["formerly"], view["name"], view["display_name"])
-                if moved:
-                    port.log("persona_renamed", persona=view["name"], moved=moved)
         # Whoever opens the page is the creator; approvals they start come back to the page. With no other
         # interface offering one, the classroom also becomes the control route.
         port.set_owners([self.user_id], control=Address(self.name, DEFAULT_CONVERSATION), fallback=True)

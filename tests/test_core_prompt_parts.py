@@ -18,7 +18,7 @@ from tests.core_support import ROOT, FakeAdapter, iface, make_config, settle, st
 from tests.test_momochat import NAMES, Script
 from tests.test_momochat import turn as room_turn
 
-ASSISTANT = {"assignments": {"*": {"engine": "assistant", "personas": ["p"]}}}
+ASSISTANT = {"assignments": {"*": {"engine": "momochat", "personas": ["p"]}}}
 
 # A module that gives its own persona parts and adds parts for others (Contributions.prompt_parts).
 MODULE = '''
@@ -282,7 +282,7 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
         core, adapter = await self.core(
             [{"name": "personality", "text": "Cheerful, a little dry."},
              {"name": "today", "text": "It is Pat's birthday.", "place": "turn"}],
-            overrides={"assignments": {"*": {"engine": "assistant", "personas": ["p"],
+            overrides={"assignments": {"*": {"engine": "momochat", "personas": ["p"],
                                              "options": {"instructions": "Keep it short."}}}})
         await self.say(core, "hello")
         system = adapter.calls[0]["messages"][0]["content"]
@@ -336,8 +336,8 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
             "personas": {"p": {"display_name": "Pat", "prompt": "You are Pat."},
                          "ivy": {"parts": [{"name": "style", "text": "core.yml's style for Ivy."},
                                            {"name": "extra", "text": "Ivy likes tea."}]}},
-            "assignments": {"*": {"engine": "assistant", "personas": ["p"]},
-                            "chat:ivy": {"engine": "assistant", "personas": ["ivy"]}}})
+            "assignments": {"*": {"engine": "momochat", "personas": ["p"]},
+                            "chat:ivy": {"engine": "momochat", "personas": ["ivy"]}}})
         self.assertEqual([part.name for part in core.manager.personas["ivy"].parts], ["style", "habit", "extra"])
         await self.say(core, "hello")
         await iface(core).say("hi Ivy", conversation="ivy")
@@ -466,13 +466,12 @@ class RoomTests(unittest.IsolatedAsyncioTestCase):
         self.core = await start_core(self.tmp, {
             "extensions": extensions, "personas": personas or {},
             "profiles": {name: [{"provider": "fake", "model": name}] for name in (*NAMES, "grok")},
-            "assignments": {"*": {"engine": "room", "personas": list(NAMES)}}}, FakeAdapter(handler=script))
+            "assignments": {"*": {"engine": "momochat", "personas": list(NAMES)}}}, FakeAdapter(handler=script))
         return iface(self.core)
 
     async def test_each_character_gets_the_parts_core_yml_adds_to_it(self):
-        # core.yml still names GPT by her former name (Persona.formerly): its parts are hers.
         script = Script(GPT=[room_turn("Hi!")], Gemini=[room_turn("Hey.")])
-        chat = await self.start(script, {"luna": {"parts": [{"name": "quirk", "text": "Luna loves puns."},
+        chat = await self.start(script, {"gpt": {"parts": [{"name": "quirk", "text": "Luna loves puns."},
                                                              {"text": "Luna had tea.", "place": "turn"}]}})
         for text in ("luna, hi", "gemini, hi"):
             await chat.say(text)
@@ -517,13 +516,12 @@ class WhaleChanTests(unittest.IsolatedAsyncioTestCase):
         from tests.test_plugin_whale_chan import PLUGIN, PROFILES, QUIET, STUDENTS, step
         adapter = FakeAdapter([step("嗨～")])
         extensions = [*make_config(self.tmp).raw["modules"]["paths"], str(PLUGIN), str(STUDENTS)]
-        # A core.yml from before still names her `whale_chan`: she is the DeepSeek student now (`formerly`).
         self.core = await start_core(self.tmp, {
             "extensions": extensions, "profiles": PROFILES,
             "extension_config": {"whale_chan": QUIET},
-            "personas": {"whale_chan": {"parts": [{"name": "personality", "text": "Teases gently."},
+            "personas": {"deepseek": {"parts": [{"name": "personality", "text": "Teases gently."},
                                                   {"name": "season", "text": "It is autumn.", "place": "turn"}]}},
-            "assignments": {"*": {"engine": "chat", "personas": ["whale_chan"]}}}, adapter)
+            "assignments": {"*": {"engine": "momochat", "personas": ["deepseek"]}}}, adapter)
         await iface(self.core).say("你好")
         await settle(self.core)
         system = adapter.calls[0]["messages"][0]["content"]

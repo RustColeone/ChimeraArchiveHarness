@@ -21,7 +21,7 @@ def setup(context) -> Contributions:
     return Contributions(engines=[MomoChatEngine(Settings(context.config))])
 
 
-EXTENSION = Extension("momochat", setup, contracts="1", version="1", formerly=("assistant", "room"),
+EXTENSION = Extension("momochat", setup, contracts="1", version="1",
                       description="Conversations, direct and in groups: talk, tools, questions and hand-offs between "
                                   "classmates", settings=(
     Setting("max_steps", "Most steps (tool rounds) of one speaker per message", "number", 8),

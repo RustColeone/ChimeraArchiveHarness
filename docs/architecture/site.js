@@ -14,7 +14,7 @@ window.SITE = (() => {
   // A module's description, then what it declares it builds on (contracts 1.10) and the names it had (1.11).
   function moduleTip(h, folder) {
     const module = h.A.modules[folder];
-    const declared = [["requires", module.requires], ["uses", module.uses], ["formerly", module.formerly]]
+    const declared = [["requires", module.requires], ["uses", module.uses]]
       .filter(([, names]) => names && names.length).map(([key, names]) => `${key} ${names.join(", ")}`);
     return [module.description, ...declared].filter(Boolean).join(" · ");
   }

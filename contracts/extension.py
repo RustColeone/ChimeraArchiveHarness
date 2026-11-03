@@ -115,11 +115,6 @@ class Extension:
     `package:<name>>=<version>`. Without one it `uses`, it loads, minus what that module would add: its setup is
     told which are there (`ExtensionContext.present`). Every engine and persona its defaults name must belong to the
     core or to a module it declares, or it is refused.
-
-    `formerly` (added in 1.11): module names it had before, or modules it took in. Its data folder under an old name
-    becomes its own (when it has none yet), its settings under an old name (`extension_config.<old>` in core.yml, and
-    `config.yml` in a folder of that name beside its own) are read under its own, its stores and facts move to it,
-    and another module declaring an old name is given this one.
     """
 
     name: str
@@ -130,7 +125,6 @@ class Extension:
     settings: Sequence[Setting] = ()
     requires: Sequence[str] = ()
     uses: Sequence[str] = ()
-    formerly: Sequence[str] = ()
 
     def __post_init__(self):
         if not NAME.match(self.name):
@@ -148,10 +142,6 @@ class Extension:
                 if item == self.name:
                     raise ValueError(f"{self.name} cannot depend on itself")
             object.__setattr__(self, key, value)
-        formerly = (self.formerly,) if isinstance(self.formerly, str) else tuple(self.formerly)
-        if not all(isinstance(item, str) and NAME.match(item) and item != self.name for item in formerly):
-            raise ValueError(f"{self.name}: `formerly` takes other module names")
-        object.__setattr__(self, "formerly", formerly)
         both = set(self.requires) & set(self.uses)
         if both:
             raise ValueError(f"{self.name}: {sorted(both)} cannot be both required and used")

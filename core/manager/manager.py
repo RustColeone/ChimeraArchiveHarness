@@ -169,7 +169,6 @@ class Manager:
         self.data_dir = Path(data_dir)
         self.audit = audit or Audit()
         self.engines: dict[str, Engine] = {}
-        self.engine_formerly: dict[str, str] = {}  # an engine's former name → its name now (EngineSpec.formerly)
         self.capabilities: dict[str, Capability] = {}
         self._origin: dict[str, str] = {}
         self._tasks: dict[str, asyncio.Task] = {}
@@ -228,12 +227,10 @@ class Manager:
 
     def register_persona(self, persona: Persona, extension: str) -> None:
         # Configuration wins over an extension's default persona of the same name; parts core.yml gives that name
-        # (an entry without a prompt) are added to the extension's persona, as are those it gives a former name of
-        # hers (Persona.formerly) when it gives none under her new one.
+        # (an entry without a prompt) are added to the extension's persona.
         if persona.name not in self.personas:
-            named = next((name for name in (persona.name, *persona.formerly) if name in self._persona_parts), None)
-            if named is not None:
-                persona = with_parts(persona, self._persona_parts[named])
+            if persona.name in self._persona_parts:
+                persona = with_parts(persona, self._persona_parts[persona.name])
             self._origin["persona:" + persona.name] = extension
         self.personas.setdefault(persona.name, persona)
 
@@ -305,7 +302,7 @@ class Manager:
         if pattern != "*" and ":" not in pattern:
             raise ValueError("Patterns are '*', 'interface:*' or 'interface:conversation'")
         assignment = Assignment.from_config(pattern, {**dict(value), "since": time.time()})
-        engine = self.engine(assignment.engine)
+        engine = self.engines.get(assignment.engine)
         if engine is None:
             raise ValueError(f"Engine {assignment.engine!r} is not registered")
         missing = [name for name in assignment.personas if name not in self.personas]
@@ -347,13 +344,6 @@ class Manager:
             raise ValueError(f"Engine {name!r} is already registered")
         self.engines[name] = engine
         self._origin["engine:" + name] = extension
-        for old in engine.spec.formerly:
-            self.engine_formerly.setdefault(old, name)
-
-    def engine(self, name: str) -> Engine | None:
-        """The engine of that name, or the one that had it before (EngineSpec.formerly); an engine registered under
-        the name itself wins."""
-        return self.engines.get(name) or self.engines.get(self.engine_formerly.get(name, ""))
 
     def origin_of(self, key: str) -> str:
         """The module that registered an engine (`engine:<name>`), for its stores."""
@@ -379,7 +369,7 @@ class Manager:
     def problems(self) -> list[str]:
         problems = []
         for pattern, assignment in self.assignments.items():
-            engine = self.engine(assignment.engine)
+            engine = self.engines.get(assignment.engine)
             if engine is None:
                 problems.append(f"assignment {pattern!r}: engine {assignment.engine!r} is not registered")
             missing = [name for name in assignment.personas if name not in self.personas]
@@ -389,9 +379,8 @@ class Manager:
                 problems.append(f"assignment {pattern!r}: engine {engine.spec.name!r} needs exactly one persona")
             if engine is not None and engine.spec.personas == "many" and not assignment.personas:
                 problems.append(f"assignment {pattern!r}: engine {engine.spec.name!r} needs personas")
-        formerly = {old for persona in self.personas.values() for old in persona.formerly}
         for name in self._persona_parts:
-            if name not in self.personas and name not in formerly:
+            if name not in self.personas:
                 problems.append(f"persona {name!r} has no `prompt` in core.yml, and no loaded module has a persona "
                                 "of that name to add its parts to")
         for persona in self.personas.values():
@@ -605,7 +594,7 @@ class Manager:
         if assignment is None or not assignment.enabled:
             self.audit.record("not_assigned", address=str(request.address), reason="leftover")
             return None
-        engine = self.engine(assignment.engine)
+        engine = self.engines.get(assignment.engine)
         record = RunRecord(id=uuid.uuid4().hex[:12], address=str(request.address),
                            lane=assignment.lane_key(request),
                            engine=engine.spec.name if engine is not None else assignment.engine,
@@ -636,7 +625,7 @@ class Manager:
         record = self.tank.run(run_id)
         if record is None or record.status != "running":
             return
-        engine = self.engine(record.engine)
+        engine = self.engines.get(record.engine)
         failure: tuple[str, str] | None = None
         outcome: Any = None
         started_events = len(self.tank.events(run_id))
@@ -1388,7 +1377,6 @@ class Manager:
             return [dict(item) for item in given] if given else self.providers.candidates(profile)
 
         return [{"name": persona.name, "display_name": persona.display_name, "aliases": list(persona.aliases),
-                 "formerly": list(persona.formerly),
                  "pictures": {kind: str(Path(path).expanduser().resolve()) for kind, path in persona.pictures.items()},
                  "ready": self.providers.profile_ready(persona.profile),
                  "module": self._origin.get("persona:" + persona.name, "core"), "description": persona.description,
@@ -1896,7 +1884,7 @@ class Manager:
 
     async def _tell_stopped(self, record: RunRecord, reason: str) -> None:
         """A waiting run was cancelled: its engine hears it (`Engine.stopped`), so it can put its own records right."""
-        engine = self.engine(record.engine)
+        engine = self.engines.get(record.engine)
         if engine is None:
             return
         session = SessionHandle(self, record, self.tank.events(record.id, ("input", "tool_result", "approval_denied",

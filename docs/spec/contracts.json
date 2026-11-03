@@ -466,7 +466,7 @@
    ]
   },
   "EngineSpec": {
-   "doc": "`formerly` (added in 1.11): engine names it had before. An assignment naming one (in core.yml, set at runtime or suggested by a module) is read as this engine, and its open runs carry on in it (with the state the old engine saved: an engine that cannot read it ends the run).",
+   "doc": "EngineSpec(name: 'str', description: 'str' = '', personas: \"Literal['one', 'many']\" = 'one')",
    "fields": [
     {
      "name": "name",
@@ -481,11 +481,6 @@
      "name": "personas",
      "type": "\"one\" | \"many\"",
      "default": "one"
-    },
-    {
-     "name": "formerly",
-     "type": "list[str]",
-     "default": "()"
     }
    ]
   },
@@ -555,7 +550,7 @@
    ]
   },
   "Extension": {
-   "doc": "Declared as `EXTENSION` in an extension's `extension.py`. `setup` receives an ExtensionContext and returns Contributions. `contracts` is the major contracts version the extension was written for. `settings` declares what the module can be set up with (see Setting); it is read without running `setup`. `requires` and `uses` (added in 1.10) declare the other modules it builds on, by module name. Without one it `requires`, the module is not loaded (and says why); a Python package is `package:<name>` or `package:<name>>=<version>`. Without one it `uses`, it loads, minus what that module would add: its setup is told which are there (`ExtensionContext.present`). Every engine and persona its defaults name must belong to the core or to a module it declares, or it is refused. `formerly` (added in 1.11): module names it had before, or modules it took in. Its data folder under an old name becomes its own (when it has none yet), its settings under an old name (`extension_config.<old>` in core.yml, and `config.yml` in a folder of that name beside its own) are read under its own, its stores and facts move to it, and another module declaring an old name is given this one.",
+   "doc": "Declared as `EXTENSION` in an extension's `extension.py`. `setup` receives an ExtensionContext and returns Contributions. `contracts` is the major contracts version the extension was written for. `settings` declares what the module can be set up with (see Setting); it is read without running `setup`. `requires` and `uses` (added in 1.10) declare the other modules it builds on, by module name. Without one it `requires`, the module is not loaded (and says why); a Python package is `package:<name>` or `package:<name>>=<version>`. Without one it `uses`, it loads, minus what that module would add: its setup is told which are there (`ExtensionContext.present`). Every engine and persona its defaults name must belong to the core or to a module it declares, or it is refused.",
    "fields": [
     {
      "name": "name",
@@ -592,11 +587,6 @@
     },
     {
      "name": "uses",
-     "type": "Sequence",
-     "default": "()"
-    },
-    {
-     "name": "formerly",
      "type": "Sequence",
      "default": "()"
     }
@@ -1063,7 +1053,7 @@
    ]
   },
   "Persona": {
-   "doc": "Who speaks: data, not behaviour. A persona with her model profile is an agent; any engine can use any of them. `parts` are prompt parts of its own (its personality, say), which engines place beside `prompt` (see PromptPart). Added in 1.9: `aliases`, other names people call her by (\"Luna, …\" still calls on GPT); `formerly`, persona names she had before, so the core moves what it keeps under them to her name and reads core.yml's old name as hers (modules that keep their own data by persona name do the same); `pictures`, kind → image file (`avatar`, square; `card`, 3:4; any other kind a page knows), which interfaces show from `InterfacePort.personas`. Added in 1.11: `description`, one line on who she is, for engines that write their own prompts around her rather than placing `prompt` (Chimera's work prompts); `profiles`, her model profiles by tier besides `profile`: `own` (her own models only, with nobody else's as a fallback, so the model family answering is hers) and `strong` (her strongest models). An engine asking for a tier she has not named uses `own`, then `profile`. Added in 1.13: `allowance`, her own default daily allowance in dollars (0: no daily limit; None: the core's default). The owner's settings come first: core.yml `stamina:` (`personas`, then `allowance`) and `$stamina`. Added in 1.15: `effort`, how hard she thinks in a conversation (an `Effort`; empty: the engine's setting). A session's own `effort` comes first; \"none\" answers at once, without a thinking phase.",
+   "doc": "Who speaks: data, not behaviour. A persona with her model profile is an agent; any engine can use any of them. `parts` are prompt parts of its own (its personality, say), which engines place beside `prompt` (see PromptPart). Added in 1.9: `aliases`, other names people call her by (\"Luna, …\" still calls on GPT); `pictures`, kind → image file (`avatar`, square; `card`, 3:4; any other kind a page knows), which interfaces show from `InterfacePort.personas`. Added in 1.11: `description`, one line on who she is, for engines that write their own prompts around her rather than placing `prompt` (Chimera's work prompts); `profiles`, her model profiles by tier besides `profile`: `own` (her own models only, with nobody else's as a fallback, so the model family answering is hers) and `strong` (her strongest models). An engine asking for a tier she has not named uses `own`, then `profile`. Added in 1.13: `allowance`, her own default daily allowance in dollars (0: no daily limit; None: the core's default). The owner's settings come first: core.yml `stamina:` (`personas`, then `allowance`) and `$stamina`. Added in 1.15: `effort`, how hard she thinks in a conversation (an `Effort`; empty: the engine's setting). A session's own `effort` comes first; \"none\" answers at once, without a thinking phase.",
    "fields": [
     {
      "name": "name",
@@ -1089,11 +1079,6 @@
     },
     {
      "name": "aliases",
-     "type": "list[str]",
-     "default": "()"
-    },
-    {
-     "name": "formerly",
      "type": "list[str]",
      "default": "()"
     },
@@ -2029,7 +2014,7 @@
      "async": false,
      "parameters": [],
      "returns": "Sequence",
-     "doc": "Every persona the core has, in the order modules gave them (added in 1.9): `name`, `display_name`, `aliases`, `formerly`, `pictures` (kind → absolute image path, see Persona) and `ready` (some candidate of her profile can be called). Pages show the students from this rather than keeping their own list."
+     "doc": "Every persona the core has, in the order modules gave them (added in 1.9): `name`, `display_name`, `aliases`, `pictures` (kind → absolute image path, see Persona) and `ready` (some candidate of her profile can be called). Pages show the students from this rather than keeping their own list."
     },
     {
      "name": "policy",

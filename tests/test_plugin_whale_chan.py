@@ -56,7 +56,7 @@ class ChatEngineTests(unittest.IsolatedAsyncioTestCase):
             "extension_config": {"whale_chan": plugin if plugin is not None else QUIET,
                                  "students": {"learn": True, **companion} if companion is not None else {}},
             # (`chat`: her own engine's name, MomoChat's former one)
-            "assignments": {"*": {"engine": "chat", "personas": ["deepseek"],
+            "assignments": {"*": {"engine": "momochat", "personas": ["deepseek"],
                                   "options": {**chat_options(plugin if plugin is not None else QUIET),
                                               **(options or {})}}},
             **({"owners": owners} if owners else {})}, self.adapter)
@@ -152,7 +152,7 @@ class NativeChatTests(unittest.IsolatedAsyncioTestCase):
         self.core = await start_core(self.tmp, {
             "extensions": extensions, "profiles": PROFILES,
             "extension_config": {"whale_chan": plugin if plugin is not None else QUIET},
-            "assignments": {"*": {"engine": "chat", "personas": ["deepseek"],
+            "assignments": {"*": {"engine": "momochat", "personas": ["deepseek"],
                                   "options": {**chat_options(), **(options or {})}}}},
             self.adapter)
         return iface(self.core)

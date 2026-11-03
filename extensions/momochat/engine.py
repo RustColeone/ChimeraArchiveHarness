@@ -77,8 +77,7 @@ class Settings:
 
 class MomoChatEngine(Engine):
     spec = EngineSpec("momochat", "Conversations, direct and in groups: each speaker talks, uses tools, asks "
-                      "questions and hands work to a classmate; resumable.", "many",
-                      formerly=("assistant", "chat", "room"))
+                      "questions and hands work to a classmate; resumable.", "many")
 
     def __init__(self, settings: Settings | None = None):
         self.settings = settings or Settings()

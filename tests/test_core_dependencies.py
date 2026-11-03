@@ -145,16 +145,16 @@ class LoadingTests(Base):
 
     async def test_a_default_naming_a_missing_module_it_uses_is_set_aside(self):
         core = await self.build(self.module(
-            "page", 'interfaces=[Page("page")], assignments={"page:*": {"engine": "room", "personas": ["p"]}}',
+            "page", 'interfaces=[Page("page")], assignments={"page:*": {"engine": "momochat", "personas": ["p"]}}',
             declared=', uses=("room",)'))
         self.assertIn("page", core.gateway.interfaces)
         self.assertNotIn("page:*", core.manager.assignments)
-        self.assertEqual(core.set_aside, [("page", "page:*", "the engine 'room' is not loaded (without room)")])
+        self.assertEqual(core.set_aside, [("page", "page:*", "the engine 'momochat' is not loaded (without room)")])
         self.assertTrue(any(event["event"] == "default_unusable" for event in core.audit.events))
 
     async def test_an_owner_assignment_naming_something_missing_still_stops_the_core(self):
-        with self.assertRaisesRegex(ConfigError, "engine 'room' is not registered"):
-            await self.build(assignments={"chat:room": {"engine": "room", "personas": ["p"]}})
+        with self.assertRaisesRegex(ConfigError, "engine 'momochat' is not registered"):
+            await self.build(assignments={"chat:room": {"engine": "momochat", "personas": ["p"]}})
 
 
 class MinimumCoreTests(Base):

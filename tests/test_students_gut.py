@@ -72,7 +72,7 @@ class Turns(unittest.IsolatedAsyncioTestCase):
             "extension_config": {"students": {"learn": True, "language": "en", "roles": {"chat:alice": role},
                                               "students": {"gpt": {"gut": gut}}}},
             "profiles": {name: [{"provider": "fake", "model": name}] for name in ("gpt", "gemini", "claude", "deepseek", "grok")},
-            "assignments": {"*": {"engine": "room", "personas": ["gpt"]}}}, FakeAdapter(handler=head))
+            "assignments": {"*": {"engine": "momochat", "personas": ["gpt"]}}}, FakeAdapter(handler=head))
         return iface(self.core)
 
     async def say(self, chat, text):
@@ -200,7 +200,7 @@ class Turns(unittest.IsolatedAsyncioTestCase):
             "extension_config": {"students": {"learn": True, "language": "en", "roles": {"chat:alice": "friend"},
                                               "students": {"gpt": {"gut": True}}}},
             "profiles": {name: [{"provider": "fake", "model": name}] for name in ("gpt", "gemini", "claude", "deepseek", "grok")},
-            "assignments": {"*": {"engine": "room", "personas": ["gpt", "gemini"]}}}, FakeAdapter(handler=head))
+            "assignments": {"*": {"engine": "momochat", "personas": ["gpt", "gemini"]}}}, FakeAdapter(handler=head))
         chat = iface(self.core)
         for text in ("GPT, Gemini, hello", "GPT, Gemini, how are you"):
             await chat.say(text, conversation="room", sender="alice")

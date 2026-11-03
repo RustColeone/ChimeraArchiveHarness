@@ -178,7 +178,7 @@ def student_seats(agents) -> dict[str, dict]:
         seats[view["name"]] = {"name": view.get("display_name") or view["name"],
                                "voice": view.get("description") or view.get("display_name") or view["name"],
                                "cheap": cheap, "strong": list(models.get("strong") or cheap),
-                               "also": [*view.get("aliases", ()), *view.get("formerly", ())]}
+                               "also": list(view["aliases"])}
     return seats
 
 

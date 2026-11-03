@@ -117,7 +117,7 @@ class InterfacePort(Protocol):
 
     def personas(self) -> Sequence[Mapping[str, Any]]:
         """Every persona the core has, in the order modules gave them (added in 1.9): `name`, `display_name`,
-        `aliases`, `formerly`, `pictures` (kind → absolute image path, see Persona) and `ready` (some candidate of
+        `aliases`, `pictures` (kind → absolute image path, see Persona) and `ready` (some candidate of
         her profile can be called). Pages show the students from this rather than keeping their own list."""
 
     def prices(self) -> Any:

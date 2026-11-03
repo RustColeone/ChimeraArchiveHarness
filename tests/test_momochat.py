@@ -19,7 +19,7 @@ def turn(message="", status="complete", actions=()):
     return {"message": message, "status": status, "actions": [dict(tool=t, arguments=a) for t, a in actions]}
 
 
-ASSISTANT = {"assignments": {"*": {"engine": "assistant", "personas": ["p"]}}}  # its former name, as core.yml may say
+ASSISTANT = {"assignments": {"*": {"engine": "momochat", "personas": ["p"]}}}
 
 
 class AssistantEngineTests(unittest.IsolatedAsyncioTestCase):
@@ -129,7 +129,7 @@ class AssistantEngineTests(unittest.IsolatedAsyncioTestCase):
         photo.write_bytes(b"jpeg")
         other.write_bytes(b"png")
         core, adapter = await self.core([turn("Ramen!")], {"assignments": {"*": {
-            "engine": "assistant", "personas": ["p"], "options": {"history_scope": "sender"}}}})
+            "engine": "momochat", "personas": ["p"], "options": {"history_scope": "sender"}}}})
         chat, room = iface(core), Address("chat", "room")
         now = time.time()
         await chat.port.observe(room, "[Image]", sender=Sender("alice", "Alice"), kind="image", message_id="m1",
@@ -156,7 +156,7 @@ class AssistantEngineTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_owner_instructions_are_used_only_when_the_owner_speaks(self):
         core, adapter = await self.core([turn("Hi boss."), turn("Hi Alice.")], {"assignments": {"*": {
-            "engine": "assistant", "personas": ["p"], "options": {"owner_instructions": "Call them captain."}}}})
+            "engine": "momochat", "personas": ["p"], "options": {"owner_instructions": "Call them captain."}}}})
         await iface(core).say("hello", sender="boss")
         await settle(core)
         await iface(core).say("hello", conversation="other")
@@ -201,7 +201,7 @@ class AssistantEngineTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_sender_history_scope_and_conversation_instructions(self):
         core, adapter = await self.core([turn("Hi Alice."), turn("Hi Bob."), turn("Again, Alice.")], {
-            "assignments": {"chat:group": {"engine": "assistant", "personas": ["p"], "lane": "sender",
+            "assignments": {"chat:group": {"engine": "momochat", "personas": ["p"], "lane": "sender",
                                            "options": {"history_scope": "sender", "instructions": "Be brief."}}}})
         group = dict(conversation="group", is_direct=False, mentions_me=True)
         await iface(core).say("alice secret plan", sender="alice", **group)
@@ -236,7 +236,7 @@ class AssistantEngineTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_quote_option_keeps_quoting_the_original_trigger(self):
         core, adapter = await self.core([turn("Working on it.", "continue", [("basic.now", {})]), turn("Done.")], {
-            "assignments": {"chat:group": {"engine": "assistant", "personas": ["p"], "options": {"quote": "trigger"}}}})
+            "assignments": {"chat:group": {"engine": "momochat", "personas": ["p"], "options": {"quote": "trigger"}}}})
         group = dict(conversation="group", is_direct=False, mentions_me=True)
         await iface(core).say("hold on", request_id="first", **group)
         await iface(core).say("also this", request_id="second", **group)
@@ -246,7 +246,7 @@ class AssistantEngineTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_step_limit_asks_the_model_for_a_closing_message(self):
         core, adapter = await self.core([turn("Checking.", "continue", [("basic.now", {})]), turn("Out of time.", "blocked")],
-                                        {"extension_config": {"assistant": {"max_steps": 1}}})
+                                        {"extension_config": {"momochat": {"max_steps": 1}}})
         await iface(core).say("go")
         await settle(core)
         self.assertEqual(iface(core).texts("room"), ["Checking.", "Out of time."])
@@ -413,7 +413,7 @@ class NativeToolCallTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(core.tank.runs(("done",))[0].usage["model_calls"], 1)  # the step cost one model call
 
     async def test_tool_calls_off_keeps_json_turns(self):
-        core, adapter = await self.core([turn("JSON it is.")], {"extension_config": {"assistant": {"tool_calls": False}}})
+        core, adapter = await self.core([turn("JSON it is.")], {"extension_config": {"momochat": {"tool_calls": False}}})
         await iface(core).say("hello")
         await settle(core)
         self.assertEqual(iface(core).texts("room"), ["JSON it is."])
@@ -454,7 +454,7 @@ class NativeToolCallTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_closing_turn_is_json_whatever_the_model_can_do(self):
         core, adapter = await self.core([calls("Checking.", ("basic.now", {})), turn("Out of time.", "blocked")],
-                                        {"extension_config": {"assistant": {"max_steps": 1}}})
+                                        {"extension_config": {"momochat": {"max_steps": 1}}})
         await iface(core).say("go")
         await settle(core)
         self.assertEqual(iface(core).texts("room"), ["Checking.", "Out of time."])
@@ -464,7 +464,7 @@ class NativeToolCallTests(unittest.IsolatedAsyncioTestCase):
 
 # ---- group chats (the room's rules) -----------------------------------------------------------------------------
 NAMES = ("gpt", "gemini", "claude", "deepseek")
-GROUP = {"engine": "room", "personas": list(NAMES)}  # (its former name, as the web UI's settings may say)
+GROUP = {"engine": "momochat", "personas": list(NAMES)}
 
 
 class Script:

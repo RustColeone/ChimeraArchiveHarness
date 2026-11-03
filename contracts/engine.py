@@ -34,23 +34,9 @@ SHUTDOWN = "core-shutdown"
 
 @dataclass(frozen=True)
 class EngineSpec:
-    """`formerly` (added in 1.11): engine names it had before. An assignment naming one (in core.yml, set at runtime
-    or suggested by a module) is read as this engine, and its open runs carry on in it (with the state the old engine
-    saved: an engine that cannot read it ends the run)."""
-
     name: str
     description: str = ""
     personas: Literal["one", "many"] = "one"
-    formerly: tuple[str, ...] = ()
-
-    def __post_init__(self):
-        formerly = (self.formerly,) if isinstance(self.formerly, str) else self.formerly
-        if not isinstance(formerly, (tuple, list)) or not all(isinstance(item, str) and item.strip()
-                                                               for item in formerly):
-            raise ValueError(f"engine {self.name!r}: formerly is a list of names")
-        object.__setattr__(self, "formerly", tuple(item.strip() for item in formerly))
-        if self.name in self.formerly:
-            raise ValueError(f"engine {self.name!r}: formerly lists its own name")
 
 
 PART_PLACES = ("stable", "turn", "context")
@@ -128,10 +114,9 @@ class Persona:
     """Who speaks: data, not behaviour. A persona with her model profile is an agent; any engine can use any of them.
     `parts` are prompt parts of its own (its personality, say), which engines place beside `prompt` (see PromptPart).
 
-    Added in 1.9: `aliases`, other names people call her by ("Luna, …" still calls on GPT); `formerly`, persona
-    names she had before, so the core moves what it keeps under them to her name and reads core.yml's old name as
-    hers (modules that keep their own data by persona name do the same); `pictures`, kind → image file (`avatar`,
-    square; `card`, 3:4; any other kind a page knows), which interfaces show from `InterfacePort.personas`.
+    Added in 1.9: `aliases`, other names people call her by ("Luna, …" still calls on GPT); `pictures`, kind → image
+    file (`avatar`, square; `card`, 3:4; any other kind a page knows), which interfaces show from
+    `InterfacePort.personas`.
 
     Added in 1.11: `description`, one line on who she is, for engines that write their own prompts around her rather
     than placing `prompt` (Chimera's work prompts); `profiles`, her model profiles by tier besides `profile`: `own`
@@ -150,7 +135,6 @@ class Persona:
     profile: str = "default"
     parts: tuple[PromptPart, ...] = ()  # added later: new fields go last
     aliases: tuple[str, ...] = ()
-    formerly: tuple[str, ...] = ()
     pictures: Mapping[str, str] = field(default_factory=dict)
     description: str = ""
     profiles: Mapping[str, str] = field(default_factory=dict)
@@ -168,15 +152,10 @@ class Persona:
         if len(set(names)) != len(names):
             raise ValueError(f"persona {self.name!r}: two parts have the same name")
         object.__setattr__(self, "parts", tuple(self.parts))
-        for field_name in ("aliases", "formerly"):
-            value = getattr(self, field_name)
-            value = (value,) if isinstance(value, str) else value
-            if not isinstance(value, (tuple, list)) or not all(isinstance(item, str) and item.strip()
-                                                                 for item in value):
-                raise ValueError(f"persona {self.name!r}: {field_name} is a list of names")
-            object.__setattr__(self, field_name, tuple(item.strip() for item in value))
-        if self.name in self.formerly:
-            raise ValueError(f"persona {self.name!r}: formerly lists her own name")
+        aliases = (self.aliases,) if isinstance(self.aliases, str) else self.aliases
+        if not isinstance(aliases, (tuple, list)) or not all(isinstance(item, str) and item.strip() for item in aliases):
+            raise ValueError(f"persona {self.name!r}: aliases is a list of names")
+        object.__setattr__(self, "aliases", tuple(item.strip() for item in aliases))
         if not isinstance(self.pictures, Mapping) or not all(isinstance(kind, str) and kind and isinstance(path, str)
                                                              and path for kind, path in self.pictures.items()):
             raise ValueError(f"persona {self.name!r}: pictures maps a kind (avatar, card, …) to an image file")

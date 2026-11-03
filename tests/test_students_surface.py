@@ -28,7 +28,7 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
                                               "embed": False, "students": {"gpt": {"gut": gut, "surface": surface}}}},
             "profiles": {name: [{"provider": "fake", "model": name}]
                          for name in ("gpt", "gemini", "claude", "deepseek", "grok")},
-            "assignments": {"*": {"engine": "room", "personas": ["gpt"]}}}, FakeAdapter(handler=head))
+            "assignments": {"*": {"engine": "momochat", "personas": ["gpt"]}}}, FakeAdapter(handler=head))
         return iface(self.core)
 
     async def say(self, chat, text):

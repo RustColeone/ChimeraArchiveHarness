@@ -85,65 +85,6 @@ class Tank:
     def store(self, scope: str) -> ScopedStore:
         return ScopedStore(self.db, "kv", scope)
 
-    def rename_persona(self, old: str, new: str, display_name: str) -> dict[str, int]:
-        """Move what is filed under persona `old` to `new` (Persona.formerly): her memory and every module's stores
-        scoped by her, her lines in the log, the runs she is in, and her name on what she said. What `new` already has
-        wins. Returns how many of each were moved (all zero once done)."""
-        moved = {"stores": 0, "notes": 0, "runs": 0, "messages": 0}
-        with self.db.transaction() as db:
-            for row in db.query("SELECT DISTINCT scope FROM kv WHERE scope=? OR scope LIKE 'extension:% {%'",
-                                ("persona:" + old,)):
-                scope = row["scope"]
-                if scope == "persona:" + old:
-                    target = "persona:" + new
-                else:
-                    head, _, parts = scope.partition(" ")
-                    try:
-                        scoped = json.loads(parts)
-                    except ValueError:
-                        continue
-                    if not isinstance(scoped, dict) or scoped.get("persona") != old:
-                        continue
-                    target = head + " " + json.dumps({**scoped, "persona": new}, ensure_ascii=False, sort_keys=True)
-                db.execute("INSERT OR IGNORE INTO kv(scope, key, value) SELECT ?, key, value FROM kv WHERE scope=?",
-                           (target, scope))
-                moved["stores"] += db.execute("DELETE FROM kv WHERE scope=?", (scope,)).rowcount
-            moved["notes"] = db.execute("UPDATE log SET persona=? WHERE persona=?", (new, old)).rowcount
-            for row in db.query("SELECT id, personas, assignment FROM runs WHERE personas LIKE ?",
-                                ("%" + json.dumps(old) + "%",)):
-                personas = loads(row["personas"], [])
-                if old not in personas:
-                    continue
-                assignment = loads(row["assignment"], {})
-                if isinstance(assignment.get("personas"), list):
-                    assignment["personas"] = [new if name == old else name for name in assignment["personas"]]
-                db.execute("UPDATE runs SET personas=?, assignment=? WHERE id=?",
-                           (dumps([new if name == old else name for name in personas]), dumps(assignment), row["id"]))
-                moved["runs"] += 1
-            moved["messages"] = db.execute(
-                "UPDATE messages SET sender_name=? WHERE direction='out' AND lower(sender_name)=lower(?)",
-                (display_name, old)).rowcount
-        return moved
-
-    def rename_engine(self, old: str, new: str) -> int:
-        """Open runs of engine `old` are `new`'s (EngineSpec.formerly). Returns how many."""
-        marks = ",".join("?" * len(OPEN))
-        return self.db.execute(f"UPDATE runs SET engine=? WHERE engine=? AND status IN ({marks})",
-                               (new, old, *OPEN)).rowcount
-
-    def rename_module(self, old: str, new: str) -> int:
-        """The stores of module `old` are module `new`'s (Extension.formerly); what `new` has wins. Returns how many
-        entries moved."""
-        moved = 0
-        with self.db.transaction() as db:
-            for row in db.query("SELECT DISTINCT scope FROM kv WHERE scope=? OR scope LIKE ?",
-                                ("extension:" + old, "extension:" + old + " {%")):
-                target = "extension:" + new + row["scope"][len("extension:" + old):]
-                db.execute("INSERT OR IGNORE INTO kv(scope, key, value) SELECT ?, key, value FROM kv WHERE scope=?",
-                           (target, row["scope"]))
-                moved += db.execute("DELETE FROM kv WHERE scope=?", (row["scope"],)).rowcount
-        return moved
-
     def record_message(self, address: str, direction: str, text: str, *, kind: str = "text",
                        sender_id: str = "", sender_name: str = "", message_id: str | None = None,
                        run_id: str | None = None, reply_to: str | None = None, quoted_text: str = "",

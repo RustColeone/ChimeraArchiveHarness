@@ -66,38 +66,6 @@ class FactsDesk:
         else:
             self.store.delete(where)
 
-    def rename(self, old: str, new: str) -> int:
-        """Persona.formerly: her facts under `old` move to `new` (what `new` has wins). Returns how many entries."""
-        moved = 0
-        for where in self.store.keys():
-            try:
-                parts = json.loads(where)
-            except ValueError:
-                continue
-            if not isinstance(parts, list) or not parts or parts[0] != old:
-                continue
-            target = json.dumps([new, *parts[1:]], ensure_ascii=False)
-            self.store.set(target, {**dict(self.store.get(where) or {}), **dict(self.store.get(target) or {})})
-            self.store.delete(where)
-            moved += 1
-        return moved
-
-    def rename_module(self, old: str, new: str) -> int:
-        """Extension.formerly: the facts module `old` published are module `new`'s (what `new` has wins). Returns how
-        many entries changed."""
-        moved = 0
-        for where in self.store.keys():
-            facts = dict(self.store.get(where) or {})
-            old_keys = [name for name in facts if name.startswith(old + ".")]
-            if not old_keys:
-                continue
-            for name in old_keys:
-                facts.setdefault(new + name[len(old):], facts[name])
-                facts.pop(name)
-            self.store.set(where, facts)
-            moved += 1
-        return moved
-
     def handle(self, module: str) -> "FactsHandle":
         return FactsHandle(self, module)
 

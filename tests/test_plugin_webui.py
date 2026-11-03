@@ -890,7 +890,7 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
 
     async def test_deleting_a_chat_from_before_the_record_still_removes_its_assignment(self):
         await self.start_room()
-        self.core.manager.set_assignment("webui:dm-old", {"engine": "room", "personas": ["gpt"]})  # (its old name)
+        self.core.manager.set_assignment("webui:dm-old", {"engine": "momochat", "personas": ["gpt"]})  # (its old name)
         self.web.store.ensure("dm-old", "GPT", ["gpt"])  # made by an older version: not in `assigned`
         ws, _ = await self.socket()
         await ws.send_json({"type": "delete", "conversation": "dm-old"})
