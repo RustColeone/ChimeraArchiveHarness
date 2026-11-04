@@ -66,7 +66,7 @@ def main() -> int:
     sys.path.insert(0, str(ROOT))
     from openai import OpenAI
     from extensions.students.extension import read_students
-    from mneme_llm.gut import ENDS, mine, note_messages, written
+    from mneme_llm.gut import ENDS, NOTED_TOKENS, mine, note_messages, written
     student = next((data for data in read_students() if data["name"] == arguments.student), None)
     if student is None:
         raise SystemExit(f"no student called {arguments.student}")
@@ -109,7 +109,7 @@ def main() -> int:
             reply = complete([{"role": "system", "content": system}, *before, {"role": "user", "content": item["said"]}], 400)
             if not reply:
                 continue
-            note = written(complete(note_messages(system, "", before, item["said"], reply), 120))
+            note = written(complete(note_messages(system, "", before, item["said"], reply), NOTED_TOKENS))
             history += [{"role": "user", "content": item["said"]}, {"role": "assistant", "content": reply}]
             if note:
                 rows.append({"language": chat["language"], "form": item["form"], "feel": note["feel"], "mood": note["mood"],
