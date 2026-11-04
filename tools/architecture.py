@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "architecture" / "data.js"
-REPO = "https://github.com/RustColeone/DiscordStudyBot"
+REPO = "https://github.com/RustColeone/ChimeraArchiveHarness"
 BRANCH = "master"
 ROOTS = ("contracts", "core", "extensions", "plugins", "tools", "tests")  # the folders the page shows, in order
 SLOTS = ("interfaces", "engines", "capabilities", "personas", "watchers")

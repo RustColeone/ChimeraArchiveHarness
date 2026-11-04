@@ -1,6 +1,7 @@
-# DiscordStudyBot
+# ChimeraArchiveHarness
 
-A personal AI bot for Discord (and optionally WeChat) built on a small plug-in core. Models from
+A multi-agent harness for personal AI companions, on a small plug-in core (it began as DiscordStudyBot, a Discord
+study bot with a music player, a timer and search). It talks on Discord, a web page and optionally WeChat. Models from
 DeepSeek, OpenAI, Gemini and Claude talk, use tools, remember people and work together; everything
 that touches a platform, decides what to say or does work is a module.
 
@@ -88,7 +89,7 @@ bot as a web page on your local network.
   manager, engines, capabilities, storage) and its rules.
 * [docs/core/EXTENSIONS.md](docs/core/EXTENSIONS.md): writing modules, configuration, policy, and which
   module to read for what.
-* [The architecture page](https://rustcoleone.github.io/DiscordStudyBot/architecture/): every module in the slots
+* [The architecture page](https://rustcoleone.github.io/ChimeraArchiveHarness/architecture/): every module in the slots
   it fills, every file, class and function, read from the code (served from master's `docs/`; rebuild
   [`docs/architecture/data.js`](docs/architecture) with `venv/bin/python tools/architecture.py`).
 * Each module's own `README.md` (for example [extensions/momochat](extensions/momochat/README.md)): what it adds,
@@ -119,18 +120,18 @@ To start it at boot, have the system run `python -m core`. On Linux, a systemd s
 starts the supervisor; restarts are the supervisor's job):
 
 ```ini
-# /etc/systemd/system/discordstudybot.service
+# /etc/systemd/system/chimeraarchiveharness.service
 [Unit]
-Description=Discord Study Bot
+Description=ChimeraArchiveHarness
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=<you>
-WorkingDirectory=/path/to/DiscordStudyBot
-EnvironmentFile=/path/to/DiscordStudyBot/.env
-ExecStart=/path/to/DiscordStudyBot/venv/bin/python -m core --config core.yml
+WorkingDirectory=/path/to/ChimeraArchiveHarness
+EnvironmentFile=/path/to/ChimeraArchiveHarness/.env
+ExecStart=/path/to/ChimeraArchiveHarness/venv/bin/python -m core --config core.yml
 Restart=on-failure
 RestartSec=5
 
@@ -139,7 +140,7 @@ WantedBy=multi-user.target
 ```
 
 On Windows, a task that starts it when you log in (the host module needs your desktop session):
-`schtasks /Create /SC ONLOGON /TN DiscordStudyBot /TR "C:\path\to\DiscordStudyBot\venv\Scripts\python.exe -m core --config C:\path\to\DiscordStudyBot\core.yml"`.
+`schtasks /Create /SC ONLOGON /TN ChimeraArchiveHarness /TR "C:\path\to\ChimeraArchiveHarness\venv\Scripts\python.exe -m core --config C:\path\to\ChimeraArchiveHarness\core.yml"`.
 
 Runtime data (databases, module data, the audit log) lives in `data/core/`.
 

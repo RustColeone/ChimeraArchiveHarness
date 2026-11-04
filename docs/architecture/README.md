@@ -34,5 +34,5 @@ a diagram keeps your zoom and place; going to another diagram keeps your zoom. E
 `python -m http.server -d docs/architecture`.
 
 **To publish it on GitHub Pages:** in the repository's Settings → Pages, choose "Deploy from a branch", the branch
-`master` and the folder `/docs`. The page is then at `https://<owner>.github.io/DiscordStudyBot/architecture/`
+`master` and the folder `/docs`. The page is then at `https://<owner>.github.io/ChimeraArchiveHarness/architecture/`
 (`docs/index.html` sends the site's root there; `docs/.nojekyll` serves the files as they are).

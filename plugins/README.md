@@ -3,7 +3,7 @@
 A module is a folder with an `extension.py`. The built-in ones live in `extensions/`; this folder holds
 external ones: someone else's code, or code specific to one person or machine. Every module, built-in or
 external, loads at startup unless core.yml excludes it. To add one, drag its folder in and restart
-(`sudo systemctl restart discordstudybot.service`). To turn one off, move it out or exclude it:
+(`sudo systemctl restart chimeraarchiveharness.service`). To turn one off, move it out or exclude it:
 `modules: {exclude: [plugins/name]}` in core.yml.
 
 ## Settings and secrets

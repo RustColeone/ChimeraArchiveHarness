@@ -1,5 +1,5 @@
 "use strict";
-// What is DiscordStudyBot's own on the architecture page: the top map (the core, and the modules in the slots they
+// What is ChimeraArchiveHarness's own on the architecture page: the top map (the core, and the modules in the slots they
 // fill), the guides "The three layers", "A student's personality" and "How a mod goes in", and how a module looks among
 // the folders. app.js, diagram.js and style.css are
 // the same viewer in every repository that has one (mneme-llm's too); this file is what differs.
@@ -66,7 +66,7 @@ window.SITE = (() => {
 
   function topPane(h) {
     const { A, make, link, linkList, heading } = h;
-    const pane = [...heading("Architecture", "DiscordStudyBot")];
+    const pane = [...heading("Architecture", "ChimeraArchiveHarness")];
     pane.push(make("div", "doc", "Every box is a real folder, file, class or function, read from the code by " +
       "tools/architecture.py. Click a box (or search above) to go deeper: the system, a module, a file (its classes " +
       "drawn around their methods), and one function, whose code shows here. A click keeps your zoom."));
@@ -418,7 +418,7 @@ window.SITE = (() => {
   }
 
   return {
-    name: "DiscordStudyBot",
+    name: "ChimeraArchiveHarness",
     top: { chart: topChart, pane: topPane, title: "The whole system",
            hint: "The core in the middle, the modules around it in the slots they fill. Click a box to go in." },
     guides: [{ path: GUIDE, label: "How a mod goes in", keywords: "how a mod goes in module plugin extension guide",

@@ -95,7 +95,7 @@ def fetch(url: str, session=None) -> dict:
     current = url
     for hop in range(MAX_REDIRECTS + 1):
         current = validated_url(current)
-        response = session.get(current, headers={"User-Agent": "DiscordStudyBot/1.0 (+public page reader)"},
+        response = session.get(current, headers={"User-Agent": "ChimeraArchiveHarness/1.0 (+public page reader)"},
                                allow_redirects=False, stream=True, timeout=(5, 20))
         try:
             if response.is_redirect or response.is_permanent_redirect:

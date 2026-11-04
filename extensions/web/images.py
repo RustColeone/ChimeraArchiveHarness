@@ -19,7 +19,7 @@ MAX_DIMENSION = 1800
 DOWNLOAD_SECONDS = 60
 SEARCH_SECONDS = 120
 HEADERS = {"Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-           "User-Agent": "DiscordStudyBot/1.0 (+image search)"}
+           "User-Agent": "ChimeraArchiveHarness/1.0 (+image search)"}
 
 
 class ImageUnavailable(RuntimeError):

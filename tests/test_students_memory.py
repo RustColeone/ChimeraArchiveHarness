@@ -166,7 +166,8 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("(Alice is someone you know; you are not close yet.)", turn)  # an acquaintance
         await self.say(chat, "Gemini, which tea do I like?")
         self.assertIn("Alice loves oolong tea.", self.seen(script, "Gemini"))  # a group chat: she heard it too
-        self.assertIn("GPT: acquaintance, closeness 20/100, mood", await self.say(chat, "$bond"))
+        # (a second exchange that pleased her: closeness moves by how much she liked it, mneme-llm 0.5)
+        self.assertIn("GPT: acquaintance, closeness 21/100, mood", await self.say(chat, "$bond"))
         self.assertEqual(self.facts("gemini")["students.bond"]["role"], "acquaintance")  # she talked with Alice too
         self.assertTrue((self.tmp / "data" / "extensions" / "students" / "claude.db").is_file())
 
@@ -360,7 +361,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("No student called 'pat'", await self.say(chat, "$alias pat Patty"))
         from core.loader import import_extension
         extension, _ = import_extension(ROOT / "extensions" / "students")
-        self.assertEqual(extension.requires, ("package:mneme-llm>=0.4.0",))
+        self.assertEqual(extension.requires, ("package:mneme-llm>=0.6.0",))
 
 
 if __name__ == "__main__":
