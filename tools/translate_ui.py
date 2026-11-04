@@ -22,7 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = [ROOT / "plugins/webui/static" / name for name in
-           ("app.js", "cafe.js", "students.js", "places.js", "me.js", "index.html", "cafe.html", "students.html",
+           ("app.js", "cafe.js", "students.js", "gut.js", "places.js", "me.js", "index.html", "cafe.html", "students.html",
             "login.html", "me.html")] + \
           [ROOT / "extensions/chimera/web/static" / name for name in ("app.js", "index.html")]
 TARGETS = [ROOT / "plugins/webui/static/i18n-zh.js", ROOT / "extensions/chimera/web/static/i18n-zh.js"]

@@ -1,7 +1,7 @@
 "use strict";
 // The Students page: every student's card (portrait, level, bond, models, her measured run alone), and one student in
-// full (#<name>): her art stages and moods, level, bond, models, the benchmark rows she is in, your record together and
-// her folder. Levels come from the Classroom (Chimera's facts), bond and mood from her memory, both through the core.
+// full (#<name>): her art stages and moods, level, bond, models, the benchmark rows she is in, your record together,
+// her folder and, for the owner, her gut (gut.js: her star map, her dials and locks). Levels come from the Classroom (Chimera's facts), bond and mood from her memory, both through the core.
 (() => {
   const $ = (selector) => document.querySelector(selector);
   const make = (tag, className, text) => {
@@ -116,6 +116,7 @@
                                "description), her prompt, her pictures; her memory comes with her."));
       grid.append(add);
     }
+    window.GutPanel?.unmount();
     main.replaceChildren(head, grid);
     document.title = `Students · ${state.title || ""}`;
   }
@@ -407,7 +408,9 @@
     right.append(duo);
 
     page.append(left, right);
-    main.replaceChildren(back, page);
+    const gut = make("div", "gut-holder");  // her gut, for the owner: filled once it is read (gut.js)
+    main.replaceChildren(back, page, gut);
+    window.GutPanel?.mount(gut, student.name, toast);
     document.title = `${shown(student)} · Students · ${state.title || ""}`;
   }
 

@@ -25,7 +25,7 @@ import time
 from pathlib import Path
 
 from contracts import (IMPULSE, Capability, Command, Context, ModelRequest, Option, PromptPart, Risk, ToolResult,
-                       Watcher, flag, impulse, impulse_line, is_command, number)
+                       View, Watcher, flag, impulse, impulse_line, is_command, number)
 
 import mneme_llm
 from mneme_llm.gut import GROWS
@@ -811,6 +811,55 @@ def make_gut(book: Book, settings: Settings, guts: Guts):
     return show
 
 
+def make_views(book: Book, guts: Guts, felt: tuple[str, ...]) -> list[View]:
+    """Her gut for her page, the owner's alone: `students.gut` (her settings, bars, people and sides) and
+    `students.starmap` (her heart as a star map), worked out when the page asks (contracts.View)."""
+    from . import panel, starmap
+
+    async def gut(persona: str, person: tuple[str, str]) -> dict:
+        found, memory = await guts.woken(persona), book.open(persona)
+        you = book.subject(*person)
+        you = book.person_of.get(you, you)
+
+        def made() -> dict:
+            names = {subject: book.name_of(subject) for subject in found.net.people} if found is not None else {}
+            return panel.view(found, you, memory, {subject: name for subject, name in names.items() if name})
+        return {"student": persona, "display": book.shown(persona), **await asyncio.to_thread(made)}
+
+    async def stars(persona: str, person: tuple[str, str]) -> dict:
+        found = await guts.woken(persona)
+        return {"stamp": panel.stamp(found), **await asyncio.to_thread(starmap.starmap, found)}
+    return [View("gut", gut, "Her gut: settings, bars lately against usual, the people she knows, her sides",
+                 personas=felt, timeout_s=30),
+            View("starmap", stars, "Her heart as a star map, and the people she knows", personas=felt, timeout_s=60)]
+
+
+def make_tune(book: Book, settings: Settings, guts: Guts):
+    async def tune(arguments, context) -> ToolResult:
+        """`$tune <student> <change>`: her gut by hand, a change as JSON (extensions/students/panel.py), checked whole
+        before any of it lands; the answer's data is her gut as her page shows it."""
+        from . import panel
+        who, _, given = str(arguments.get("text") or "").strip().partition(" ")
+        persona = book.find(who, book.subject(context.address.interface, context.sender.id)) if who else None
+        if persona is None or not settings.of(persona).gut:
+            return ToolResult.fail("Use `$tune <student> <change>`, the change as JSON (tau, sensitivity, age, locked, "
+                                   "tune, people, sides, side).", "invalid_tune")
+        try:
+            asked = json.loads(given)
+        except ValueError:
+            return ToolResult.fail("The change is JSON: {\"tune\": [{\"end\": \"sweet\", \"nature\": 2}]}, say.",
+                                   "invalid_tune")
+        gut, memory = await guts.woken(persona), book.open(persona)
+        try:
+            await asyncio.to_thread(panel.change, gut, asked, memory)
+        except ValueError as error:
+            return ToolResult.fail(f"Not changed: {error}.", "invalid_tune")
+        subject = book.subject(context.address.interface, context.sender.id)
+        shown = await asyncio.to_thread(panel.view, gut, book.person_of.get(subject, subject), memory)
+        return ToolResult.ok(f"{book.shown(persona)}'s gut: changed.", data={"gut": shown})
+    return tune
+
+
 def weight_of(text: str) -> float | None:
     """A weight for `$side`: a number above nothing, or None for a sentence."""
     try:
@@ -881,6 +930,11 @@ def contributions(context, students: dict[str, dict]) -> dict:
                           {"text": {"type": "string", "description": "<student> <side> <sentence>, <student> <side> <number>, or <student> <side> off"}},
                           risk=Risk.WRITE, access="creator", internal=True, command="side",
                           command_argument="text")] if felt else []),
+            *([Capability("students.tune", "Change a student's gut by hand: her settings, feelings, people and sides.",
+                          make_tune(book, settings, guts),
+                          {"text": {"type": "string", "description": "<student> <change as JSON>"}},
+                          risk=Risk.WRITE, access="creator", internal=True, command="tune",
+                          command_argument="text")] if felt else []),
             Capability("students.first", "Show or set the first prompt the students keep of you.", make_first(book),
                        {"text": {"type": "string", "description": "<text>, on, off, clear, a student first, or nothing"}},
                        risk=Risk.WRITE, internal=True, command="first", command_argument="text"),
@@ -912,5 +966,7 @@ def contributions(context, students: dict[str, dict]) -> dict:
         # Each changes only what is yours (your name for her, her name for you, your own accounts: a link needs a
         # code from the account it joins), and only you can type them (models are not offered them).
         "permissions": {"*": {"rules": {"students.alias": "auto", "students.callme": "auto", "students.link": "auto",
-                                        "students.first": "auto"}}},
+                                        "students.first": "auto", "students.tune": "auto"}}},
+        # Her gut for her page (the owner's alone): what it shows, worked out when asked.
+        "views": make_views(book, guts, felt) if felt else [],
     }

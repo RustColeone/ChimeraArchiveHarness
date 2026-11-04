@@ -30,7 +30,8 @@ to a character is a change to a file, not to code.
 | Watcher | `gut` | With `gut` on: her note, and what this person is making of her ([Her gut](#her-gut)) |
 | Capabilities | `students.alias`, `students.bond`, `students.callme`, `students.link` | `$alias`, `$bond`, `$callme` and `$link` (typed only) |
 | Capabilities | `students.first`, `students.new` | `$first` and `$new`: the first prompt she keeps of you, and starting over deeper than `/new` (see below) |
-| Capabilities | `students.gut`, `students.side` | With `gut` on: `$gut` and `$side` ([Her gut](#her-gut)) |
+| Capabilities | `students.gut`, `students.side`, `students.tune` | With `gut` on: `$gut`, `$side` and `$tune` ([Her gut](#her-gut)) |
+| Views | `students.gut`, `students.starmap` | With `gut` on, the owner's: her gut and her star map for her page ([Her page](#her-page)) |
 | Capabilities | `students.search_memory`, `students.read_memory` | Her tools to look through everything said before with the person (offered to the students' turns only) |
 | Facts | `students.alias`, `students.bond`, `students.mood`, `students.plans`, `students.called`, `students.accounts` | Where she stands with each person, what she calls them and their accounts, for the pages |
 | Declares | `requires=("package:mneme-llm>=0.6.0",)` | Her memory is mneme-llm's |
@@ -326,7 +327,7 @@ flowchart TD
     M[A message] --> R[Her model reads it into a small form, no history]
     M --> L[Her memory is looked up]
     L --> V[Her head says how she feels, with her memory in view]
-    R --> N[Her gut: her heart, and this person's table on top: 24 ends on 13 bars]
+    R --> N[Her gut: her heart, and this person's table on top: 26 ends on 14 bars]
     N --> B{The balance: lived against known}
     V --> B
     T[Her slow levels: lately against usual, SAN and self-esteem] --> O
@@ -388,6 +389,21 @@ flowchart TD
 * `$gut` shows where it stands (lessons, how grown up she is, how many people she knows); the owner also sees her SAN,
   self-esteem and sensitivity, the last line and her last note.
 
+### Her page
+
+On the web UI's Students page, her own page shows the owner her gut ([`panel.py`](panel.py), the dsh-mneme-llm
+panel's): her star map ([`starmap.py`](starmap.py), the same map as that panel's and the mneme-llm tuner's), how grown
+up she is, SAN and self-esteem, her bars lately against usual, and her dials and locks: growing up, sensitivity, each
+feeling (nature −6 to 6, where she stands, and now), each person she knows (how much is theirs, a lock, closeness and
+its hold, a nudge to a feeling with them alone, forgetting them) and her sides (a sentence, a weight, locked in one and
+how often, removing one).
+
+* The page reads two views (`contracts.View`), `students.gut` and `students.starmap`: worked out when asked and never
+  stored, for the owner only.
+* It changes her with `$tune <student> <change>`, the change as JSON (`{tau, sensitivity, age, locked, tune, people,
+  sides, side}`, any of them, as panel.py says), checked whole before any of it lands. The owner alone may type it, and
+  it runs without asking (its permission rule). Its answer's data is her gut as the page shows it.
+
 ## Does a student know the other students?
 
 From her prompt, yes: the shared `school.md` names the club and each member, and her own prompt says how she sees
@@ -401,10 +417,12 @@ file, one line in her turn (`classmates`).
 | File | Role |
 | --- | --- |
 | [`extension.py`](extension.py) | `EXTENSION`, with a key setting for each provider a student brings. `read_students` reads the folders, `compose` builds each prompt, `pictures` finds her picture files (inside her folder only), `profiles` builds the fallback lists and her tiers (`tiers`), and `setup` merges `config.yml`'s `providers` and `profiles` over them and adds her memory. |
-| [`memory.py`](memory.py) | Her memory. `Settings` reads its settings; `Book` opens each student's file when first needed (with the links of `people:`, `link`), finds a student by name, says where she stands with someone (`stand`) and publishes it for each account (`publish`, `publish_all`); `make_part` builds the turn part (async: her look waits on an embedding), `make_context` the surface, `make_learner` the watcher (with `their_words`, what the person said since her last exchange, `writer`, her model calls, `hear`, a group chat's exchange for the classmates there, and `share`, its notes), `make_recall` her two search tools (one mneme-llm `Toolbox` per run, `Book.toolbox`), `make_alias`, `make_bond`, `make_callme`, `make_link`, `make_first`, `make_new`, `make_gut` and `make_side` the commands (`Book.calling` is what her memory calls a person and why; the names asked and the accounts joined are kept in `people.json`); `contributions` wires them in for the students, with a permission rule letting `$alias`, `$callme` and `$link` run without asking. |
+| [`memory.py`](memory.py) | Her memory. `Settings` reads its settings; `Book` opens each student's file when first needed (with the links of `people:`, `link`), finds a student by name, says where she stands with someone (`stand`) and publishes it for each account (`publish`, `publish_all`); `make_part` builds the turn part (async: her look waits on an embedding), `make_context` the surface, `make_learner` the watcher (with `their_words`, what the person said since her last exchange, `writer`, her model calls, `hear`, a group chat's exchange for the classmates there, and `share`, its notes), `make_recall` her two search tools (one mneme-llm `Toolbox` per run, `Book.toolbox`), `make_alias`, `make_bond`, `make_callme`, `make_link`, `make_first`, `make_new`, `make_gut`, `make_side` and `make_tune` the commands, `make_views` her page's views (`Book.calling` is what her memory calls a person and why; the names asked and the accounts joined are kept in `people.json`); `contributions` wires them in for the students, with a permission rule letting `$alias`, `$callme`, `$link`, `$first` and `$tune` run without asking. |
 | `<name>/student.yml` | One student: name, display name, other names, order, description, models, strong models, fallback, providers, pictures, prompt files. |
 | `<name>/*.md`, [`shared/`](shared) | The prompt text. |
 | [`gut.py`](gut.py) | A thin host over `mneme_llm.gut`: one gut for each student (`Guts`), woken beside her first message, and her turns between her reading and her note. |
+| [`panel.py`](panel.py) | Her gut on her page: `view` (her settings, bars, ends, people with closeness from her memory, sides), `change` (one change, checked whole, then made to her gut and her memory) and `stamp` (what changes her star map). |
+| [`starmap.py`](starmap.py) | Her heart as a star map: dsh-mneme-llm's `lib/starmap.js` in Python (each row a star, her arms against her birth, a star for each person; in 3D her bars on a sphere). |
 | [`config.example.yml`](config.example.yml) | The documented settings. |
 
 The folders are read once, when the module is imported, so a change to a student takes a restart.

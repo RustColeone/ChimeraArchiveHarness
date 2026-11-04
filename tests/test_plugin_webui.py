@@ -58,11 +58,12 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
             await self.core.stop()
         self._tmp.cleanup()
 
-    async def start(self, settings=None):
+    async def start(self, settings=None, students=None):
         paths = [*make_config(self.tmp).raw["modules"]["paths"], str(ROOT / "extensions" / "students"), str(PLUGIN)]
         self.core = await start_core(self.tmp, {
             "extensions": paths,
-            "extension_config": {"webui": {"host": "127.0.0.1", "port": 0, "user_name": "Leo", **(settings or {})}},
+            "extension_config": {"webui": {"host": "127.0.0.1", "port": 0, "user_name": "Leo", **(settings or {})},
+                                 **({"students": students} if students else {})},
             "profiles": {name: [{"provider": "fake", "model": name}] for name in STUDENTS},
             "agents": {"q": {"display_name": "Q", "prompt": "You are Q.", "profile": "none"}},  # no model to answer
             "assignments": {"webui:*": {"engine": "probe", "personas": ["p"]}}})
@@ -359,6 +360,32 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(next(item for item in state["people"] if item["name"] == "gpt")["level"], 2)  # on her card too
         self.assertIn({"name": "Students", "icon": "👥", "path": "students", "order": 40}, web.place()["views"])
         await ws.close()
+
+    async def test_her_page_shows_her_gut_and_star_map_to_you_and_tunes_her(self):
+        await self.start(students={"students": {"gpt": {"gut": True}}})
+        async with self.http.get(f"{self.base}/api/gut/gpt") as response:
+            self.assertEqual((response.status, response.headers["Cache-Control"]), (200, "no-store"))
+            gut = await response.json()
+        self.assertEqual((gut["student"], len(gut["bars"]), gut["nature"]), ("gpt", 14, 6))
+        async with self.http.get(f"{self.base}/api/starmap/gpt") as response:
+            stars = await response.json()
+        self.assertEqual((len(stars["ends"]), stars["stamp"]), (26, gut["stamp"]))
+        for path in ("/api/gut/claude", "/api/starmap/claude", "/api/gut/nobody"):  # no gut, or no student
+            async with self.http.get(f"{self.base}{path}") as response:
+                self.assertEqual(response.status, 404, path)
+        change = {"tune": [{"end": "suspicious", "nature": 6}], "sides": [{"name": "多疑", "what": "你总觉得别人话里有话。"}]}
+        async with self.http.post(f"{self.base}/api/gut/gpt", json=change) as response:
+            answer = await response.json()
+        self.assertTrue(answer["ok"], answer)
+        self.assertEqual(next(item for item in answer["gut"]["ends"] if item["end"] == "suspicious")["nature"], 6)
+        self.assertEqual([side["name"] for side in answer["gut"]["sides"]], ["多疑"])
+        async with self.http.post(f"{self.base}/api/gut/gpt", json={"tune": [{"end": "suspicious", "nature": 7}]}) as response:
+            refused = await response.json()
+        self.assertEqual((refused["ok"], refused["gut"]), (False, None))
+        self.assertIn("from -6 to 6", refused["text"])
+        for body in ([], "x"):
+            async with self.http.post(f"{self.base}/api/gut/gpt", json=body) as response:
+                self.assertEqual(response.status, 400, body)
 
     async def test_her_card_renames_her_with_your_alias(self):
         web = await self.start()

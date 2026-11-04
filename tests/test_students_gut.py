@@ -335,3 +335,58 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         shown = await self.say(chat, "$gut")
         self.assertIn("1 lessons", shown)
         self.assertNotIn("told:", shown)  # what she was told is for her owner
+
+    # ---- her gut on her page: the views it reads and the change it makes (extensions/students/panel.py) ----------
+    async def test_her_page_reads_her_gut_and_star_map_for_the_owner_alone(self):
+        script = room.Script(GPT=[room.turn(str(n)) for n in range(4)])
+        chat = await self.start(Head(script), owner=True)
+        await self.awake(chat)
+        await self.say(chat, "one")
+        port = chat.port
+        shown = await port.view("students.gut", "gpt", "alice")
+        self.assertEqual((shown["student"], shown["display"], len(shown["bars"]), len(shown["ends"]), shown["nature"]),
+                         ("gpt", "GPT", len(G.BARS), len(G.ENDS), G.NATURE))
+        self.assertEqual(shown["bars"][-1]["ends"], ["suspicious", "trusting"])
+        you = next(item for item in shown["people"] if item["you"])
+        self.assertEqual((you["subject"], you["lessons"], you["closeness"]["role"]), ("chat:alice", 1, "friend"))
+        stars = await port.view("students.starmap", "gpt", "alice")
+        self.assertEqual((len(stars["ends"]), len(stars["directions"]), stars["stamp"]), (26, 26, shown["stamp"]))
+        self.assertTrue(stars["stars"] and stars["people"][0]["subject"] == "chat:alice")
+        from contracts import ViewError
+        with self.assertRaises(ViewError) as caught:
+            await port.view("students.gut", "gpt", "bob")  # not the owner
+        self.assertEqual(caught.exception.code, "forbidden")
+        with self.assertRaises(ViewError) as caught:
+            await port.view("students.gut", "gemini", "alice")  # a student without a gut
+        self.assertEqual(caught.exception.code, "unknown")
+
+    async def test_the_owner_tunes_her_and_a_change_lands_whole_or_not_at_all(self):
+        script = room.Script(GPT=[room.turn(str(n)) for n in range(4)])
+        chat = await self.start(Head(script), owner=True)
+        gut = await self.awake(chat)
+        change = {"tau": 300, "tune": [{"end": "suspicious", "nature": 6}],
+                  "people": [{"subject": "chat:alice", "tune": [{"end": "trusting", "nature": 4}], "closeness": 70,
+                              "hold": True}], "sides": [{"name": "多疑", "what": "你总觉得别人话里有话。"}],
+                  "side": {"name": "多疑", "often": .5}}
+        self.assertIn("GPT's gut: changed", await self.say(chat, "$tune gpt " + json.dumps(change, ensure_ascii=False)))
+        self.assertEqual((gut.net.tau, gut.settings["nudge"], gut.settings["people"]["chat:alice"]["nudge"]),
+                         (300.0, {"suspicious": 6.0}, {"trusting": 4.0}))
+        self.assertEqual((gut.grown, gut.settings["side"]), ({"多疑": "你总觉得别人话里有话。"}, {"name": "多疑", "often": .5}))
+        shown = await chat.port.view("students.gut", "gpt", "alice")
+        alice = next(item for item in shown["people"] if item["subject"] == "chat:alice")
+        self.assertEqual((alice["closeness"]["value"], alice["closeness"]["locked"]), (70, True))
+        self.assertGreater(gut.net.vector(FORM, 85)["suspicious"], .9)  # 6: fully suspicious, from where she was
+        self.assertGreater(gut.net.vector(FORM, 85, "chat:alice")["trusting"], gut.net.vector(FORM, 85)["trusting"])
+        bad = {"tau": 999, "tune": [{"end": "suspicious", "nature": 7}]}  # (7 is past the dial)
+        self.assertIn("Not changed: nature for suspicious is a number from -6 to 6",
+                      await self.say(chat, "$tune gpt " + json.dumps(bad)))
+        self.assertEqual(gut.net.tau, 300.0)  # nothing of it landed
+        self.assertIn("The change is JSON", await self.say(chat, "$tune gpt {tau"))
+        self.assertIn("Use `$tune", await self.say(chat, "$tune nobody {}"))
+
+    async def test_only_the_owner_can_tune_her(self):
+        script = room.Script(GPT=[room.turn("a"), room.turn("b")])
+        chat = await self.start(Head(script))
+        gut = await self.awake(chat)
+        await self.say(chat, '$tune gpt {"tau": 300}')
+        self.assertEqual(gut.net.tau, G.TAU)

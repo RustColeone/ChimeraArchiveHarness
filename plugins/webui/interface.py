@@ -26,7 +26,7 @@ from typing import Any
 
 from aiohttp import WSMsgType, web
 
-from contracts import Address, Delivery, Display, FileRef, Interface, Reply, Request, Sender, fact, place_key
+from contracts import Address, Delivery, Display, FileRef, Interface, Reply, Request, Sender, ViewError, fact, place_key
 
 from .store import Store
 
@@ -257,6 +257,8 @@ class WebUI(Interface):
             web.get("/api/cafe", self._cafe_state), web.get("/rooms/{name}", self._room),
             web.get("/students", self._students_page), web.get("/api/students", self._students_state),
             web.get("/pictures/{name}/{kind}", self._picture), web.post("/api/alias", self._alias),
+            web.get("/api/gut/{name}", self._gut), web.get("/api/starmap/{name}", self._starmap),
+            web.post("/api/gut/{name}", self._tune),
             web.post("/api/stamina", self._stamina), web.get("/me", self._me_page),
             web.get("/api/me", self._me_state),
             web.post("/api/callme", self._callme), web.post("/api/link", self._link),
@@ -660,6 +662,39 @@ class WebUI(Interface):
             raise web.HTTPNotFound()
         return web.FileResponse(path, headers={"Content-Type": AVATAR_TYPES[path.suffix.lower()],
                                                "Cache-Control": "max-age=300"})
+
+    async def _viewed(self, view: str, name: str) -> web.Response:
+        """A student's view (contracts.View) for her page, read as you: her gut and her star map are the owner's."""
+        if name not in self.personas:
+            raise web.HTTPNotFound()
+        try:
+            value = await self.port.view(view, name, self.user_id)
+        except ViewError as error:
+            status = {"unknown": 404, "forbidden": 403}.get(error.code, 503)
+            return web.json_response({"error": error.code}, status=status, headers={"Cache-Control": "no-store"})
+        return web.json_response(value, headers={"Cache-Control": "no-store"})
+
+    async def _gut(self, request: web.Request) -> web.Response:
+        return await self._viewed("students.gut", request.match_info["name"])
+
+    async def _starmap(self, request: web.Request) -> web.Response:
+        return await self._viewed("students.starmap", request.match_info["name"])
+
+    async def _tune(self, request: web.Request) -> web.Response:
+        """A change to her gut from her page (extensions/students/panel.py): `$tune <student> <change>`, sent quietly
+        as you; the answer carries her gut as it is now."""
+        name = request.match_info["name"]
+        try:
+            body = await request.json()
+        except ValueError:
+            raise web.HTTPBadRequest() from None
+        if name not in self.personas or not isinstance(body, dict):
+            raise web.HTTPBadRequest()
+        answer = await self._quietly(DEFAULT_CONVERSATION, f"$tune {name} {json.dumps(body, ensure_ascii=False)}",
+                                     "tune")
+        gut = (answer.get("result") or {}).get("gut")  # (a change that landed carries her gut; a refusal is only text)
+        return web.json_response({"ok": bool(answer.get("ok")) and gut is not None, "text": answer.get("text") or "",
+                                  "gut": gut}, headers={"Cache-Control": "no-store"})
 
     async def _alias(self, request: web.Request) -> web.Response:
         """Your name for a student, from her card: `$alias <student> <name>` (or `reset`), sent quietly as you."""
