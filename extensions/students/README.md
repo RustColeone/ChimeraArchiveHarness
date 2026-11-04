@@ -325,16 +325,16 @@ host over it (one gut for each student, and her turns between her reading and he
 flowchart TD
     M[A message] --> R[Her model reads it into a small form, no history]
     M --> L[Her memory is looked up]
-    L --> V[Her head votes seven numbers, with her memory in view]
-    R --> N[Her gut: a small network of her own, seven numbers]
+    L --> V[Her head says how she feels, with her memory in view]
+    R --> N[Her gut: her heart, and this person's table on top: 24 ends on 13 bars]
     N --> B{The balance: lived against known}
     V --> B
-    T[Her tone: seven slow numbers, half gone in two weeks] --> O
+    T[Her slow levels: lately against usual, SAN and self-esteem] --> O
     B --> O[One soft line beside the message, with her words and the language]
     O --> A[She answers: nothing is hidden in what she says]
     A --> W[A watcher: she writes a private note, with the line in view]
     W --> Z[A lesson: the form and the note, weighted by closeness]
-    Z --> S[Every so often she sleeps: lessons and a fading starter, replayed]
+    Z --> S[Every so often she sleeps: what the lessons since the last sleep taught, settled]
     S --> N
     A --> H[A short reading: is this person making something of her?]
     H --> G[Wanted on separate days: a side, a name from the list and one sentence, kept in her gut]
@@ -352,7 +352,14 @@ flowchart TD
 * **It never holds her up for long.** Her reading and vote run side by side, "Thinking…" beside them, within 3 seconds:
   what has not come by then does not count for this answer, and a reading that comes late still teaches. With nothing
   at all she answers as she would without a gut.
-* **Strangers teach nothing**, below closeness 40; they still meet her temper and her words, but not her sides.
+* **Her feelings are 24 ends on 13 bars** (难过 or 开心, 易怒 or 平和, 委屈 or 不服, 胆小 or 大胆 and the rest, with 吃醋 and
+  心疼 on their own), each a strength of its own, so both ends of a bar can be strong at once: sweet and scornful is
+  love-hate. The line names at most three.
+* **Her heart grows up.** It learns from people at closeness 40 or more, by closeness, fast while she is young and slowly
+  once grown (`tau`, 150 lessons; grown at five times that). Each person also has a table of what is different with
+  them, learned from anyone, read on top of her heart, counting more as she knows them and fading on talking days
+  without them. Below closeness 40 a person teaches only that table: they meet her temper, but not her sides, and
+  teach neither her heart nor her words.
 * **A side grows from what people say they want.** After each reply a short reading of the last few messages, with no
   character and no memory, notes whether the person called her a kind of character, asked for one, enjoyed it or objected.
   Only what they say counts, not how she acts. "More" counts once a day per person, by closeness, half gone in two weeks;
@@ -370,12 +377,16 @@ flowchart TD
 * **`$gut`** shows the owner her sides with their weights, the one she is in and what is noted.
   `$side <student> <side> <sentence>` writes a better sentence or a new side, `$side <student> <side> <number>` sets how
   much of her it is, and `$side <student> <side> off` takes one away.
-* **Where it lives:** `<data>/gut/<persona>.db`, apart from her memory, so a wipe does not reach it. `Gut.forget(subject)`
-  takes out what one person taught and rebuilds her from the rest; nothing calls it yet, since the app has no "forget
-  me" command.
-* **She is born with something.** `tools/gut_starter.py <student>` puts 2,400 everyday messages to her real character
-  and writes `gut-starter.json.gz` in her folder. A student with none starts blank, and her head decides until she has lived.
-* `$gut` shows where it stands; the owner also sees the last line and her last note.
+* **Where it lives:** `<data>/gut/<persona>.db`, apart from her memory, so a wipe does not reach it. A 0.4 file is lived
+  again under the new rules the first time it wakes. `Gut.forget(subject)` removes how she is with one person; what
+  they did to her heart stays. Nothing calls it yet, since the app has no "forget me" command.
+* **She is born with a lean.** `tools/gut_starter.py <student>` puts one in three of 2,400 everyday messages, with the
+  moments everyday chat lacks mixed in (`tools/gut_more.py`: fear, blame, mockery, a rival, praise, shame, wanting quiet
+  or a long talk, an apology, being let down), to her real character and writes `gut-starter.json.gz` in her folder:
+  1,119 lessons for DeepSeek, for ¥0.2. Her prompt gives the rest. A student with none starts blank, and her head
+  decides until she has lived.
+* `$gut` shows where it stands (lessons, how grown up she is, how many people she knows); the owner also sees her SAN,
+  self-esteem and sensitivity, the last line and her last note.
 
 ## Does a student know the other students?
 

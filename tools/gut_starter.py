@@ -2,10 +2,12 @@
 
     python tools/gut_starter.py deepseek                       # writes extensions/students/deepseek/gut-starter.json.gz
 
-The same 2,400 messages (extensions/students/shared/gut-readings.json.gz: everyday chats in four languages, at three
-closenesses, already read into forms) go to her real character, so students differ by character alone. She answers
-each, then writes her note as she does in a real chat; the form and that note are a lesson, and the words she uses say
-what is normal for her. Only her replies and notes cost anything. It stops by itself at --floor CNY of DeepSeek balance; the key is DEEPSEEK_API_KEY,
+Everyday chats in four languages, at three closenesses, already read into forms (extensions/students/shared/
+gut-readings.json.gz, 2,400 messages, of which `--every` keeps one in so many), with the moments everyday chat lacks
+mixed in (gut-readings-more.json.gz, from tools/gut_more.py: fear, blame, mockery, a rival, praise, shame, quiet, a long
+talk, an apology, being let down), go to her real character, so students differ by character alone. She answers each,
+then writes her note as she does in a real chat; the form and that note are a lesson, and the words she uses say what
+is normal for her. Only her replies and notes cost anything. Her birth is a lean: her prompt gives the rest. It stops by itself at --floor CNY of DeepSeek balance; the key is DEEPSEEK_API_KEY,
 from the environment or the .env file named by --env-file (only that key is read from it). Other students: --base-url,
 --model and --key-env name an OpenAI-compatible endpoint.
 """
@@ -57,11 +59,14 @@ def main() -> int:
     parser.add_argument("--key-env", default="DEEPSEEK_API_KEY")
     parser.add_argument("--floor", type=float, default=30.0, help="stop at this DeepSeek balance, CNY")
     parser.add_argument("--workers", type=int, default=16)
+    parser.add_argument("--every", type=int, default=3, help="keep one everyday message in so many")
+    parser.add_argument("--more", default=str(ROOT / "extensions/students/shared/gut-readings-more.json.gz"),
+                        help="the extra moments (tools/gut_more.py); '' for none")
     arguments = parser.parse_args()
     sys.path.insert(0, str(ROOT))
     from openai import OpenAI
     from extensions.students.extension import read_students
-    from mneme_llm.gut import mine, note_messages, written
+    from mneme_llm.gut import ENDS, mine, note_messages, written
     student = next((data for data in read_students() if data["name"] == arguments.student), None)
     if student is None:
         raise SystemExit(f"no student called {arguments.student}")
@@ -69,6 +74,18 @@ def main() -> int:
     client = OpenAI(api_key=key, base_url=arguments.base_url)
     with gzip.open(ROOT / "extensions/students/shared/gut-readings.json.gz", "rt", encoding="utf-8") as file:
         chats = json.load(file)
+    for index, chat in enumerate(chats):  # one in so many, a different one in each chat
+        chat["items"] = chat["items"][index % arguments.every::arguments.every]
+    if arguments.more and Path(arguments.more).exists():
+        with gzip.open(arguments.more, "rt", encoding="utf-8") as file:
+            more = json.load(file)
+        for language in {chat["language"] for chat in chats}:  # each extra moment into a chat of its language
+            mine_chats = [chat for chat in chats if chat["language"] == language]
+            extra = [item for item in more if item["language"] == language]
+            for number, item in enumerate(extra):
+                chat = mine_chats[number % len(mine_chats)]
+                at = (number // len(mine_chats) * 3 + 1) % (len(chat["items"]) + 1)
+                chat["items"].insert(at, {"said": item["said"], "form": item["form"]})
     spent_from = balance(key) if "deepseek" in arguments.base_url else None
     stopped = []
 
@@ -116,7 +133,7 @@ def main() -> int:
     for row in rows:
         words.setdefault(row["language"], Counter()).update(row["words"])
         replies[row["language"]] += 1
-    data = {"rows": [[row["form"], row["feel"], row["mood"], row["closeness"]] for row in rows],
+    data = {"ends": list(ENDS), "rows": [[row["form"], row["feel"], row["mood"], row["closeness"]] for row in rows],
             "words": {language: {"n": replies[language], "words": {word: count for word, count in found.items() if count > 1}}
                       for language, found in words.items()}}
     path = ROOT / "extensions/students" / student["name"] / "gut-starter.json.gz"

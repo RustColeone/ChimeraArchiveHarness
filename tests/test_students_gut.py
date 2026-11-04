@@ -99,12 +99,12 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         gut = await self.awake(chat)
         self.assertEqual(await self.say(chat, "had lunch with a coworker"), "Oh, a coworker. Nice.")
         turn = script.seen("GPT")
-        self.assertIn("(Right now you feel mostly jealous, a little sweet, and it shows in how you answer.)", turn)
+        self.assertIn("(Right now you feel very jealous, a little sweet, and it shows in how you answer.)", turn)
         self.assertIn("Reply in English.", turn)
         self.assertEqual(head.reads, ["had lunch with a coworker"])  # no history in her reading
         self.assertIn("(Alice is ", head.votes[-1][-1]["content"])  # her memory in her vote
         self.assertEqual(gut.report()["lessons"], 1)
-        self.assertEqual(gut.net.lessons[0][1], JEALOUS)
+        self.assertEqual(json.loads(sqlite3.connect(gut.path).execute("select feel from lessons").fetchone()[0]), JEALOUS)
         self.assertEqual(head.notes[-1][-2], {"role": "assistant", "content": "Oh, a coworker. Nice."})
         self.assertIn("Right now you feel", head.notes[-1][0]["content"])  # the line stays in view of her note
         said = sqlite3.connect(gut.path).execute("select form, feel from lessons").fetchall()
@@ -125,7 +125,7 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         gut = await self.awake(chat)
         head.fail = {"read"}
         self.assertEqual(await self.say(chat, "one"), "b")
-        self.assertIn("mostly jealous", script.seen("GPT"))  # her head alone
+        self.assertIn("very jealous", script.seen("GPT"))  # her head alone
         self.assertEqual(gut.report()["lessons"], 0)  # no form, no lesson
         head.fail = {"vote"}
         self.assertEqual(await self.say(chat, "two"), "c")
@@ -158,7 +158,7 @@ class Turns(unittest.IsolatedAsyncioTestCase):
                 break
             await asyncio.sleep(.01)
         self.assertIn("b", chat.texts("dm"))  # she answered with her reading still out
-        self.assertIn("mostly jealous", script.seen("GPT"))  # on her vote
+        self.assertIn("very jealous", script.seen("GPT"))  # on her vote
         slow.set()
         await self.core.manager.idle()
         self.assertEqual(gut.report()["lessons"], 1)
@@ -173,14 +173,15 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(gut.report()["lessons"], 0)
         self.assertEqual(len(head.notes), 2)  # asked twice ("hello" came before she woke: not asked)
 
-    async def test_a_stranger_gets_her_gut_and_teaches_it_nothing(self):
+    async def test_a_stranger_gets_her_gut_and_teaches_only_how_she_is_with_them(self):
         script = room.Script(GPT=[room.turn("a"), room.turn("b")])
         head = Head(script)
         chat = await self.start(head, role="acquaintance")
         gut = await self.awake(chat)
         await self.say(chat, "one")
-        self.assertIn("mostly jealous", script.seen("GPT"))
-        self.assertEqual(gut.report()["lessons"], 0)
+        self.assertIn("very jealous", script.seen("GPT"))
+        found = gut.report()
+        self.assertEqual((found["lessons"], found["age"], len(found["people"])), (1, 0, 1))  # not her heart
 
     async def test_wiping_her_memory_leaves_her_gut(self):
         script = room.Script(GPT=[room.turn("a"), room.turn("b"), room.turn("c")])

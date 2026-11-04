@@ -792,8 +792,11 @@ def make_gut(book: Book, settings: Settings, guts: Guts):
             if not settings.of(persona).gut:
                 continue
             found = (await guts.woken(persona)).report()
-            lines.append(f"{book.shown(persona)}: {found['lessons']} lessons, born with {found['born']} (they count "
-                         f"{found['starter']}), last balance {found.get('share', '?')}")
+            lines.append(f"{book.shown(persona)}: {found['lessons']} lessons, {round(found['grown'] * 100)}% grown up "
+                         f"(tau {found['tau']:g}), {len(found['people'])} people, last balance {found.get('share', '?')}")
+            if owner:
+                lines.append(f"  SAN {found['SAN']:+.2f}, self-esteem {found['self-esteem']:+.2f}, sensitivity "
+                             f"{found['sensitivity']:+g}")
             if owner and found["sides"]:
                 lines += [f"  side {name} ({found['weights'][name]}): {what}" for name, what in found["sides"].items()]
                 lines.append(f"  she is in {', '.join(found['held'])} for {found['days']} more days at least")
