@@ -326,7 +326,9 @@ that the other interfaces read from the `directory`: modules learn about each ot
 never by calling each other. An interface lists the personas (`personas`: names, aliases, pictures,
 readiness) and reads `facts`, the small public values modules publish about a persona and one of its own people
 (kept in the tank's `core:facts` by `core/manager/facts.py`), so a page shows a bond or a mood without knowing which
-module keeps it. When the core stops, it cancels runs with `contracts.SHUTDOWN`, so an engine can tell a
+module keeps it. For data too big for a fact (a star map, a settings panel's state) it reads a module's `view`
+(`contracts.View`): worked out when asked, for that person with their access checked as for a command, and never
+stored; changes still go through capabilities. When the core stops, it cancels runs with `contracts.SHUTDOWN`, so an engine can tell a
 stop (the run resumes) from a cancel.
 
 Revocation is immediate: a rule that stops admitting a conversation, or an assignment that is disabled

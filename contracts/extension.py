@@ -13,6 +13,7 @@ from contracts.interface import Interface
 from contracts.models import AdapterFactory
 from contracts.shared import NAME
 from contracts.stores import Facts
+from contracts.views import View
 from contracts.watchers import Watcher
 
 PACKAGE = re.compile(r"^package:[A-Za-z0-9][A-Za-z0-9._-]*(>=[0-9][0-9A-Za-z.]*)?$")
@@ -55,7 +56,8 @@ class Contributions:
     providers, and core.yml's, may then use `kind: <that kind>`. A kind that already exists is refused.
 
     `watchers` see every persona's delivered messages, whichever engine she spoke in (see Watcher). `secrets` are file
-    patterns in the module's data folder that models may never read (keys it keeps there)."""
+    patterns in the module's data folder that models may never read (keys it keeps there). `views` are read-only data
+    for pages, bigger than facts and never stored (see View)."""
 
     interfaces: Sequence[Interface] = ()
     engines: Sequence[Engine] = ()
@@ -70,6 +72,7 @@ class Contributions:
     prompt_parts: Sequence[PromptPart] = ()  # parts for every persona, or for those each part names
     watchers: Sequence[Watcher] = ()
     secrets: Sequence[str] = ()
+    views: Sequence[View] = ()
 
 
 @dataclass(frozen=True)

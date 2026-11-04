@@ -134,6 +134,11 @@ class InterfacePort(Protocol):
         core does not know. With no persona: everyone's day against the day's total, `{today: {...}}`. A run that
         reaches her allowance, the total, or its own `budget_usd` waits for the owner."""
 
+    async def view(self, name: str, persona: str, sender_id: str) -> Any:
+        """What a module's view (`<module>.<name>`, see contracts.View) gives about a persona, read for this
+        interface's `sender_id`, whose access is checked as for a command. Raises contracts.ViewError: `unknown`,
+        `forbidden`, `failed` or `too_big`. Nothing is stored, so a page may ask whenever it shows the view."""
+
     def facts(self, persona: str, sender_id: str | None = None) -> Mapping[str, Any]:
         """What modules publish about a persona (`<module>.<key>` → value, see contracts.Facts), and with
         `sender_id`, what they publish about her and that person of this interface over it."""

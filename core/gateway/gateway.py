@@ -116,6 +116,9 @@ class Port:
             return manager.stamina.view_total()
         return manager.stamina.view(str(persona)) if str(persona) in manager.personas else None
 
+    async def view(self, name: str, persona: str, sender_id: str):
+        return await self._gateway.manager.read_view(str(name), str(persona), self.name, str(sender_id))
+
     def facts(self, persona: str, sender_id: str | None = None):
         person = (self.name, str(sender_id)) if sender_id not in (None, "") else None
         return self._gateway.manager.facts.read(str(persona), person)

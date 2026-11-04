@@ -13,9 +13,10 @@ from contracts.models import (AdapterFactory, AdapterResult, Image, ModelAdapter
 from contracts.shared import (IMPULSE, NAME, chinese, code_style, fact, flag, impulse, impulse_line, is_command,
                               local_time, number, persona_names, place_key, split_text)
 from contracts.stores import Facts, Store
+from contracts.views import VIEW_MAX, View, ViewError
 from contracts.watchers import Exchange, WatchContext, Watcher
 
-CONTRACTS_VERSION = "2.0"
+CONTRACTS_VERSION = "2.1"
 
 __all__ = [
     "AdapterFactory", "AdapterResult", "Image", "ModelAdapter", "NotConfigured",
@@ -27,5 +28,5 @@ __all__ = [
     "Interface", "InterfacePort", "PLACE_STATUS", "ModelError", "ModelRequest", "ModelResult", "Models", "Operation",
     "PART_PLACES", "PartContext", "Persona", "PromptPart", "Reply", "Request", "Risk", "TIERS", "RunYield", "SHUTDOWN", "Sender", "Session", "Setting", "Store", "SubmitResult", "ToolContext",
     "ToolCall", "ToolResult", "ToolSpec", "Tools",
-    "WatchContext", "Watcher", "IMPULSE", "LEVELS",
+    "VIEW_MAX", "View", "ViewError", "WatchContext", "Watcher", "IMPULSE", "LEVELS",
 ]

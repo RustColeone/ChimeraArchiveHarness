@@ -1,7 +1,7 @@
 {
- "version": "2.0",
+ "version": "2.1",
  "constants": {
-  "CONTRACTS_VERSION": "2.0",
+  "CONTRACTS_VERSION": "2.1",
   "IMPULSE": "⟨speak-up⟩ ",
   "LEVELS": {
    "member": 0,
@@ -25,7 +25,8 @@
   "TIERS": [
    "own",
    "strong"
-  ]
+  ],
+  "VIEW_MAX": 1000000
  },
  "enums": {
   "Risk": {
@@ -332,7 +333,7 @@
    ]
   },
   "Contributions": {
-   "doc": "What an extension adds. Besides interfaces, engines, capabilities and personas, an extension may suggest defaults so it works when dropped in: model `providers` (name → settings, as in core.yml; configured settings win key by key) and `profiles` (name → ordered candidates, as in core.yml), and `assignments` and `admission` rules for its own interfaces' addresses (`<interface>:*` or `<interface>:<conversation>`). core.yml and runtime edits always win. `permissions` suggests permission defaults in the core.yml `permissions:` form (`{pattern: {use, tiers, rules}}`): `use` and `tiers` only for its own interfaces' addresses, `rules` only for its own capabilities. The module's config.yml `permissions:` overrides these, and core.yml overrides both, setting by setting. `adapters` adds provider kinds (kind → AdapterFactory) for APIs the built-in kinds do not speak; its providers, and core.yml's, may then use `kind: <that kind>`. A kind that already exists is refused. `watchers` see every persona's delivered messages, whichever engine she spoke in (see Watcher). `secrets` are file patterns in the module's data folder that models may never read (keys it keeps there).",
+   "doc": "What an extension adds. Besides interfaces, engines, capabilities and personas, an extension may suggest defaults so it works when dropped in: model `providers` (name → settings, as in core.yml; configured settings win key by key) and `profiles` (name → ordered candidates, as in core.yml), and `assignments` and `admission` rules for its own interfaces' addresses (`<interface>:*` or `<interface>:<conversation>`). core.yml and runtime edits always win. `permissions` suggests permission defaults in the core.yml `permissions:` form (`{pattern: {use, tiers, rules}}`): `use` and `tiers` only for its own interfaces' addresses, `rules` only for its own capabilities. The module's config.yml `permissions:` overrides these, and core.yml overrides both, setting by setting. `adapters` adds provider kinds (kind → AdapterFactory) for APIs the built-in kinds do not speak; its providers, and core.yml's, may then use `kind: <that kind>`. A kind that already exists is refused. `watchers` see every persona's delivered messages, whichever engine she spoke in (see Watcher). `secrets` are file patterns in the module's data folder that models may never read (keys it keeps there). `views` are read-only data for pages, bigger than facts and never stored (see View).",
    "fields": [
     {
      "name": "interfaces",
@@ -396,6 +397,11 @@
     },
     {
      "name": "secrets",
+     "type": "Sequence",
+     "default": "()"
+    },
+    {
+     "name": "views",
      "type": "Sequence",
      "default": "()"
     }
@@ -1422,6 +1428,53 @@
     }
    ]
   },
+  "View": {
+   "doc": "Read-only data a module offers pages about a persona, too big for a fact (a star map, the state of a settings panel): worked out when a page asks and never stored, so asking again costs only the work. Changes are never made through a view; they are capabilities, which the core checks and records. `read(persona, person)` gives JSON, at most VIEW_MAX once encoded; `person` is `(interface, sender id)`, who asks. `access` is the lowest level that may read it (`creator`, the owner; `admin`; `member`, anyone the interface lets in), checked the way a command's is. `personas` limits it to these (empty: any persona the core has). Interfaces read it as `<module>.<name>` with `InterfacePort.view`.",
+   "fields": [
+    {
+     "name": "name",
+     "type": "str"
+    },
+    {
+     "name": "read",
+     "type": "Callable"
+    },
+    {
+     "name": "description",
+     "type": "str",
+     "default": ""
+    },
+    {
+     "name": "access",
+     "type": "str",
+     "default": "creator"
+    },
+    {
+     "name": "personas",
+     "type": "Sequence",
+     "default": "()"
+    },
+    {
+     "name": "timeout_s",
+     "type": "float",
+     "default": 10.0
+    }
+   ]
+  },
+  "ViewError": {
+   "doc": "Why a view could not be read: `unknown` (no such view, or a persona it does not cover), `forbidden` (below its access), `failed` (it raised or took too long) or `too_big` (more than VIEW_MAX).",
+   "error": true,
+   "fields": [
+    {
+     "name": "kind",
+     "type": "str"
+    },
+    {
+     "name": "message",
+     "type": "str"
+    }
+   ]
+  },
   "Watcher": {
    "doc": "A module's watcher: `run(exchange, context)` is awaited after each exchange of the personas it names (`personas`), or of every persona when it names none. It runs beside the conversation, never before a delivery, and within `timeout_s`; a failure or a timeout is only written in the audit log.",
    "fields": [
@@ -2091,6 +2144,29 @@
      ],
      "returns": "SubmitResult",
      "doc": "Hand one request to the core. Returns after it is durably accepted (truthy) or rejected by admission or deduplication (falsy, with a reason). Advance any read cursor only after this returns."
+    },
+    {
+     "name": "view",
+     "async": true,
+     "parameters": [
+      {
+       "name": "name",
+       "type": "str",
+       "keyword_only": false
+      },
+      {
+       "name": "persona",
+       "type": "str",
+       "keyword_only": false
+      },
+      {
+       "name": "sender_id",
+       "type": "str",
+       "keyword_only": false
+      }
+     ],
+     "returns": "any",
+     "doc": "What a module's view (`<module>.<name>`, see contracts.View) gives about a persona, read for this interface's `sender_id`, whose access is checked as for a command. Raises contracts.ViewError: `unknown`, `forbidden`, `failed` or `too_big`. Nothing is stored, so a page may ask whenever it shows the view."
     }
    ]
   },

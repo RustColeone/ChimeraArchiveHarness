@@ -21,8 +21,8 @@ import jsonschema
 
 from contracts import (LEVELS, SHUTDOWN, TIERS, Action, Address, Capability, Command, Context, Delivery, Display,
                        Engine, Exchange, FileRef, ModelError, ModelRequest, ModelResult, Operation, Option, PartContext,
-                       Persona, PromptPart, Reply, Request, Risk, RunYield, Sender, ToolResult, Watcher, code_style,
-                       local_time)
+                       Persona, PromptPart, Reply, Request, Risk, RunYield, Sender, ToolResult, VIEW_MAX, View, ViewError,
+                       Watcher, code_style, local_time)
 from core.audit import Audit
 from core.manager.core_capabilities import core_capabilities
 from core.manager.facts import FactsDesk
@@ -141,6 +141,7 @@ class Manager:
         self._persona_parts = dict(persona_parts or {})  # core.yml's parts for modules' personas, by name
         self.prompt_parts: list[PromptPart] = []  # modules' parts, for every persona or those they name
         self.watchers: list[tuple[Watcher, str]] = []  # (watcher, its module), in the order modules gave them
+        self.views: dict[str, View] = {}  # modules' views for pages, as `<module>.<name>`
         self._watching: dict[tuple[str, str], asyncio.Lock] = defaultdict(asyncio.Lock)  # (watcher, persona)
         self.facts = FactsDesk(tank)
         self.threads = Threads(tank)  # when each conversation's, and each persona's, thread began
@@ -229,6 +230,34 @@ class Manager:
         if other is not None:
             raise ValueError(f"Watcher {watcher.name!r} is already registered by {other!r}")
         self.watchers.append((watcher, extension))
+
+    def register_view(self, view: View, extension: str) -> None:
+        key = f"{extension}.{view.name}"
+        if key in self.views:
+            raise ValueError(f"View {key!r} is already registered")
+        self.views[key] = view
+
+    async def read_view(self, key: str, persona: str, interface: str, sender_id: str) -> Any:
+        """A module's view for a page (contracts.View), read for that person of that interface: their access is
+        theirs as for a typed command (an admin with their admin view off reads as a member). Never stored."""
+        view = self.views.get(key)
+        if view is None or persona not in self.personas or (view.personas and persona not in view.personas):
+            raise ViewError("unknown", key)
+        sender = Sender(str(sender_id))
+        asking = Request(id="view", address=Address(interface, "view"), sender=sender, text="", received_at=time.time())
+        if LEVELS[self.access_of(asking)] < LEVELS[view.access]:
+            raise ViewError("forbidden", key)
+        try:
+            value = await asyncio.wait_for(view.read(persona, (interface, str(sender_id))), view.timeout_s)
+            size = len(json.dumps(value, ensure_ascii=False).encode())
+        except ViewError:
+            raise
+        except Exception as error:  # (a view that fails or takes too long: the page says so; the core goes on)
+            self.audit.record("view_failed", view=key, persona=persona, error=type(error).__name__)
+            raise ViewError("failed", key) from error
+        if size > VIEW_MAX:
+            raise ViewError("too_big", f"{key}: {size} bytes")
+        return value
 
     def register_prompt_part(self, part: PromptPart, extension: str) -> None:
         other = next((item for item in self.prompt_parts if item.name == part.name), None)
@@ -329,7 +358,7 @@ class Manager:
     def registries(self) -> tuple:
         """What modules add to, for a module that fails halfway to be taken out again."""
         return (self.engines, self._origin, self.capabilities, self.personas, self.prompt_parts, self._part_origin,
-                self.watchers)
+                self.watchers, self.views)
 
     def register_engine(self, engine: Engine, extension: str) -> None:
         name = engine.spec.name

@@ -344,6 +344,19 @@ them, so a fact is never a module's private state (that goes in its stores).
 * Facts are kept in the tank (`core:facts`) and last across restarts. Publish again at start what your own data
   already holds, so a page shows it before anyone talks.
 
+### Views
+
+A view is read-only data a module offers pages about a persona when a fact is too small for it: her star map, the
+state of a settings panel. It is worked out when a page asks and never stored, so a page may ask whenever it shows it.
+
+* A module contributes `views=[View(name, read, access="creator", personas=(), timeout_s=10)]`; `read(persona,
+  person)` is async and gives JSON, at most `VIEW_MAX` (1 MB) once encoded; `person` is `(interface, sender id)`.
+* An interface reads `await port.view("<module>.<name>", persona, sender_id)`. The core checks the reader's access as
+  for a typed command (`creator` is the owner; `admin`; `member`) and the persona; it raises `ViewError` with
+  `code` `unknown`, `forbidden`, `failed` (it raised or took longer than `timeout_s`) or `too_big`.
+* A view never changes anything: a page changes things with the module's capabilities (its `$` commands), which the
+  core checks, asks about and records as usual.
+
 ### Model providers
 
 A module may bring the models it needs. A vendor with an OpenAI-compatible API (most of them) needs only

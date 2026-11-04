@@ -213,6 +213,8 @@ class Core:
             self.manager.register_prompt_part(part, name)
         for watcher in contributions.watchers:
             self.manager.register_watcher(watcher, name)
+        for view in contributions.views:
+            self.manager.register_view(view, name)
 
     def _registries(self) -> list:
         """The registries a module adds to, copied, so a module that fails halfway can be taken out again."""
