@@ -91,7 +91,9 @@ class ShippedStudentsTests(unittest.TestCase):
         self.assertTrue(all(persona.description for persona in contributions.personas))  # for Chimera's prompts
         self.assertEqual((gpt.tier("strong"), contributions.profiles["gpt_strong"]),
                          ("gpt_strong", [{"provider": "openai", "model": "gpt-6.1-sol"},
-                                         {"provider": "openrouter", "model": "openai/gpt-6.1-sol"}]))
+                                         {"provider": "openai", "model": "gpt-6-astra"},
+                                         {"provider": "openrouter", "model": "openai/gpt-6.1-sol"},
+                                         {"provider": "openrouter", "model": "openai/gpt-6-astra"}]))
         self.assertEqual((contributions.personas[1].tier("strong"), contributions.profiles["gemini_strong"]),
                          ("gemini_strong", [{"provider": "gemini", "model": "gemini-3.1-pro-preview"},
                                             {"provider": "openrouter", "model": "google/gemini-3.1-pro-preview"}]))

@@ -53,7 +53,7 @@ The model profiles, each tried in order (a candidate whose provider has no key i
 | `deepseek` | `deepseek/deepseek-flash`, `openai/gpt-6-luna`, `gemini/gemini-3.8-flash`, `claude/claude-haiku-5-5` |
 | `grok` | `grok/grok-4-fast`, then GPT's chain: `openai/gpt-6-luna`, `deepseek/deepseek-flash`, `gemini/gemini-3.8-flash`, `claude/claude-haiku-5-5` |
 | `<name>_own` | Her `models:` only (each student has one) |
-| `<name>_strong` | Her `strong:` models, weakest first: `openai/gpt-6.1-sol`; `claude/claude-sonnet-5-5`, `claude-opus-5-5`, `claude-fable-5-1`; `deepseek/deepseek-v4-pro`; `gemini/gemini-3.1-pro-preview`; `grok/grok-4.7` |
+| `<name>_strong` | Her `strong:` models, weakest first: `openai/gpt-6.1-sol`, `gpt-6-astra` (her `own` has Luna and Terra); `claude/claude-sonnet-5-5`, `claude-opus-5-5`, `claude-fable-5-1`; `deepseek/deepseek-v4-pro`; `gemini/gemini-3.1-pro-preview`; `grok/grok-4.7` |
 
 Each student prefers her own models, then falls back to the others' first models, so any one key is enough for every
 student. Her tiers (`Persona.profiles`) are for engines that need her own model family for sure or

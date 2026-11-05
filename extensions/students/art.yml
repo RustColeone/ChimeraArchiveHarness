@@ -171,7 +171,7 @@ kinds:
 # Which of her models is which: the weakest a chibi, the strongest a high-school or university student. A model
 # drawn as `chibi` shows her chibi; the others their `model-<tier>` picture.
 ladders:
-  gpt: {gpt-6-luna: chibi, gpt-6.1-sol: koukousei}
+  gpt: {gpt-6-luna: chibi, gpt-6.1-terra: chuugakusei, gpt-6.1-sol: koukousei, gpt-6-astra: daigakusei}
   claude: {claude-haiku-5-5: chibi, claude-sonnet-5-5: chuugakusei, claude-opus-5-5: koukousei, claude-fable-5-1: daigakusei}
   deepseek: {deepseek-flash: chibi, deepseek-v4-pro: koukousei}
   gemini: {gemini-3.8-flash: chibi, gemini-3.1-pro-preview: koukousei}
