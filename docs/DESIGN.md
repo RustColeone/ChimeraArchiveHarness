@@ -136,7 +136,7 @@ rest of 2 to 6 is planned.
 - A default a module suggests that names a missing `uses` is set aside with a warning. core.yml's own lines naming
   something missing stay fatal: the owner wrote them.
 
-The chain today: `students` requires `package:mneme-llm>=0.7.0`; `whale_chan` requires `students` and `momochat`;
+The chain today: `students` requires `package:mneme-llm>=0.8.0`; `whale_chan` requires `students` and `momochat`;
 `webui` uses `momochat` and `students`; `chimera` uses `students`; `wechat` uses `momochat`.
 
 ## The minimum core

@@ -98,6 +98,8 @@ class ShippedStudentsTests(unittest.TestCase):
                          ("gemini_strong", [{"provider": "gemini", "model": "gemini-3.1-pro-preview"},
                                             {"provider": "openrouter", "model": "google/gemini-3.1-pro-preview"}]))
         self.assertEqual(claude.aliases, ("Haiku",))
+        for persona in contributions.personas:  # each is born with a lean of her own (her gut's starter)
+            self.assertTrue((ROOT / "extensions" / "students" / persona.name / "gut-starter.json.gz").is_file(), persona.name)
         for persona in contributions.personas:  # each has her picture in her own folder
             self.assertEqual(Path(persona.pictures["avatar"]), ROOT / "extensions" / "students" / persona.name
                              / "avatar.png")

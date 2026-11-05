@@ -65,15 +65,24 @@ class Turns(unittest.IsolatedAsyncioTestCase):
             await self.core.stop()
         self._tmp.cleanup()
 
-    async def start(self, head, gut=True, role="friend", owner=False):
+    async def start(self, head, gut=True, role="friend", owner=False, people=None):
         self.core = await start_core(self.tmp, {
             **({"owners": {"chat": ["alice"]}} if owner else {}),
             "extensions": [*make_config(self.tmp).raw["modules"]["paths"], str(ROOT / "extensions" / "students")],
             "extension_config": {"students": {"learn": True, "language": "en", "roles": {"chat:alice": role},
+                                              **({"people": people} if people else {}),
+                                              "gut": False,  # (on by default: here, GPT's alone)
                                               "students": {"gpt": {"gut": gut}}}},
             "profiles": {name: [{"provider": "fake", "model": name}] for name in ("gpt", "gemini", "claude", "deepseek", "grok")},
             "assignments": {"*": {"engine": "momochat", "personas": ["gpt"]}}}, FakeAdapter(handler=head))
+        self.blank()
         return iface(self.core)
+
+    def blank(self):
+        """Her gut born blank, not from her starter: what these tests check is what each turn teaches."""
+        guts = next((watcher.run.__self__ for watcher, _ in self.core.manager.watchers if watcher.name == "gut"), None)
+        if guts is not None:
+            guts.starters.clear()
 
     async def say(self, chat, text):
         await chat.say(text, conversation="dm", sender="alice")
@@ -183,6 +192,39 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         found = gut.report()
         self.assertEqual((found["lessons"], found["age"], len(found["people"])), (1, 0, 1))  # not her heart
 
+    async def test_two_accounts_of_one_person_are_one_person_to_her_gut(self):
+        script = room.Script(GPT=[room.turn("a"), room.turn("b"), room.turn("c"), room.turn("d")])
+        head = Head(script)
+        chat = await self.start(head)
+        gut = await self.awake(chat)
+        await self.say(chat, "one")
+        await chat.say("two", conversation="dm-bob", sender="bob")
+        await settle(self.core)
+        await self.core.manager.idle()
+        self.assertEqual(set(gut.net.people), {"chat:alice", "chat:bob"})
+        book = self.guts().person.__self__
+        self.assertTrue(book.join("chat:bob", "chat:alice"))  # (as `$link` does, with a code)
+        self.assertEqual(set(gut.net.people), {"chat:alice"})  # her gut joins them at once, as her memory does
+        self.assertEqual(gut.net.people["chat:alice"]["n"], 2)
+        await chat.say("three", conversation="dm-bob", sender="bob")
+        await settle(self.core)
+        await self.core.manager.idle()
+        self.assertEqual((set(gut.net.people), gut.net.people["chat:alice"]["n"]), ({"chat:alice"}, 3))
+
+    async def test_accounts_linked_while_she_slept_are_joined_when_she_wakes(self):
+        folder = self.tmp / "data" / "extensions" / "students" / "gut"
+        folder.mkdir(parents=True)
+        before = G.Gut(folder / "gpt.db")
+        before.wake()
+        for subject in ("chat:alice", "chat:bob"):
+            before.teach(subject, "en", FORM, {"feel": JEALOUS, "mood": 1}, 85, [])
+        before.close()
+        chat = await self.start(Head(room.Script(GPT=[room.turn("Hi.")])), people={"Alice": ["chat:alice", "chat:bob"]})
+        gut = await self.awake(chat)
+        self.assertEqual(set(gut.net.people), {"chat:alice"})
+        self.assertEqual(sqlite3.connect(gut.path).execute("select count(*) from lessons where subject = 'chat:bob'")
+                         .fetchone()[0], 0)
+
     async def test_wiping_her_memory_leaves_her_gut(self):
         script = room.Script(GPT=[room.turn("a"), room.turn("b"), room.turn("c")])
         head = Head(script)
@@ -199,9 +241,10 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         self.core = await start_core(self.tmp, {
             "extensions": [*make_config(self.tmp).raw["modules"]["paths"], str(ROOT / "extensions" / "students")],
             "extension_config": {"students": {"learn": True, "language": "en", "roles": {"chat:alice": "friend"},
-                                              "students": {"gpt": {"gut": True}}}},
+                                              "gut": False, "students": {"gpt": {"gut": True}}}},
             "profiles": {name: [{"provider": "fake", "model": name}] for name in ("gpt", "gemini", "claude", "deepseek", "grok")},
             "assignments": {"*": {"engine": "momochat", "personas": ["gpt", "gemini"]}}}, FakeAdapter(handler=head))
+        self.blank()
         chat = iface(self.core)
         for text in ("GPT, Gemini, hello", "GPT, Gemini, how are you"):
             await chat.say(text, conversation="room", sender="alice")

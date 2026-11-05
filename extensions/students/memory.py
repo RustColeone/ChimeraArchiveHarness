@@ -86,7 +86,7 @@ class Settings:
         self.said = number(config.get("said"), 6000, 0, 50_000)
         self.embed = flag(config.get("embed"), True)
         self.search = flag(config.get("search"), True)
-        self.gut = flag(config.get("gut"), False)  # what stays of her without her memory or her model (gut.py)
+        self.gut = flag(config.get("gut"), True)  # what stays of her without her memory or her model (gut.py)
         # `surface`: with one person, she reads the newest of what is kept of them in place of the engine's window. How
         # much is mneme-llm's (`surface_days`, `surface_floor`, `surface_cap`, `surface_window`), as high as anyone likes.
         self.surface = flag(config.get("surface"), True)
@@ -119,6 +119,7 @@ class Book:
         self.folder, self.personas = Path(folder), tuple(personas)
         self.names = {str(name): dict(value) for name, value in dict(names or {}).items()}  # her display name and others
         self.opened: dict[str, object] = {}
+        self.joined: list = []  # (called when an account is linked: what else knows people, such as her gut)
         self.platforms = {str(name): str(platform) for name, platform in (platforms or {}).items()}
         self.roles = {self.named(subject): str(role) for subject, role in (roles or {}).items()}
         # One person behind several accounts (`people: {Leo: [discord:1, webui:creator]}`): their first account is
@@ -202,6 +203,8 @@ class Book:
         self.person_of[account] = person
         for memory in self.opened.values():
             self.link(memory)
+        for joined in self.joined:  # (her gut, which knows people as her memory does)
+            joined()
         return True
 
     def save(self) -> None:
@@ -958,7 +961,9 @@ def contributions(context, students: dict[str, dict]) -> dict:
     spec = {item["name"]: item for item in SPECS}
     felt = tuple(name for name in keep if settings.of(name).gut)
     guts = Guts(Path(context.data_dir) / "gut", {name: Path(students[name]["folder"]) / STARTER for name in felt
-                                                 if students[name].get("folder")}) if felt else None
+                                                 if students[name].get("folder")}, person=book.person) if felt else None
+    if guts is not None:
+        book.joined.append(guts.relink)
     return {
         "prompt_parts": [PromptPart("card", make_card_part(book, settings), place="stable", order=110, personas=keep),
                          PromptPart("memory", make_part(book, settings, guts), place="turn", order=50, personas=keep),

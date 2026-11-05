@@ -8,8 +8,8 @@ talk and Chimera ([`extensions/chimera`](../chimera)) where they work, but any e
 
 **A student is an agent with her memory, always.** An agent is a persona with her models and nothing else: core.yml
 defines its own under `agents:`, and any module may add some. A student is the special agent this module defines, and
-she always has her memory, whichever engine she speaks in. So the module needs mneme-llm 0.7 or newer, and declares
-it (`requires=("package:mneme-llm>=0.7.0",)`): without it the core leaves the module out and says why (`--check`, and
+she always has her memory, whichever engine she speaks in. So the module needs mneme-llm 0.8 or newer, and declares
+it (`requires=("package:mneme-llm>=0.8.0",)`): without it the core leaves the module out and says why (`--check`, and
 `module_skipped` in the audit log), and there are no students. An agent keeps nothing.
 
 Add a student by adding a folder. Change one by editing her files. The prompts are plain text files, so a change
@@ -35,7 +35,7 @@ to a character is a change to a file, not to code.
 | Views | `students.gut`, `students.starmap` | With `gut` on, the owner's: her gut and her star map for her page ([Her page](#her-page)) |
 | Capabilities | `students.search_memory`, `students.read_memory` | Her tools to look through everything said before with the person (offered to the students' turns only) |
 | Facts | `students.alias`, `students.bond`, `students.mood`, `students.plans`, `students.called`, `students.accounts` | Where she stands with each person, what she calls them and their accounts, for the pages |
-| Declares | `requires=("package:mneme-llm>=0.7.0",)` | Her memory is mneme-llm's |
+| Declares | `requires=("package:mneme-llm>=0.8.0",)` | Her memory is mneme-llm's |
 | Provider | `grok` | `openai_compatible` at `https://api.x.ai/v1`, key in `GROK_API_KEY`, `schema_mode: native`, `effort_param: true`; `$model` offers models released since 2026-06-01, excluding IDs matching `imagine` |
 | Setting | `grok_api_key` | `secret`, env `GROK_API_KEY`: "API key for Grok (`grok`; without it, GPT's model answers for her)" |
 
@@ -305,7 +305,7 @@ At the top level of this module's `config.yml` (and `extension_config.students` 
 | `surface_floor` | mneme-llm's (70,000) | The tokens it never keeps less than. |
 | `surface_cap` | mneme-llm's (504,000) | The tokens it never holds more than. |
 | `surface_window` | mneme-llm's (1,048,576) | The tokens her model reads at most; the surface fills 80% of it at most. |
-| `gut` | false | What stays of her without her memory or her model ([Her gut](#her-gut)). |
+| `gut` | true | What stays of her without her memory or her model ([Her gut](#her-gut)). |
 | `config` | none | A mneme-llm config file (TOML: prompts, sentences, roles, settings), read when her file is first made; relative to `data/extensions/students/`. |
 | `students` | her `memory:` | Settings of one student's own, over these, for when one should differ: `students: {grok: {learn: false}}`. A student may set `learn`, `notes`, `mood`, `classmates`, `met_role`, `owner_role`, `writer_profile`, `reflect_after_notes`, `language`, `memory_language`, `call_owner`, `config`, `episodes`, `said`, `embed`, `search`, `gut`, `surface`, `surface_days`, `surface_floor`, `surface_cap` and `surface_window`. Her student.yml `memory:` has her own, under these: DeepSeek's are `call_owner: 主人`, `language: zh` and `memory_language: Chinese`, as Whale-chan's were. |
 | `platforms` | what the modules declare | Interfaces that share people: a Discord user is one person on both bots. A module says so of its own interfaces (`Extension.platforms`: Whale-chan's bot is Discord's); this adds to them. |
@@ -325,8 +325,11 @@ the network, so mneme-llm's embeddings are not used. The `mneme-llm` command rea
 ## Her gut
 
 What is left of her when her memory is wiped and her model is swapped: mneme-llm's `gut`, with [gut.py](gut.py) a thin
-host over it (one gut for each student, and her turns between her reading and her note). It is off until a student's
-`student.yml` says `memory: {gut: true}` (or `students: <name>: {gut: true}` in the settings).
+host over it (one gut for each student, and her turns between her reading and her note). Every student has one;
+`memory: {gut: false}` in her `student.yml` (or `students: <name>: {gut: false}` in the settings) turns hers off. It
+knows people as her memory does: your accounts are one person to it, and accounts linked later (`people:`, `$link`)
+are joined to you at once, or when it next wakes (`Gut.link`: the lessons and sightings become yours, the two tables
+one, weighed by their lessons; her heart is not touched).
 
 ```mermaid
 flowchart TD

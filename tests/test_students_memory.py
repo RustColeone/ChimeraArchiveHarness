@@ -139,6 +139,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         memory = memory_module()
         owner = SimpleNamespace(relations={}, relate=lambda subject, role: owner.relations.setdefault(subject, role))
         two = memory.Settings({})
+        self.assertTrue(two.gut)  # (her gut is on unless a setting says no)
         memory.first_role(owner, "chat:boss", two, True)
 
         def one_creator(subject, role):
@@ -246,7 +247,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.core = None
         from core.loader import import_extension
         memory = memory_module()
-        context = SimpleNamespace(config={"learn": False}, data_dir=self.tmp / "off", log=lambda *a, **k: None, facts=None,
+        context = SimpleNamespace(config={"learn": False, "gut": False}, data_dir=self.tmp / "off", log=lambda *a, **k: None, facts=None,
                                   platforms={})
         self.assertEqual(memory.contributions(context, {"gpt": {"display_name": "GPT"}})["watchers"], [])
 
@@ -361,7 +362,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("No student called 'pat'", await self.say(chat, "$alias pat Patty"))
         from core.loader import import_extension
         extension, _ = import_extension(ROOT / "extensions" / "students")
-        self.assertEqual(extension.requires, ("package:mneme-llm>=0.7.0",))
+        self.assertEqual(extension.requires, ("package:mneme-llm>=0.8.0",))
 
 
 if __name__ == "__main__":

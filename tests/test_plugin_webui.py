@@ -362,7 +362,7 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
         await ws.close()
 
     async def test_her_page_shows_her_gut_and_star_map_to_you_and_tunes_her(self):
-        await self.start(students={"students": {"gpt": {"gut": True}}})
+        await self.start(students={"students": {"gpt": {"gut": True}, "claude": {"gut": False}}})
         async with self.http.get(f"{self.base}/api/gut/gpt") as response:
             self.assertEqual((response.status, response.headers["Cache-Control"]), (200, "no-store"))
             gut = await response.json()
