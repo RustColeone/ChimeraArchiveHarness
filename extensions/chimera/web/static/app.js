@@ -575,7 +575,7 @@
     const maker = chosen.formation === "cascade" ? "drafter" : "builder";
     chosen.choosing = seatName;
     $("#seat-title").textContent = `${info.title}: who sits here?`;
-    $("#seat-hint").textContent = `${info.does} Nobody is ever busy: a student can sit in many sessions at once.`;
+    $("#seat-hint").textContent = info.does;
     const people = $("#seat-students");
     const close = () => { $("#seat-dialog").hidden = true; };  // (the watch below clears the choice and draws the seats)
     const empty = make("button", "student-pick is-anyone");

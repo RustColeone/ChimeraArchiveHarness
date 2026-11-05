@@ -49,7 +49,8 @@ drafter → 起草; judge → 评审; tester → 测试员; takes over → 接�
 benchmark → 实测; budget → 预算; allowance → 额度; daily allowance → 每日体力上限; account → 账户; mood → 心情;
 middle-schooler → 初中生; high-schooler → 高中生; university student → 大学生; your page → 个人主页; what the students
 call you → 学生们对你的称呼; account → 账号 (a login: Discord, WeChat); link an account → 绑定账号; theme → 主题;
-voice → 语音; creator → 创造者"""
+voice → 语音; creator → 创造者; token(s) → token (never 币 or 代币); list prices → 标价; $x in / $y out (prices) →
+输入 $x / 输出 $y"""
 
 
 ESCAPES = {"n": "\n", "t": "\t"}

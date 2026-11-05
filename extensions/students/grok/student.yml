@@ -5,6 +5,8 @@ order: 5
 description: "Grok, the blonde vampire, a cocky and mischievous young lady"
 models:
   - {provider: grok, model: grok-4-fast, openrouter: x-ai/grok-4.3}   # (OpenRouter has no Grok 4 Fast)
+strong:                      # her stronger model, for heavy work (Chimera's strong seats; `$model` picks it for a chat)
+  - {provider: grok, model: grok-4.7, openrouter: x-ai/grok-4.7}
 # No `fallback`: her model needs its own key, so it is no one else's fallback. Without the key, GPT's list answers.
 falls_back_to: gpt
 # No `allowance`: Artificial Analysis lists no cost per task for Grok 4 Fast (2026-10-28), so her day is the core's

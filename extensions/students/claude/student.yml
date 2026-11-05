@@ -6,8 +6,11 @@ order: 3
 description: "Claude, the orange-haired young lady and sharp-eyed, elegant disciplinary-committee member"
 models:
   - {provider: claude, model: claude-haiku-5-5, openrouter: anthropic/claude-haiku-5.5}
-strong:                     # her strongest models, for heavy work (Chimera's strong seats)
+strong:                     # her stronger models, weakest first: the first for heavy work (Chimera's strong seats),
+                            # each a level a seat or `$model` can pick (the newest of each tier, on the same key)
   - {provider: claude, model: claude-sonnet-5-5, openrouter: anthropic/claude-sonnet-5.5}
+  - {provider: claude, model: claude-opus-5-5, openrouter: anthropic/claude-opus-5.5}
+  - {provider: claude, model: claude-fable-5-1, openrouter: anthropic/claude-fable-5.1}
 fallback: 4
 allowance: 7.81             # her day's spending by default, in dollars (yours: her card on the Students page):
                             # 10 × Artificial Analysis's cost per task of Claude Sonnet 5.5 (Medium), $0.78 on

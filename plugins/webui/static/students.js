@@ -336,14 +336,20 @@
       models.append(make("p", "panel-note", "Each of her models is drawn as she would be on it: a chibi on the lightest, a " +
                                             "high-school or university student on the strongest."));
       const ladderRow = make("div", "ladder");
-      const hers = new Set([...(student.own || []), ...(student.strong || [])].map((id) => norm(modelName(id))));
+      const own = (student.own || []).map((id) => norm(modelName(id)));
+      const strong = (student.strong || []).map((id) => norm(modelName(id)));
+      // What each of her models is for: her everyday one, the first strong one for heavy work, the rest when picked
+      // (a seat set to it, or `$model` in a chat).
+      const use = (model) => model === own[0] ? "everyday" : model === strong[0] ? "heavy work"
+        : own.includes(model) || strong.includes(model) ? "when picked" : "not in her settings";
       for (const step of steps) {
-        const rung = make("div", `rung${hers.has(step.model) ? " is-hers" : ""}`);
+        const hers = own.includes(step.model) || strong.includes(step.model);
+        const rung = make("div", `rung${hers ? " is-hers" : ""}`);
         const image = make("img", "rung-image");
         image.src = `pictures/${encodeURIComponent(student.name)}/${step.kind}`;
         image.alt = `${shown(student)} as ${TIERS[step.tier]}`;
         rung.append(image, make("span", "rung-tier", TIERS[step.tier]), make("span", "rung-model", step.label),
-                    make("span", "rung-note", hers.has(step.model) ? "hers here" : "not set up"));
+                    make("span", "rung-note", use(step.model)));
         ladderRow.append(rung);
       }
       models.append(ladderRow);

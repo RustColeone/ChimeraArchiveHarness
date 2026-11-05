@@ -6,6 +6,8 @@ order: 4
 description: "DeepSeek, the blue-haired whale girl, a clever and lazy junior (she is not fat)"
 models:
   - {provider: deepseek, model: deepseek-flash, openrouter: deepseek/deepseek-v4.1-flash}
+strong:                      # her stronger model, for heavy work (Chimera's strong seats; `$model` picks it for a chat)
+  - {provider: deepseek, model: deepseek-v4-pro, openrouter: deepseek/deepseek-v4-pro-0813}
 fallback: 1
 effort: none                 # she answers at once: chat without a thinking phase (her Flash spent four tokens
                              # thinking for each one it said, most of the wait; Chimera's seats set their own)

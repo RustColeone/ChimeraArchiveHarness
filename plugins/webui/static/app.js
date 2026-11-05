@@ -405,7 +405,7 @@
     menu.replaceChildren();
     state.modelMenuFor = name;
     const row = personaOf(name);
-    menu.append(make("div", "menu-label", `${name}'s model here`));
+    menu.append(make("div", "menu-label", `${name}'s model in this chat`));
     const entry = (label, action, current = false) => {
       const item = make("button", "menu-item" + (current ? " is-current" : ""), label);
       item.type = "button";

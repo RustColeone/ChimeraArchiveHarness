@@ -20,10 +20,10 @@ to a character is a change to a file, not to code.
 | Kind | Name | Details |
 | --- | --- | --- |
 | Persona | `gpt` | Display name `GPT`, profile `gpt`, tiers `own` (`gpt_own`) and `strong` (`gpt_strong`); also called `Luna` |
-| Persona | `gemini` | Display name `Gemini`, profile `gemini`, tier `own` (`gemini_own`) |
+| Persona | `gemini` | Display name `Gemini`, profile `gemini`, tiers `own` (`gemini_own`) and `strong` |
 | Persona | `claude` | Display name `Claude`, profile `claude`, tiers `own` and `strong`; also called `Haiku` |
-| Persona | `deepseek` | Display name `DeepSeek`, profile `deepseek`, tier `own`; also called `鲸酱` |
-| Persona | `grok` | Display name `Grok`, profile `grok`, tier `own` |
+| Persona | `deepseek` | Display name `DeepSeek`, profile `deepseek`, tiers `own` and `strong`; also called `鲸酱` |
+| Persona | `grok` | Display name `Grok`, profile `grok`, tiers `own` and `strong` |
 | Prompt part | `memory` | Her memory of the person, each turn of a conversation ([Her memory](#her-memory)) |
 | Prompt part | `surface` | The conversation she keeps with one person, read in place of the engine's window ([The surface](#the-surface)) |
 | Watcher | `memory` | After each of her messages in a conversation, what she learns from it |
@@ -53,12 +53,13 @@ The model profiles, each tried in order (a candidate whose provider has no key i
 | `deepseek` | `deepseek/deepseek-flash`, `openai/gpt-6-luna`, `gemini/gemini-3.8-flash`, `claude/claude-haiku-5-5` |
 | `grok` | `grok/grok-4-fast`, then GPT's chain: `openai/gpt-6-luna`, `deepseek/deepseek-flash`, `gemini/gemini-3.8-flash`, `claude/claude-haiku-5-5` |
 | `<name>_own` | Her `models:` only (each student has one) |
-| `gpt_strong`, `claude_strong` | Her `strong:` models: `openai/gpt-6.1-sol`, `claude/claude-sonnet-5-5` |
+| `<name>_strong` | Her `strong:` models, weakest first: `openai/gpt-6.1-sol`; `claude/claude-sonnet-5-5`, `claude-opus-5-5`, `claude-fable-5-1`; `deepseek/deepseek-v4-pro`; `gemini/gemini-3.1-pro-preview`; `grok/grok-4.7` |
 
 Each student prefers her own models, then falls back to the others' first models, so any one key is enough for every
 student. Her tiers (`Persona.profiles`) are for engines that need her own model family for sure or
 her strongest models: Chimera's cheap seat is her `own` tier, its strong seat her `strong` tier (her `own` when she
-has none). The `deepseek`, `openai`, `gemini` and `claude` providers are built into the core
+has none), the first of it first. Each of her models is also a level a seat can be set to, and `$model` picks any of
+them for a chat: the newest model of each of her company's tiers, on the same key, so there is nothing to set up. The `deepseek`, `openai`, `gemini` and `claude` providers are built into the core
 ([`core/defaults.py`](../../core/defaults.py)); `grok` is the only one a student brings.
 
 ## A student's folder
@@ -118,7 +119,8 @@ read). Each picture is drawn from her design sheet (`reference:` in art.yml, a w
 蓝色大肥鱼.com: her whole look) and her `avatar.png` (her face); a chibi also from the chibi reference (`references:
 chibi`, for its style and proportions only). A works page's address is enough: the tool downloads its picture once
 into `data/art-references/`, which is git-ignored because the archive lists those pictures' license as unknown. `ladders:` there names each of her models' tier, weakest to strongest (a chibi, a
-middle-school, a high-school or a university student), which the Students page shows. Tune a prompt and draw that
+middle-school, a high-school or a university student), which the Students page shows with what each is for: her
+everyday model, the one for heavy work (her first `strong:`), or one used when picked. Tune a prompt and draw that
 one again: `--students claude --kinds stage-3 --force`.
 
 How a prompt is put together: the `prompt:` files in order, and inside each file **its lines joined with nothing

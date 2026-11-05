@@ -174,5 +174,5 @@ ladders:
   gpt: {gpt-6-luna: chibi, gpt-6.1-sol: koukousei}
   claude: {claude-haiku-5-5: chibi, claude-sonnet-5-5: chuugakusei, claude-opus-5-5: koukousei, claude-fable-5-1: daigakusei}
   deepseek: {deepseek-flash: chibi, deepseek-v4-pro: koukousei}
-  gemini: {gemini-3.8-flash: chibi, gemini-3.8-pro: koukousei}
-  grok: {grok-4-fast: chibi, grok-4: koukousei}
+  gemini: {gemini-3.8-flash: chibi, gemini-3.1-pro-preview: koukousei}
+  grok: {grok-4-fast: chibi, grok-4.7: koukousei}
