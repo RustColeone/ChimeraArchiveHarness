@@ -4,7 +4,7 @@ and each one's memory of the people she talks with (memory.py, one mneme-llm fil
 An agent is a persona with her models; a student is an agent with her memory, always. Every folder with a
 `student.yml` is a student. Engines (MomoChat, Chimera) and interfaces use them by name; this module describes who they
 are, what they look like and which models they prefer, and keeps what each remembers of you, whichever engine she
-spoke in. It needs mneme-llm 0.8 or newer: without it, it is not loaded (and says why), and so there are no students.
+spoke in. It needs mneme-llm 0.7.1 or newer: without it, it is not loaded (and says why), and so there are no students.
 """
 
 from __future__ import annotations
@@ -161,7 +161,7 @@ def setup(context) -> Contributions:
                          profiles={**profiles(STUDENTS), **dict(config.get("profiles") or {})}, **remembered)
 
 
-EXTENSION = Extension("students", setup, requires=("package:mneme-llm>=0.8.0",),
+EXTENSION = Extension("students", setup, requires=("package:mneme-llm>=0.7.1",),
                       description="The students: one folder each with her prompt, models and pictures, and her memory "
                                   "of each person (mneme-llm)",
                       settings=tuple(key_setting(*item) for item in KEYS))
