@@ -8,8 +8,8 @@ talk and Chimera ([`extensions/chimera`](../chimera)) where they work, but any e
 
 **A student is an agent with her memory, always.** An agent is a persona with her models and nothing else: core.yml
 defines its own under `agents:`, and any module may add some. A student is the special agent this module defines, and
-she always has her memory, whichever engine she speaks in. So the module needs mneme-llm 0.6 or newer, and declares
-it (`requires=("package:mneme-llm>=0.6.0",)`): without it the core leaves the module out and says why (`--check`, and
+she always has her memory, whichever engine she speaks in. So the module needs mneme-llm 0.7 or newer, and declares
+it (`requires=("package:mneme-llm>=0.7.0",)`): without it the core leaves the module out and says why (`--check`, and
 `module_skipped` in the audit log), and there are no students. An agent keeps nothing.
 
 Add a student by adding a folder. Change one by editing her files. The prompts are plain text files, so a change
@@ -29,12 +29,13 @@ to a character is a change to a file, not to code.
 | Watcher | `memory` | After each of her messages in a conversation, what she learns from it |
 | Watcher | `gut` | With `gut` on: her note, and what this person is making of her ([Her gut](#her-gut)) |
 | Capabilities | `students.alias`, `students.bond`, `students.callme`, `students.link` | `$alias`, `$bond`, `$callme` and `$link` (typed only) |
-| Capabilities | `students.first`, `students.new` | `$first` and `$new`: the first prompt she keeps of you, and starting over deeper than `/new` (see below) |
+| Prompt part | `card` | Her Character Card, once it is on: in the system prompt ([Her Character Card](#starting-over-and-her-character-card)) |
+| Capabilities | `students.card`, `students.new` | `$card` and `$new`: her Character Card, and starting over deeper than `/new` (see below) |
 | Capabilities | `students.gut`, `students.side`, `students.tune` | With `gut` on: `$gut`, `$side` and `$tune` ([Her gut](#her-gut)) |
 | Views | `students.gut`, `students.starmap` | With `gut` on, the owner's: her gut and her star map for her page ([Her page](#her-page)) |
 | Capabilities | `students.search_memory`, `students.read_memory` | Her tools to look through everything said before with the person (offered to the students' turns only) |
 | Facts | `students.alias`, `students.bond`, `students.mood`, `students.plans`, `students.called`, `students.accounts` | Where she stands with each person, what she calls them and their accounts, for the pages |
-| Declares | `requires=("package:mneme-llm>=0.6.0",)` | Her memory is mneme-llm's |
+| Declares | `requires=("package:mneme-llm>=0.7.0",)` | Her memory is mneme-llm's |
 | Provider | `grok` | `openai_compatible` at `https://api.x.ai/v1`, key in `GROK_API_KEY`, `schema_mode: native`, `effort_param: true`; `$model` offers models released since 2026-06-01, excluding IDs matching `imagine` |
 | Setting | `grok_api_key` | `secret`, env `GROK_API_KEY`: "API key for Grok (`grok`; without it, GPT's model answers for her)" |
 
@@ -184,7 +185,8 @@ bot), she is one student with one memory of you; and you are one person to her o
 | Kind | Name | Details |
 | --- | --- | --- |
 | Prompt part | `memory` | Place `turn`, order 50, for every student (or those in `personas:`), in the engines of `engines:`: "(Alice is your friend; you are close.)", "(Alice calls you Lulu.)", her notes for this message (found by its words, marked as data, not instructions; "Notes about Alice: (none yet)" when there are none, so she knows her memory is kept for her), her look at what was said before (below), her mood's news (until she has replied) and how her classmates seem today (`classmates`). Nothing for a routine run or a person she has nothing on. An async part: MomoChat renders it once a turn. |
-| Prompt part | `surface` | Place `context`, in a chat with her alone: her first prompt if you asked for it, what stands for what she let go, and the newest of what she keeps of you ([The surface](#the-surface)). |
+| Prompt part | `card` | Place `stable`, order 110 (after her own character), for every student: her Character Card while it is on, with everyone she talks with. Nothing while it is off. |
+| Prompt part | `surface` | Place `context`, in a chat with her alone: what stands for what she let go, and the newest of what she keeps of you ([The surface](#the-surface)). |
 | Watcher | `memory` | After each of her messages in a conversation engine (`engines:`): the exchange is kept word for word with the chat it was said in: everything you said there since her last one (an answer to her question, a message that came while she worked, one whose run failed, without `$commands`) and her message, so a run that posts three messages keeps your words once; one decision call judges her mood and whether anything is worth keeping; only then does the note writer run. In a group chat (a conversation with several students) the exchange and the notes she keeps go into each classmate's file there too: they all heard it. The first message of a day is a day of contact (closeness grows by 1, within the role's band). Someone new gets `met_role` (an acquaintance), the bot's owner `owner_role` (her creator). Once a day, after `reflect_after_notes` notes, she rewrites her impression of the person. Then it publishes the facts below. Timeout 180 s; a failure is only audited. |
 | Facts | `students.alias`, `students.bond`, `students.mood`, `students.plans`, `students.called`, `students.accounts` | Per student and person, for the pages (MomoChat shows them) and speaking up (Whale-chan's bot): your name for her; `{role, closeness}`; `{value, face, feelings}` (face: great, good, ok, worry or sad); `[{text, at}]`, what you have coming from yesterday to a month ahead; `{name, asked, everyone, setting}`, what she calls you and why (None when nothing was asked or set); your accounts, when there is more than one. Published for every account of the person, after each exchange, after `$alias`, `$callme` and `$link`, and at start for what the files already hold. |
 | Capability | `students.alias` | `$alias`: what you call each student; `$alias <student> <name>` names her, `$alias <student> reset` takes it back. The student is found by her name, her display name, her other names (Luna for GPT) or your alias for her. Typed only (models are not offered it); it runs without asking, since it changes only your own name for her. |
@@ -253,7 +255,7 @@ chat with several students is a group however it calls itself. Her gut reads the
 it learns the same on any host. In your own conversation with her what she remembers comes with no data label; in a group,
 it keeps it. `surface: false` leaves every chat to the engine.
 
-### Starting over, and your first prompt
+### Starting over, and her Character Card
 
 | Type | Clears | Keeps |
 | --- | --- | --- |
@@ -266,10 +268,12 @@ it keeps it. `surface: false` leaves every chat to the engine.
 the creator's alone and critical to any model, and it stays out of command menus, so `/new` is always the plain message
 MomoChat starts a fresh thread on. Its words do not come back. `/new` with any other word is a message.
 
-The first thing you say to her, usually who you want her to be, stays apart from the conversation, where it does not fade.
-`$first` shows it, `$first <text>` sets it for every student, `$first clear` takes it away, and `$first on` puts it in front
-of what she reads in every direct chat (off by default, since you may have grown away from it), `$first off` only keeps it.
-A student first (`$first <student> ...`) is her alone.
+Her Character Card is who she is, in your words: kept apart from the conversation, where it does not fade, and once it
+is on, part of her system prompt, which every turn carries and nothing compacts, with everyone she talks with. At first
+it is the first thing you said to her. `$card` shows it, `$card <text>` sets it for every student, `$card clear` takes
+it away, `$card on` puts it in her system prompt (off by default, since you may have grown away from what you said
+first), and `$card off` only keeps it. A student first (`$card <student> ...`) is her alone. Only the bot's owner can
+use it, from any of their accounts: one card is on at a time, and turning one on turns any other off.
 
 ### Settings of her memory
 

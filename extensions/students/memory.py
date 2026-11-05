@@ -11,8 +11,9 @@ it. What was said in a group chat, every student there heard: the exchange and t
 classmate's file too; a direct chat stays between the two. A person with several accounts (`people:`, or linked with
 `$link`) is one person to every student. Pages see where she stands with you as facts (bond, alias, mood, plans, what
 she calls you, your accounts). `$alias` names a student your way, `$callme` says what the students call you, `$link`
-joins another account of yours, `$bond` shows where each stands with you, `$first` the first prompt she keeps of you,
-and `$new` starts over deeper than `/new`. Agents (personas that are not students) keep nothing.
+joins another account of yours, `$bond` shows where each stands with you, `$card` is her Character Card (her
+creator's alone: who she is, in their words, in her system prompt once it is on), and `$new` starts over deeper than
+`/new`. Agents (personas that are not students) keep nothing.
 """
 
 from __future__ import annotations
@@ -476,9 +477,9 @@ def started_over(memory, subject: str, context) -> None:
 
 def make_context(book: Book, settings: Settings):
     def context(part) -> Context | None:
-        """Her surface, when she is talking with one person: their first prompt if they asked for it, what stands for
-        what she let go, and the newest of what she keeps of them, whichever chat it was said in. So a new chat starts
-        where the last one stopped, and the engine reads only what came after it. A group is the engine's own."""
+        """Her surface, when she is talking with one person: what stands for what she let go, and the newest of what
+        she keeps of them, whichever chat it was said in. So a new chat starts where the last one stopped, and the engine
+        reads only what came after it. A group is the engine's own."""
         persona, trigger = part.persona, part.trigger
         own = settings.of(persona.name)
         if not (direct(part) and trigger.origin == "person" and own.surface and own.learn and own.episodes
@@ -714,20 +715,59 @@ def make_bond(book: Book):
     return bond
 
 
-def make_first(book: Book):
+def creator_of(memory, own: Settings) -> str | None:
+    """Her creator's subject (`owner_role`), once the bot's owner has talked with her and nothing gave them another."""
+    for item in memory.relations.all():
+        if item.role == own.owner_role:
+            return item.subject
+    return None
+
+
+def card_holder(memory, own: Settings, asking: str | None = None) -> str | None:
+    """Whose Character Card is hers: the one that is on (only the bot's owner can turn one on, and one at a time: from
+    any of their accounts), else the one asking, else her creator's."""
+    on = [subject for subject in memory.surface.subjects() if (card := memory.surface.card(subject)) and card.on]
+    if on:
+        creator = creator_of(memory, own)
+        return creator if creator in on else max(on, key=lambda subject: memory.surface.card(subject).at)
+    return asking or creator_of(memory, own)
+
+
+def make_card_part(book: Book, settings: Settings):
+    def text(context) -> str:
+        """Her Character Card, once it is on: who she is, in her creator's words, with everyone she talks with. In the
+        system prompt, which every turn carries and nothing compacts."""
+        persona = context.persona.name
+        memory = book.open(persona) if book.keeps(persona) else None
+        holder = card_holder(memory, settings.of(persona)) if memory is not None else None
+        card = memory.surface.card(holder) if holder else None
+        return card.text if card is not None and card.on else ""
+    return text
+
+
+def make_card(book: Book, settings: Settings):
     def shown(persona: str, subject: str) -> str:
         memory, name = book.open(persona), book.shown(persona)
-        first = memory.surface.first(subject) if memory is not None else None
-        if first is None:
-            return f"{name}: nothing kept yet"
-        return (f"{name}: {first.text}\n  ({'you set this' if first.by_command else 'the first thing you said'}; "
-                f"{'she reads it first in every direct chat' if first.send else 'only kept'})")
+        holder = card_holder(memory, settings.of(persona), subject) if memory is not None else None
+        card = memory.surface.card(holder) if holder else None
+        if card is None:
+            return f"{name}: no Character Card yet"
+        return (f"{name}: {card.text}\n  ({'you set this' if card.by_command else 'the first thing you said'}; "
+                f"{'in her system prompt, every turn' if card.on else 'only kept'})")
 
-    async def first(arguments, context) -> ToolResult:
-        """`$first` shows the first prompt each student keeps of you, `$first <text>` sets it for every student, `$first
-        on` puts it in front of everything she reads in every direct chat, so a new one is {first prompt} + {what she
-        keeps of you} + {your message}, `$first off` only keeps it, and `$first clear` takes it away. A student first
-        (`$first <student> ...`) is her alone."""
+    def turn_on(memory, holder: str, on: bool) -> bool:
+        """Hers on or off; on, it is the only one."""
+        if not memory.surface.card_on(holder, on):
+            return False
+        for other in memory.surface.subjects() if on else ():
+            if other != holder and (card := memory.surface.card(other)) and card.on:
+                memory.surface.card_on(other, False)
+        return True
+
+    async def card(arguments, context) -> ToolResult:
+        """`$card` shows each student's Character Card, `$card <text>` sets it for every student, `$card on` puts it in
+        her system prompt, with everyone she talks with, `$card off` only keeps it, and `$card clear` takes it away. A
+        student first (`$card <student> ...`) is her alone. Only the bot's owner can: it is who she is."""
         subject = book.subject(context.address.interface, context.sender.id)
         text = str(arguments.get("text") or "").strip()
         word, _, rest = text.partition(" ")
@@ -740,19 +780,21 @@ def make_first(book: Book):
         if not text:
             return ToolResult.ok("\n".join(shown(item, subject) for item in personas))
         shown_as, word = book.shown(persona) if persona else "every student", text.casefold()
+        holder = lambda memory, item: card_holder(memory, settings.of(item), subject)  # noqa: E731
         if word in ("on", "off", "clear"):
-            kept = [book.open(item) for item in personas if book.has(item)]  # (asking makes no file)
+            kept = [(item, book.open(item)) for item in personas if book.has(item)]  # (asking makes no file)
             if word == "clear":
-                taken = [memory.surface.drop_first(subject) for memory in kept]
+                taken = [memory.surface.drop_card(holder(memory, item)) for item, memory in kept]
                 return ToolResult.ok(f"Taken away, for {shown_as}." if any(taken) else f"Nothing is kept, for {shown_as}.")
-            if not any([memory.surface.send_first(subject, word == "on") for memory in kept]):
-                return ToolResult.fail("There is no first prompt yet: set one with `$first <text>`.", "no_first")
-            return ToolResult.ok(f"She reads it first in every direct chat, for {shown_as}." if word == "on"
+            if not any([turn_on(memory, holder(memory, item), word == "on") for item, memory in kept]):
+                return ToolResult.fail("There is no Character Card yet: set one with `$card <text>`.", "no_card")
+            return ToolResult.ok(f"It is in her system prompt from now on, for {shown_as}." if word == "on"
                                  else f"It is only kept now, for {shown_as}.")
         for item in personas:
-            book.open(item, create=True).surface.set_first(subject, text)
-        return ToolResult.ok(f"Kept, for {shown_as}. `$first on` has her read it first in every direct chat.")
-    return first
+            memory = book.open(item, create=True)
+            memory.surface.set_card(holder(memory, item), text)
+        return ToolResult.ok(f"Kept, for {shown_as}. `$card on` puts it in her system prompt.")
+    return card
 
 
 def make_new(book: Book, settings: Settings, guts: "Guts | None", facts):
@@ -918,7 +960,8 @@ def contributions(context, students: dict[str, dict]) -> dict:
     guts = Guts(Path(context.data_dir) / "gut", {name: Path(students[name]["folder"]) / STARTER for name in felt
                                                  if students[name].get("folder")}) if felt else None
     return {
-        "prompt_parts": [PromptPart("memory", make_part(book, settings, guts), place="turn", order=50, personas=keep),
+        "prompt_parts": [PromptPart("card", make_card_part(book, settings), place="stable", order=110, personas=keep),
+                         PromptPart("memory", make_part(book, settings, guts), place="turn", order=50, personas=keep),
                          PromptPart("surface", make_context(book, settings), place="context", personas=keep)],
         "watchers": [*([Watcher("memory", make_learner(book, settings), personas=keep, timeout_s=180)] if learns else []),
                      *([Watcher("gut", guts.learn, personas=felt, timeout_s=120)] if felt else [])],
@@ -935,9 +978,10 @@ def contributions(context, students: dict[str, dict]) -> dict:
                           {"text": {"type": "string", "description": "<student> <change as JSON>"}},
                           risk=Risk.WRITE, access="creator", internal=True, command="tune",
                           command_argument="text")] if felt else []),
-            Capability("students.first", "Show or set the first prompt the students keep of you.", make_first(book),
+            Capability("students.card", "Show or set the students' Character Card: who she is, in her system prompt.",
+                       make_card(book, settings),
                        {"text": {"type": "string", "description": "<text>, on, off, clear, a student first, or nothing"}},
-                       risk=Risk.WRITE, internal=True, command="first", command_argument="text"),
+                       risk=Risk.WRITE, access="creator", internal=True, command="card", command_argument="text"),
             Capability("students.new", "Start over deeper than /new, for one student or everyone: what they remember, "
                        "for good.", make_new(book, settings, guts, facts),
                        {"text": {"type": "string", "description": "deep or gut, then a student or everyone"}},
@@ -966,7 +1010,7 @@ def contributions(context, students: dict[str, dict]) -> dict:
         # Each changes only what is yours (your name for her, her name for you, your own accounts: a link needs a
         # code from the account it joins), and only you can type them (models are not offered them).
         "permissions": {"*": {"rules": {"students.alias": "auto", "students.callme": "auto", "students.link": "auto",
-                                        "students.first": "auto", "students.tune": "auto"}}},
+                                        "students.card": "auto", "students.tune": "auto"}}},
         # Her gut for her page (the owner's alone): what it shows, worked out when asked.
         "views": make_views(book, guts, felt) if felt else [],
     }

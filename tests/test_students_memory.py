@@ -361,7 +361,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("No student called 'pat'", await self.say(chat, "$alias pat Patty"))
         from core.loader import import_extension
         extension, _ = import_extension(ROOT / "extensions" / "students")
-        self.assertEqual(extension.requires, ("package:mneme-llm>=0.6.0",))
+        self.assertEqual(extension.requires, ("package:mneme-llm>=0.7.0",))
 
 
 if __name__ == "__main__":

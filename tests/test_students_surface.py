@@ -1,4 +1,4 @@
-"""Her surface in the real core: `/new` and how deep it goes, what her vote reads, and a person's first prompt."""
+"""Her surface in the real core: `/new` and how deep it goes, what her vote reads, and her Character Card."""
 
 import tempfile
 import time
@@ -289,50 +289,63 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(gut.report()["lessons"], 0)
         self.assertEqual(gut.grown, {})
 
-    async def test_the_first_thing_said_is_kept_and_the_person_can_change_it(self):
-        chat = await self.start(Head(room.Script(GPT=[room.turn("Yes."), room.turn("Ok.")])), owner=False, gut=False)
+    async def test_the_first_thing_said_is_kept_and_her_creator_can_change_it(self):
+        chat = await self.start(Head(room.Script(GPT=[room.turn("Yes."), room.turn("Ok.")])), gut=False)
         await self.say(chat, "you are my big sister")
         await self.say(chat, "long day")
-        shown = await self.say(chat, "$first")
+        shown = await self.say(chat, "$card")
         self.assertIn("you are my big sister", shown)
         self.assertIn("the first thing you said", shown)
-        self.assertIn("Kept, for GPT", await self.say(chat, "$first gpt talk less"))
-        shown = await self.say(chat, "$first gpt")
+        self.assertIn("Kept, for GPT", await self.say(chat, "$card gpt talk less"))
+        shown = await self.say(chat, "$card gpt")
         self.assertIn("talk less", shown)
         self.assertIn("you set this", shown)
         self.assertIn("only kept", shown)
-        self.assertIn("Taken away", await self.say(chat, "$first clear"))
-        self.assertIn("nothing kept yet", await self.say(chat, "$first"))
-        self.assertIn("no first prompt yet", await self.say(chat, "$first on"))
+        self.assertIn("Taken away", await self.say(chat, "$card clear"))
+        self.assertIn("no Character Card yet", await self.say(chat, "$card"))
+        self.assertIn("no Character Card yet", await self.say(chat, "$card on"))
 
-    async def test_asking_about_the_first_prompt_makes_no_file_and_says_what_there_is(self):
-        chat = await self.start(Head(room.Script()), owner=False, gut=False, settings={"roles": {}})
-        self.assertIn("no first prompt yet", await self.say(chat, "$first on"))
-        self.assertIn("no first prompt yet", await self.say(chat, "$first off"))
-        self.assertIn("Nothing is kept", await self.say(chat, "$first clear"))
+    async def test_her_card_is_her_creators_alone(self):
+        chat = await self.start(Head(room.Script(GPT=[room.turn("Yes.")])), owner=False, gut=False)
+        await self.say(chat, "you are my big sister")
+        self.assertIn("available only to the owner", await self.say(chat, "$card gpt talk less"))
+
+    async def test_asking_about_her_card_makes_no_file_and_says_what_there_is(self):
+        chat = await self.start(Head(room.Script()), gut=False, settings={"roles": {}})
+        self.assertIn("no Character Card yet", await self.say(chat, "$card on"))
+        self.assertIn("no Character Card yet", await self.say(chat, "$card off"))
+        self.assertIn("Nothing is kept", await self.say(chat, "$card clear"))
         self.assertEqual(list(self.book().folder.glob("*.db")), [])
-        self.assertIn("in every direct chat", await self.say(chat, "$first gpt talk less"))
-        self.assertIn("in every direct chat", await self.say(chat, "$first gpt on"))
-        self.assertIn("she reads it first in every direct chat", await self.say(chat, "$first gpt"))
+        self.assertIn("puts it in her system prompt", await self.say(chat, "$card gpt talk less"))
+        self.assertIn("in her system prompt from now on", await self.say(chat, "$card gpt on"))
+        self.assertIn("in her system prompt, every turn", await self.say(chat, "$card gpt"))
 
     async def test_the_first_thing_said_is_kept_with_mood_and_notes_off(self):
-        chat = await self.start(Head(room.Script(GPT=[room.turn("Yes.")])), owner=False, gut=False,
+        chat = await self.start(Head(room.Script(GPT=[room.turn("Yes.")])), gut=False,
                                 settings={"mood": False, "notes": False})
         await self.say(chat, "you are my big sister")
-        self.assertIn("you are my big sister", await self.say(chat, "$first gpt"))
+        self.assertIn("you are my big sister", await self.say(chat, "$card gpt"))
 
-    async def test_a_new_chat_is_the_first_prompt_the_surface_and_the_new_message(self):
-        script = room.Script(GPT=[room.turn("Yes."), room.turn("Ok.")])
+    async def test_on_her_card_is_in_her_system_prompt_with_everyone_and_never_in_the_surface(self):
+        script = room.Script(GPT=[room.turn("Yes."), room.turn("Ok."), room.turn("Hi.")])
         chat = await self.start(Head(script), gut=False)
         await self.say(chat, "my violin teacher is Anna")
-        await self.say(chat, "$first talk less")
-        await self.say(chat, "$first on")
+        await self.say(chat, "$card talk less")
+        await self.say(chat, "$card on")
         await chat.say("hello again", conversation="dm2", sender="alice", is_direct=True)
         await settle(self.core)
         messages = script.prompts["GPT"][-1]
-        self.assertEqual(messages[1], {"role": "user", "content": "talk less\n\nmy violin teacher is Anna"})
-        self.assertEqual(messages[2], {"role": "assistant", "content": "Yes."})
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertIn("talk less", messages[0]["content"])
+        self.assertEqual(messages[1], {"role": "user", "content": "my violin teacher is Anna"})
         self.assertTrue(messages[3]["content"].endswith("hello again"))
+        await chat.say("hi, I am Bob", conversation="dm3", sender="bob", is_direct=True)
+        await settle(self.core)
+        self.assertIn("talk less", script.prompts["GPT"][-1][0]["content"], "with everyone she talks with")
+        await self.say(chat, "$card off")
+        await chat.say("and now?", conversation="dm2", sender="alice", is_direct=True)
+        await settle(self.core)
+        self.assertNotIn("talk less", script.prompts["GPT"][-1][0]["content"])
 
     async def test_off_a_new_chat_is_the_surface_and_the_new_message(self):
         script = room.Script(GPT=[room.turn("Yes."), room.turn("Ok.")])
@@ -342,16 +355,17 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         await settle(self.core)
         self.assertEqual(script.prompts["GPT"][-1][1], {"role": "user", "content": "my violin teacher is Anna"})
 
-    async def test_after_new_only_the_first_prompt_is_left_in_front(self):
+    async def test_after_new_her_card_is_still_in_her_system_prompt(self):
         script = room.Script(GPT=[room.turn("Yes."), room.turn("Ok.")])
         chat = await self.start(Head(script), gut=False)
         await self.say(chat, "my violin teacher is Anna")
-        await self.say(chat, "$first talk less")
-        await self.say(chat, "$first on")
+        await self.say(chat, "$card talk less")
+        await self.say(chat, "$card on")
         await self.say(chat, "/new")
         await self.say(chat, "hi again")
         messages = script.prompts["GPT"][-1]
-        self.assertTrue(messages[1]["content"].startswith("talk less\n\n[This turn's context"))
+        self.assertIn("talk less", messages[0]["content"])
+        self.assertTrue(messages[1]["content"].startswith("[This turn's context"), messages[1]["content"][:80])
         self.assertEqual(len(messages), 2)  # (no turns of before, and not "New chat started.")
 
     async def test_the_surface_reads_far_past_the_engines_window_and_only_what_is_newer_comes_from_it(self):
