@@ -153,6 +153,13 @@
 /* ---- her gut (gut.js): her star map, how she is, and her dials and locks ------------------------------------- */
 .gut-holder { margin-top: 28px; }
 .gut-holder:empty { display: none; }
+.settings-holder { margin-top: 20px; }
+.settings-holder:empty { display: none; }
+/* Her settings (mneme-settings.js) in this page's colours. */
+.settings-box { --ms-accent: var(--accent); --ms-on-accent: var(--accent-ink); --ms-line: var(--line);
+                --ms-soft: var(--line); --ms-strong: var(--line-2); --ms-dim: var(--muted); --ms-field: var(--bg);
+                --ms-card: var(--bg); --ms-bar: var(--paper); --ms-hover: var(--panel); --ms-chosen: var(--tab);
+                --ms-error: var(--heart-ink); --ms-ok: var(--good-ink); --ms-fg: var(--ink); font-size: 15px; }
 .gut-panel h3 { margin: 0 0 8px; font-size: 15px; font-weight: 900; }
 .gut-top { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; align-items: start; }
 .gut-map-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
@@ -172,46 +179,7 @@
 .gut-middle { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--line-2); }
 .gut-fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; }
 .gut-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); }
-.gut-tune { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 18px; }
-.gut-tune-title { font-size: 17px !important; }
-.gut-tune-part { display: flex; flex-direction: column; gap: 8px; }
-.gut-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; }
-.gut-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 800; color: var(--ink-2); }
-.gut-field input { width: 8em; min-height: 36px; padding: 4px 8px; border: 1px solid var(--line-2); border-radius: 10px;
-                   background: var(--bg); color: var(--ink); font: inherit; font-size: 15px; }
-.gut-check { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
-.gut-check input { width: 18px; height: 18px; accent-color: var(--accent); }
-.gut-slider { display: grid; grid-template-columns: 7em minmax(0, 1fr) 4em; align-items: center; gap: 10px; font-size: 13px; }
-.gut-slider-name { font-weight: 800; color: var(--ink-2); overflow-wrap: anywhere; }
-.gut-slider input { width: 100%; accent-color: var(--accent); }
-.gut-value { font-variant-numeric: tabular-nums; text-align: right; font-weight: 800; }
-.gut-split { display: grid; grid-template-columns: minmax(0, 15em) minmax(0, 1fr); gap: 14px; align-items: start; }
-.gut-list { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 4px;
-            border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
-.gut-list-heading { margin: 8px 6px 2px; font-size: 11px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
-                    color: var(--muted); }
-.gut-pick { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 8px; border: 0; border-radius: 8px;
-            background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
-.gut-pick:hover { background: var(--panel); }
-.gut-pick.is-on { background: var(--panel); box-shadow: inset 3px 0 0 var(--accent); font-weight: 800; }
-.gut-pick-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
-.gut-pick-note { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
-.gut-swatch { flex: none; width: 10px; height: 10px; border-radius: 50%; }
-.gut-editor { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--bg); }
-.gut-select { min-height: 36px; padding: 4px 8px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper);
-              color: var(--ink); font: inherit; font-size: 15px; max-width: 100%; }
-.gut-sentence { width: 100%; padding: 8px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper);
-                color: var(--ink); font: inherit; font-size: 15px; resize: vertical; }
-.gut-tags { gap: 6px; }
-.gut-tag { min-height: 32px; }
-.gut-tag.is-on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.gut-tag.is-locked::after { content: " 🔒"; }
-.small-button.chip { min-height: 30px; border-radius: 999px; }
-.small-button.is-danger { align-self: flex-start; color: var(--danger, #b3412e); }
 @media (max-width: 760px) {
-  .gut-top, .gut-split { grid-template-columns: minmax(0, 1fr); }
+  .gut-top { grid-template-columns: minmax(0, 1fr); }
   .gut-bar { grid-template-columns: 5em minmax(0, 1fr) 5em; }
-  .gut-slider { grid-template-columns: 5.5em minmax(0, 1fr) 3.5em; }
 }
-.gut-editor > .small-button { align-self: flex-start; }
-.gut-list { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }

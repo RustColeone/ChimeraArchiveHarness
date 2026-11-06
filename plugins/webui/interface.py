@@ -258,7 +258,7 @@ class WebUI(Interface):
             web.get("/students", self._students_page), web.get("/api/students", self._students_state),
             web.get("/pictures/{name}/{kind}", self._picture), web.post("/api/alias", self._alias),
             web.get("/api/gut/{name}", self._gut), web.get("/api/starmap/{name}", self._starmap),
-            web.post("/api/gut/{name}", self._tune),
+            web.get("/api/settings/{name}", self._settings), web.post("/api/settings/{name}", self._save_settings),
             web.post("/api/stamina", self._stamina), web.get("/me", self._me_page),
             web.get("/api/me", self._me_state),
             web.post("/api/callme", self._callme), web.post("/api/link", self._link),
@@ -680,9 +680,12 @@ class WebUI(Interface):
     async def _starmap(self, request: web.Request) -> web.Response:
         return await self._viewed("students.starmap", request.match_info["name"])
 
-    async def _tune(self, request: web.Request) -> web.Response:
-        """A change to her gut from her page (extensions/students/panel.py): `$tune <student> <change>`, sent quietly
-        as you; the answer carries her gut as it is now."""
+    async def _settings(self, request: web.Request) -> web.Response:
+        return await self._viewed("students.settings", request.match_info["name"])
+
+    async def _save_settings(self, request: web.Request) -> web.Response:
+        """A save from her settings page (extensions/students/panel.py): `$settings <student> <save>`, sent quietly as
+        you; the answer carries her settings as they are then, or says why nothing was saved."""
         name = request.match_info["name"]
         try:
             body = await request.json()
@@ -690,11 +693,11 @@ class WebUI(Interface):
             raise web.HTTPBadRequest() from None
         if name not in self.personas or not isinstance(body, dict):
             raise web.HTTPBadRequest()
-        answer = await self._quietly(DEFAULT_CONVERSATION, f"$tune {name} {json.dumps(body, ensure_ascii=False)}",
-                                     "tune")
-        gut = (answer.get("result") or {}).get("gut")  # (a change that landed carries her gut; a refusal is only text)
-        return web.json_response({"ok": bool(answer.get("ok")) and gut is not None, "text": answer.get("text") or "",
-                                  "gut": gut}, headers={"Cache-Control": "no-store"})
+        answer = await self._quietly(DEFAULT_CONVERSATION,
+                                     f"$settings {name} {json.dumps(body, ensure_ascii=False)}", "settings")
+        settings = (answer.get("result") or {}).get("settings")  # (a save that landed carries them; a refusal is text)
+        return web.json_response({"ok": bool(answer.get("ok")) and settings is not None, "text": answer.get("text") or "",
+                                  "settings": settings}, headers={"Cache-Control": "no-store"})
 
     async def _alias(self, request: web.Request) -> web.Response:
         """Your name for a student, from her card: `$alias <student> <name>` (or `reset`), sent quietly as you."""

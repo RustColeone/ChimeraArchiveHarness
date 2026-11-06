@@ -1,7 +1,9 @@
 "use strict";
 // The Students page: every student's card (portrait, level, bond, models, her measured run alone), and one student in
 // full (#<name>): her art stages and moods, level, bond, models, the benchmark rows she is in, your record together,
-// her folder and, for the owner, her gut (gut.js: her star map, her dials and locks). Levels come from the Classroom (Chimera's facts), bond and mood from her memory, both through the core.
+// her folder and, for the owner, her gut (gut.js: her star map and her bars) and her settings (mneme-settings.js: the
+// four tabs Her, People, Memory, Gut, the same page as the DSH plugin's). Levels come from the Classroom (Chimera's
+// facts), bond and mood from her memory, both through the core.
 (() => {
   const $ = (selector) => document.querySelector(selector);
   const make = (tag, className, text) => {
@@ -117,6 +119,7 @@
       grid.append(add);
     }
     window.GutPanel?.unmount();
+    closeSettings();
     main.replaceChildren(head, grid);
     document.title = `Students · ${state.title || ""}`;
   }
@@ -415,9 +418,69 @@
 
     page.append(left, right);
     const gut = make("div", "gut-holder");  // her gut, for the owner: filled once it is read (gut.js)
-    main.replaceChildren(back, page, gut);
+    const settings = make("div", "settings-holder");  // and her settings (mneme-settings.js)
+    main.replaceChildren(back, page, gut, settings);
     window.GutPanel?.mount(gut, student.name, toast);
+    openSettings(settings, student);
     document.title = `${shown(student)} · Students · ${state.title || ""}`;
+  }
+
+  // ---- her settings: the four tabs (mneme-settings.js), read with `api/settings/<name>` and saved with
+  // `POST api/settings/<name>` ($settings); the page draws itself, in the page's language, and translates itself --------
+  const SETTINGS_WORDS = {
+    en: {
+      "page.intro": "Her settings, in four tabs. A save is used at once and kept; her name, from the next start.",
+      "her.nameHint": "Used everywhere once the app starts again.",
+      "me.accountsHint": "Messages from them are yours, to every student: one person to her memory and to her gut.",
+      "me.placeholder": "discord:123456789",
+      "me.badAccount": "A channel and an id, such as discord:123456789.",
+    },
+    zh: {
+      "page.intro": "她的设置，分成四页。保存后立刻生效，并且会一直保留；名字要到下次启动才生效。",
+      "her.nameHint": "应用重新启动后，各处都会用这个名字。",
+      "me.accountsHint": "从这些账号发来的消息都算你的（对每个同学都一样）：在她的记忆和直觉里是同一个人。",
+      "me.placeholder": "discord:123456789",
+      "me.badAccount": "写平台名和账号，比如 discord:123456789。",
+    },
+  };
+  let settingsPage = null;
+  const isDark = () => {
+    const theme = document.documentElement.dataset.theme;
+    return theme === "dark" || (theme !== "light" && Boolean(window.matchMedia?.("(prefers-color-scheme: dark)").matches));
+  };
+  function closeSettings() {
+    settingsPage?.destroy();
+    settingsPage = null;
+  }
+  function openSettings(holder, student) {
+    closeSettings();
+    if (!window.MnemeSettings) return;
+    const path = `api/settings/${encodeURIComponent(student.name)}`;
+    const section = make("section", "panel settings-panel");
+    const title = make("h2", "", "Her settings");
+    title.append(make("span", "panel-aside", " · mneme-llm"));
+    const box = make("div", "settings-box");
+    box.dataset.noI18n = "";  // (it is in the page's language already)
+    section.append(title, box);
+    holder.replaceChildren(section);
+    settingsPage = window.MnemeSettings.mount(box, {
+      language: window.uiLanguage === "zh" ? "zh" : "en", dark: isDark, words: SETTINGS_WORDS,
+      load: async () => {
+        const response = await fetch(path, { headers: { Accept: "application/json" } });
+        if (response.status === 401) { location.href = "login"; throw new Error("signed out"); }
+        if (response.status === 403 || response.status === 404) holder.replaceChildren(); // (not yours, or no student)
+        if (!response.ok) throw new Error(String(response.status));
+        return response.json();
+      },
+      save: async (body) => {
+        const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" },
+                                             body: JSON.stringify(body) });
+        const answer = response.ok ? await response.json() : { ok: false, text: String(response.status) };
+        if (!answer.ok) throw new Error(answer.text || "Not saved.");
+        window.GutPanel?.refresh(); // (her star map and bars, as they are now)
+        return answer.settings;
+      },
+    });
   }
 
   // A picture you can show in her portrait (a click), and a glimpse of one not opened yet (blurred, what opens it).

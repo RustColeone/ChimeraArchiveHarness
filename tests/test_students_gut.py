@@ -151,12 +151,12 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         real = G.Turn.__init__
         slow = asyncio.Event()
 
-        def begin(turn, gut, ask, prompt, said, subject):
+        def begin(turn, gut, ask, prompt, said, subject, *rest):
             async def slowed(messages, tokens, *more):
                 if messages[0]["content"] == G.FORM:
                     await slow.wait()
                 return await ask(messages, tokens, *more)
-            real(turn, gut, slowed, prompt, said, subject)
+            real(turn, gut, slowed, prompt, said, subject, *rest)
         G.Turn.__init__, limit, G.TIME_LIMIT = begin, G.TIME_LIMIT, .05
         self.addCleanup(setattr, G, "TIME_LIMIT", limit)
         self.addCleanup(setattr, G.Turn, "__init__", real)

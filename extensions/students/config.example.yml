@@ -10,6 +10,8 @@
 #   gpt: [{provider: openai, model: gpt-6-luna}, {provider: deepseek, model: deepseek-flash}]
 
 # ---- her memory (memory.py): what each student keeps of each person --------------------------------------------------
+# (Her settings page on the web UI keeps what it changes of these in data/extensions/students/settings.json, over this
+# file, until this file says something new for it: the latest word wins. See the README, "Her page".)
 # personas: [gpt, gemini, claude, deepseek, grok]   # whose memory is kept (left out: every student)
 # engines: [momochat]           # whose messages are conversation (not Chimera's reports on work)
 # learn: true                   # after each of her messages: her mood, notes worth keeping (a group chat's for
@@ -24,6 +26,8 @@
 # writer_profile: deepseek      # the model profile for mneme-llm's own calls (left out: her own)
 # reflect_after_notes: 5        # rewrite her impression of a person once a day, once she has this many notes
 # language: zh                  # the language of the lines it adds to prompts (en or zh; mneme-llm's default: en)
+# reply_language: auto          # the language she answers in, whatever people write in: auto (each person's own),
+#                               # english, chinese, cantonese or japanese; her memory's lines in it too
 # memory_language: Chinese      # notes also glossed in this language, so they are found whatever language you ask in
 # call_owner: 主人               # what her memory calls the bot's owner (left out: their name)
 # episodes: true                # keep each exchange word for word too, found again below

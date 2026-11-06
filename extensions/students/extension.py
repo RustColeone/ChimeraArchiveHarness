@@ -4,7 +4,7 @@ and each one's memory of the people she talks with (memory.py, one mneme-llm fil
 An agent is a persona with her models; a student is an agent with her memory, always. Every folder with a
 `student.yml` is a student. Engines (MomoChat, Chimera) and interfaces use them by name; this module describes who they
 are, what they look like and which models they prefer, and keeps what each remembers of you, whichever engine she
-spoke in. It needs mneme-llm 0.7.1 or newer: without it, it is not loaded (and says why), and so there are no students.
+spoke in. It needs mneme-llm 0.7.2 or newer: without it, it is not loaded (and says why), and so there are no students.
 """
 
 from __future__ import annotations
@@ -137,10 +137,19 @@ def key_setting(provider: str, env: str, data: dict) -> Setting:
                    "answers for her)", "secret", env=env)
 
 
+def model_names(models) -> list[str]:
+    return [f"{item['provider']}/{item['model']}" for item in models or () if item.get("provider") and item.get("model")]
+
+
 def setup(context) -> Contributions:
     from . import memory  # (mneme-llm, which `requires` has made sure of)
+    from .kept import Kept
     config = context.config
-    personas = [Persona(data["name"], data["display_name"], data["prompt"], profile=data["name"],
+    # Her name, as her settings page set it (kept.py, in this module's data folder) over her student.yml's, until her
+    # student.yml says another: the latest word wins.
+    kept = Kept(Path(context.data_dir) / "settings.json")
+    shown = {data["name"]: kept.value(data["name"], "display_name", data["display_name"]) for data in STUDENTS}
+    personas = [Persona(data["name"], shown[data["name"]], data["prompt"], profile=data["name"],
                         aliases=tuple(data.get("aliases") or ()), pictures=data["pictures"], description=str(data.get("description") or ""),
                         profiles=tiers(data), allowance=data.get("allowance"),
                         effort=str(data.get("effort") or "")) for data in STUDENTS]
@@ -152,16 +161,19 @@ def setup(context) -> Contributions:
             providers[name] = dict(settings)
     for name, settings in (config.get("providers") or {}).items():
         providers[name] = {**providers.get(name, {}), **dict(settings)}
-    remembered = memory.contributions(context, {data["name"]: {"display_name": data["display_name"],
+    remembered = memory.contributions(context, {data["name"]: {"display_name": shown[data["name"]],
+                                                             "given_name": data["display_name"],
                                                              "aliases": list(data.get("aliases") or ()),
                                                              "memory": dict(data.get("memory") or {}),
+                                                             "models": model_names(data.get("models")),
+                                                             "strong": model_names(data.get("strong")),
                                                              "folder": data["folder"]}
-                                                for data in STUDENTS})
+                                                for data in STUDENTS}, kept)
     return Contributions(personas=personas, providers=providers,
                          profiles={**profiles(STUDENTS), **dict(config.get("profiles") or {})}, **remembered)
 
 
-EXTENSION = Extension("students", setup, requires=("package:mneme-llm>=0.7.1",),
+EXTENSION = Extension("students", setup, requires=("package:mneme-llm>=0.7.2",),
                       description="The students: one folder each with her prompt, models and pictures, and her memory "
                                   "of each person (mneme-llm)",
                       settings=tuple(key_setting(*item) for item in KEYS))

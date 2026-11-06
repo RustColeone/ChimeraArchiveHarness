@@ -361,7 +361,7 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
         self.assertIn({"name": "Students", "icon": "👥", "path": "students", "order": 40}, web.place()["views"])
         await ws.close()
 
-    async def test_her_page_shows_her_gut_and_star_map_to_you_and_tunes_her(self):
+    async def test_her_page_shows_her_gut_and_star_map_to_you_and_her_settings_change_her(self):
         await self.start(students={"students": {"gpt": {"gut": True}, "claude": {"gut": False}}})
         async with self.http.get(f"{self.base}/api/gut/gpt") as response:
             self.assertEqual((response.status, response.headers["Cache-Control"]), (200, "no-store"))
@@ -370,21 +370,33 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
         async with self.http.get(f"{self.base}/api/starmap/gpt") as response:
             stars = await response.json()
         self.assertEqual((len(stars["ends"]), stars["stamp"]), (26, gut["stamp"]))
-        for path in ("/api/gut/claude", "/api/starmap/claude", "/api/gut/nobody"):  # no gut, or no student
-            async with self.http.get(f"{self.base}{path}") as response:
+        for path in ("/api/gut/claude", "/api/starmap/claude", "/api/gut/nobody", "/api/settings/nobody"):
+            async with self.http.get(f"{self.base}{path}") as response:  # no gut, or no student
                 self.assertEqual(response.status, 404, path)
-        change = {"tune": [{"end": "suspicious", "nature": 6}], "sides": [{"name": "多疑", "what": "你总觉得别人话里有话。"}]}
-        async with self.http.post(f"{self.base}/api/gut/gpt", json=change) as response:
+        async with self.http.get(f"{self.base}/api/settings/gpt") as response:
+            self.assertEqual((response.status, response.headers["Cache-Control"]), (200, "no-store"))
+            shown = await response.json()
+        self.assertEqual((shown["student"], shown["her"]["name"], shown["people"][0]["you"]), ("gpt", "GPT", True))
+        async with self.http.get(f"{self.base}/api/settings/claude") as response:
+            self.assertIsNone((await response.json())["gut"])  # her settings, without a gut
+        save = {"her": {"zone": "UTC+8"}, "gut": {"tune": [{"end": "suspicious", "nature": 6}],
+                                                 "sides": [{"name": "多疑", "what": "你总觉得别人话里有话。"}]}}
+        async with self.http.post(f"{self.base}/api/settings/gpt", json=save) as response:
             answer = await response.json()
         self.assertTrue(answer["ok"], answer)
-        self.assertEqual(next(item for item in answer["gut"]["ends"] if item["end"] == "suspicious")["nature"], 6)
-        self.assertEqual([side["name"] for side in answer["gut"]["sides"]], ["多疑"])
-        async with self.http.post(f"{self.base}/api/gut/gpt", json={"tune": [{"end": "suspicious", "nature": 7}]}) as response:
+        settings = answer["settings"]
+        self.assertEqual(settings["her"]["zone"], "UTC+8")
+        self.assertEqual(next(item for item in settings["gut"]["ends"] if item["end"] == "suspicious")["nature"], 6)
+        self.assertEqual([side["name"] for side in settings["gut"]["sides"]], ["多疑"])
+        refused_save = {"her": {"zone": "UTC+9"}, "gut": {"tune": [{"end": "suspicious", "nature": 7}]}}
+        async with self.http.post(f"{self.base}/api/settings/gpt", json=refused_save) as response:
             refused = await response.json()
-        self.assertEqual((refused["ok"], refused["gut"]), (False, None))
+        self.assertEqual((refused["ok"], refused["settings"]), (False, None))
         self.assertIn("from -6 to 6", refused["text"])
+        async with self.http.get(f"{self.base}/api/settings/gpt") as response:
+            self.assertEqual((await response.json())["her"]["zone"], "UTC+8")  # nothing of it landed
         for body in ([], "x"):
-            async with self.http.post(f"{self.base}/api/gut/gpt", json=body) as response:
+            async with self.http.post(f"{self.base}/api/settings/gpt", json=body) as response:
                 self.assertEqual(response.status, 400, body)
 
     async def test_her_card_renames_her_with_your_alias(self):

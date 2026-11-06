@@ -1,9 +1,8 @@
 "use strict";
-// A student's gut on her page (students.js mounts it under her card): her star map, how grown up she is, her bars
-// lately against usual, and, for the owner, her dials and locks: growing up, sensitivity, each feeling, each person
-// she knows and her sides. It reads her views (`api/gut/<name>`, `api/starmap/<name>`: worked out when asked, never
-// stored) and changes her with `$tune` (`POST api/gut/<name>`, extensions/students/panel.py), one change at a time;
-// the answer is her gut as it is then. Only the owner reads it: for anyone else the server says no and nothing shows.
+// A student's gut on her page (students.js mounts it under her card): her star map, how grown up she is and her bars
+// lately against usual. It reads her views (`api/gut/<name>`, `api/starmap/<name>`: worked out when asked, never
+// stored), and looks again while it is in view. What changes her is her settings, below it (mneme-settings.js, its Gut
+// tab). Only the owner reads it: for anyone else the server says no and nothing shows.
 (() => {
   const EVERY = 15000; // how often it looks again while it is in view (a lesson lands a few seconds after a turn)
   const TURNING = 0.12; // in 3D, radians a second it turns by itself while nobody turns it
@@ -28,16 +27,11 @@
   };
 
   // What is open: one student's gut at a time.
-  let open = null; // {name, holder, view, map, three, turn, drag, rested, pick, stop, timer, toast}
+  let open = null; // {name, holder, view, map, three, turn, drag, rested, stop, timer, toast}
 
   function endName(end) {
     const found = open?.view?.ends.find((item) => item.end === end);
     return chinese() && found ? found.zh : end;
-  }
-  function barName(bar) {
-    const named = bar.bar === "composure" ? "SAN" : bar.bar === "pride" ? "self-esteem" : "";
-    const name = chinese() ? bar.zh : bar.bar;
-    return named ? `${name} · ${named}` : name;
   }
   function personName(person) {
     return person.you ? "You" : person.name || person.subject;
@@ -71,24 +65,6 @@
     }
     if (mine === open) render();
   }
-  async function tune(change, done) {
-    const mine = open;
-    try {
-      const response = await fetch(`api/gut/${encodeURIComponent(mine.name)}`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) });
-      const answer = response.ok ? await response.json() : { ok: false, text: "Not changed." };
-      if (!answer.ok) mine.toast(answer.text || "Not changed.");
-      if (answer.gut && mine === open) mine.view = { ...mine.view, ...answer.gut };
-    } catch {
-      mine.toast("Could not reach the page's server.");
-    }
-    if (done) done();
-    if (mine === open) {
-      render();
-      look(); // (her star map, when her heart has changed: her age set by hand, someone forgotten)
-    }
-  }
-
   // ---- her star map ---------------------------------------------------------------------------------------
   function starMap() {
     const map = open.map, box = make("div", "gut-map");
@@ -216,267 +192,12 @@
     return box;
   }
 
-  // ---- her dials and locks (the owner's) --------------------------------------------------------------------
-  function slider({ label, value, low, high, step, show, onChange, disabled = false }) {
-    const row = make("label", "gut-slider");
-    const out = make("output", "gut-value", show(value));
-    const input = make("input");
-    Object.assign(input, { type: "range", min: low, max: high, step, value, disabled });
-    input.oninput = () => { out.textContent = show(Number(input.value)); };
-    input.onchange = () => onChange(Number(input.value), input);
-    row.append(make("span", "gut-slider-name", label), input, out);
-    return row;
-  }
-  function check({ label, checked, onChange, disabled = false }) {
-    const row = make("label", "gut-check");
-    const input = make("input");
-    Object.assign(input, { type: "checkbox", checked, disabled });
-    input.onchange = () => onChange(input.checked, input);
-    row.append(input, make("span", "", label));
-    return row;
-  }
-  function button(label, onClick, kind = "") {
-    const node = make("button", `small-button${kind ? ` ${kind}` : ""}`, label);
-    node.type = "button";
-    node.onclick = onClick;
-    return node;
-  }
-  function pickList(kind, items, chosen) { // one list to choose from; the editor beside it
-    const list = make("div", "gut-list");
-    for (const item of items) {
-      if (item.heading) { list.append(make("div", "gut-list-heading", item.heading)); continue; }
-      const row = make("button", `gut-pick${item.key === chosen ? " is-on" : ""}`);
-      row.type = "button";
-      row.setAttribute("aria-pressed", String(item.key === chosen));
-      if (item.colour) {
-        const swatch = make("span", "gut-swatch");
-        swatch.style.background = item.colour;
-        row.append(swatch);
-      }
-      row.append(make("span", "gut-pick-name", item.label));
-      if (item.note) row.append(make("span", "gut-pick-note", item.note));
-      row.onclick = () => { open.pick[kind] = item.key; render(); };
-      list.append(row);
-    }
-    return list;
-  }
-
-  function growing() {
-    const view = open.view, report = view.report, box = make("div", "gut-tune-part");
-    box.append(make("h3", "", "Growing up"));
-    const age = make("label", "gut-field");
-    const ageInput = make("input");
-    Object.assign(ageInput, { type: "number", min: 0, step: 1, value: report.age });
-    ageInput.onchange = () => {
-      const value = Number(ageInput.value);
-      if (Number.isFinite(value) && value >= 0) tune({ age: value });
-    };
-    age.append(make("span", "", "Age (lessons)"), ageInput);
-    const tau = make("label", "gut-field");
-    const tauInput = make("input");
-    Object.assign(tauInput, { type: "number", min: 1, step: 1, value: report.tau });
-    tauInput.onchange = () => {
-      const value = Number(tauInput.value);
-      if (Number.isFinite(value) && value > 0) tune({ tau: value });
-    };
-    tau.append(make("span", "", "tau (lessons)"), tauInput);
-    const row = make("div", "gut-row");
-    row.append(age, button("Young again", () => tune({ age: 0 })), tau);
-    box.append(row, make("p", "panel-note", "Lower age makes her younger: she learns faster again and forgets nothing. " +
-                                            "tau is how fast her heart grows up: fully grown at five times it."),
-               check({ label: "Lock her heart", checked: view.locked, onChange: (locked) => tune({ locked }) }),
-               make("p", "panel-note", "A locked heart learns nothing and does not grow up, so her nature stays as " +
-                                       "set. How she is with each person still learns, unless they are locked too."),
-               slider({ label: "Sensitivity", value: report.sensitivity, low: -1, high: 1, step: 0.05,
-                        show: (value) => signed(value), onChange: (sensitivity) => tune({ sensitivity }) }),
-               make("p", "panel-note", "How hard every moment hits her: -1 thick-skinned, 1 sensitive, 0 as she is."));
-    return box;
-  }
-
-  function feelings() {
-    const view = open.view, box = make("div", "gut-tune-part");
-    box.append(make("h3", "", "Each feeling"),
-               make("p", "panel-note", "Nature (−6 to 6) is where she stands on a feeling, as if she had been born so: " +
-                                       "3 is about even, 6 fully. What she lives moves her on from there. Now (−1 to 1) " +
-                                       "is how much more or less she feels it lately than usual. It fades."));
-    const items = [];
-    for (const bar of view.bars) {
-      items.push({ heading: barName(bar) });
-      for (const end of bar.ends.filter(Boolean)) {
-        const tuned = view.ends.find((item) => item.end === end);
-        const marks = [tuned.nature ? `nature ${signed(tuned.nature, 1)}` : "", tuned.now ? `now ${signed(tuned.now)}` : ""];
-        items.push({ key: end, label: endName(end), colour: colourOf(end), note: marks.filter(Boolean).join(" · ") });
-      }
-    }
-    const chosen = view.ends.some((item) => item.end === open.pick.end) ? open.pick.end : view.ends[0].end;
-    const tuned = view.ends.find((item) => item.end === chosen);
-    const editor = make("div", "gut-editor");
-    editor.append(make("div", "soft-title", endName(chosen)),
-                  slider({ label: "Nature", value: tuned.nature, low: -view.nature, high: view.nature, step: 0.1,
-                           show: (value) => signed(value, 1),
-                           onChange: (nature) => tune({ tune: [{ end: chosen, nature }] }) }),
-                  slider({ label: "Now", value: tuned.now, low: -1, high: 1, step: 0.05, show: (value) => signed(value),
-                           onChange: (now) => tune({ tune: [{ end: chosen, now }] }) }));
-    const split = make("div", "gut-split");
-    split.append(pickList("end", items, chosen), editor);
-    box.append(split);
-    return box;
-  }
-
-  function people() {
-    const view = open.view, box = make("div", "gut-tune-part");
-    box.append(make("h3", "", "People she knows"),
-               make("p", "panel-note", "How she is with each person: what is theirs alone rides on her heart, more as " +
-                                       "she knows them (at most 70%). Closeness lives in her memory."));
-    if (!view.people.length) {
-      box.append(make("p", "panel-note", "Nobody yet."));
-      return box;
-    }
-    const chosen = view.people.some((item) => item.subject === open.pick.person) ? open.pick.person : view.people[0].subject;
-    const person = view.people.find((item) => item.subject === chosen);
-    const items = view.people.map((item) => ({ key: item.subject, label: personName(item),
-                                               note: `${item.lessons} lessons · ${percent(item.weight)}` }));
-    const editor = make("div", "gut-editor");
-    editor.append(make("div", "soft-title", personName(person)),
-                  make("div", "soft-note", `${person.subject} · ${person.lessons} lessons · ${percent(person.weight)} theirs`));
-    const byHand = person.set !== null && person.set !== undefined;
-    editor.append(check({ label: "Set how much is theirs by hand", checked: byHand,
-                          onChange: (on) => tune({ people: [{ subject: chosen, weight: on ? person.weight : "learned" }] }) }),
-                  slider({ label: "Theirs", value: byHand ? person.set : person.weight, low: 0, high: 1, step: 0.01,
-                           show: percent, disabled: !byHand,
-                           onChange: (weight) => tune({ people: [{ subject: chosen, weight }] }) }),
-                  check({ label: "Lock how she is with them: what they say teaches nothing, and they do not fade",
-                          checked: person.locked, onChange: (locked) => tune({ people: [{ subject: chosen, locked }] }) }));
-    const close = person.closeness;
-    if (close) {
-      editor.append(slider({ label: `closeness (${close.role})`, value: close.value, low: close.floor, high: close.ceiling,
-                             step: 1, show: (value) => String(Math.round(value)),
-                             onChange: (closeness) => tune({ people: [{ subject: chosen, closeness }] }) }),
-                    check({ label: "Hold closeness where it is", checked: close.locked,
-                            onChange: (hold) => tune({ people: [{ subject: chosen, hold }] }) }));
-    }
-    const pickedEnd = view.ends.some((item) => item.end === open.pick.personEnd) ? open.pick.personEnd : view.ends[0].end;
-    const ends = make("select", "gut-select");
-    ends.setAttribute("aria-label", "A feeling with them");
-    for (const bar of view.bars) {
-      const group = make("optgroup");
-      group.label = barName(bar);
-      for (const end of bar.ends.filter(Boolean)) {
-        const option = make("option", "", endName(end));
-        option.value = end;
-        option.selected = end === pickedEnd;
-        group.append(option);
-      }
-      ends.append(group);
-    }
-    ends.onchange = () => { open.pick.personEnd = ends.value; render(); };
-    editor.append(make("div", "soft-note", "A nudge to a feeling with them alone, on top of all she is. It stays."), ends,
-                  slider({ label: endName(pickedEnd), value: Number(person.nudge[pickedEnd] || 0), low: -view.nature,
-                           high: view.nature, step: 0.1, show: (value) => signed(value, 1),
-                           onChange: (nature) => tune({ people: [{ subject: chosen, tune: [{ end: pickedEnd, nature }] }] }) }));
-    const nudged = Object.keys(person.nudge || {});
-    if (nudged.length) {
-      const chips = make("div", "chips");
-      for (const end of nudged) {
-        const chip = button(`${endName(end)} ${signed(person.nudge[end], 1)}`, () => { open.pick.personEnd = end; render(); },
-                            "chip");
-        chips.append(chip);
-      }
-      editor.append(chips);
-    }
-    editor.append(button("Forget them", () => {
-      if (!confirm(window.t("Forget {name}? How she is with them goes, and the sides only they wanted. What they did " +
-                            "to her heart stays. Her memory of them is not touched.", { name: window.t(personName(person)) }))) return;
-      tune({ people: [{ subject: chosen, forget: true }] });
-    }, "is-danger"));
-    const split = make("div", "gut-split");
-    split.append(pickList("person", items, chosen), editor);
-    box.append(split);
-    return box;
-  }
-
-  function sides() {
-    const view = open.view, box = make("div", "gut-tune-part");
-    box.append(make("h3", "", "Sides (属性)"),
-               make("p", "panel-note", "A side is a kind of character: a name and one sentence saying what she does. " +
-                                       "She is in one at a time, for a month at least, drawn by weight. One locked by hand " +
-                                       "is hers until unlocked."));
-    const tags = make("div", "chips gut-tags");
-    const chosen = view.sides.some((item) => item.name === open.pick.side) ? open.pick.side : view.sides[0]?.name;
-    for (const side of view.sides) {
-      const tag = button(side.name, () => { open.pick.side = side.name; render(); },
-                         `chip gut-tag${side.name === chosen ? " is-on" : ""}${view.side?.name === side.name ? " is-locked" : ""}`);
-      tag.setAttribute("aria-pressed", String(side.name === chosen));
-      tags.append(tag);
-    }
-    const names = make("select", "gut-select");
-    names.setAttribute("aria-label", "A name");
-    const blank = make("option", "", "Choose a name");
-    blank.value = "";
-    names.append(blank);
-    for (const name of view.names.filter((item) => !view.sides.some((side) => side.name === item))) {
-      const option = make("option", "", name);
-      option.value = name;
-      names.append(option);
-    }
-    const add = button("Add", () => {
-      if (!names.value) return;
-      const what = prompt(window.t("What she does in her {side} side, said to her (\"You…\")", { side: names.value }));
-      if (!what || !what.trim()) return;
-      open.pick.side = names.value;
-      tune({ sides: [{ name: names.value, what: what.trim(), weight: view.grows }] });
-    });
-    const adding = make("div", "gut-row");
-    adding.append(names, add);
-    box.append(tags, adding);
-    const side = view.sides.find((item) => item.name === chosen);
-    if (!side) {
-      box.append(make("p", "panel-note", "No sides yet."));
-      return box;
-    }
-    const editor = make("div", "gut-editor");
-    const sentence = make("textarea", "gut-sentence");
-    sentence.value = side.what;
-    sentence.maxLength = 200;
-    sentence.rows = 2;
-    sentence.setAttribute("aria-label", "What she does, said to her");
-    const weight = make("label", "gut-field");
-    const weightInput = make("input");
-    Object.assign(weightInput, { type: "number", min: 0, step: 0.5, value: side.own || side.weight });
-    weight.append(make("span", "", "Weight when drawn"), weightInput);
-    const locked = view.side?.name === side.name;
-    editor.append(make("div", "soft-title", side.name), sentence,
-                  button("Save the sentence", () => {
-                    const what = sentence.value.trim();
-                    if (what) tune({ sides: [{ name: side.name, what }] });
-                  }), weight,
-                  check({ label: "Lock her in this side", checked: locked,
-                          onChange: (on) => tune({ side: on ? { name: side.name, often: view.side?.often ?? 1 } : null }) }));
-    weightInput.onchange = () => {
-      const value = Number(weightInput.value);
-      if (Number.isFinite(value) && value >= 0) tune({ sides: [{ name: side.name, weight: value }] });
-    };
-    if (locked) {
-      editor.append(slider({ label: "How often", value: view.side.often, low: 0, high: 1, step: 0.05, show: percent,
-                             onChange: (often) => tune({ side: { name: side.name, often } }) }),
-                    make("p", "panel-note", "The share of her turns the sentence goes beside the message."));
-    }
-    editor.append(button("Remove", () => {
-      if (!confirm(window.t("Drop her {side} side? It goes with what taught it, so growing it again starts over.",
-                            { side: side.name }))) return;
-      tune({ sides: [{ name: side.name, drop: true }] });
-    }, "is-danger"));
-    box.append(editor);
-    return box;
-  }
-
   // ---- the section ---------------------------------------------------------------------------------------------
   function render() {
     if (!open || !open.view) return;
     open.stop?.();
     open.stop = null;
     const holder = open.holder;
-    const scrolled = [...holder.querySelectorAll(".gut-list")].map((node) => node.scrollTop);
     const section = make("section", "panel gut-panel");
     const title = make("h2", "", "Her gut");
     title.append(make("span", "panel-aside", " · mneme-llm"));
@@ -484,19 +205,15 @@
                                                   "her heart, how she is with each person, her sides. Only you see this."));
     const top = make("div", "gut-top");
     top.append(starMap(), standing());
-    const tuning = make("div", "gut-tune");
-    tuning.append(make("h3", "gut-tune-title", "Tune her"), growing(), feelings(), people(), sides());
-    section.append(top, tuning);
+    section.append(top);
     holder.replaceChildren(section);
-    holder.querySelectorAll(".gut-list").forEach((node, index) => { node.scrollTop = scrolled[index] || 0; });
   }
 
   /** Her gut under her card, in `holder` (empty until it is read, and stays so for anyone but the owner). */
   function mount(holder, name, toast) {
     if (open) { open.stop?.(); clearInterval(open.timer); }
     open = { name, holder, view: null, map: null, three: kept.get(SAVED) === "3d", turn: { yaw: 0.6, pitch: -0.32 },
-             drag: null, rested: 0, pick: { end: null, person: null, personEnd: null, side: null }, stop: null,
-             timer: setInterval(look, EVERY), toast: toast || (() => {}) };
+             drag: null, rested: 0, stop: null, timer: setInterval(look, EVERY), toast: toast || (() => {}) };
     look();
   }
   /** Her page is gone: nothing more is read. */
@@ -507,5 +224,9 @@
     open = null;
   }
   window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", render);
-  window.GutPanel = { mount, unmount };
+  /** Read her again now (a save on her settings page changed her). */
+  function refresh() {
+    if (open) look();
+  }
+  window.GutPanel = { mount, unmount, refresh };
 })();

@@ -8,8 +8,8 @@ talk and Chimera ([`extensions/chimera`](../chimera)) where they work, but any e
 
 **A student is an agent with her memory, always.** An agent is a persona with her models and nothing else: core.yml
 defines its own under `agents:`, and any module may add some. A student is the special agent this module defines, and
-she always has her memory, whichever engine she speaks in. So the module needs mneme-llm 0.7.1 or newer, and declares
-it (`requires=("package:mneme-llm>=0.7.1",)`): without it the core leaves the module out and says why (`--check`, and
+she always has her memory, whichever engine she speaks in. So the module needs mneme-llm 0.7.2 or newer, and declares
+it (`requires=("package:mneme-llm>=0.7.2",)`): without it the core leaves the module out and says why (`--check`, and
 `module_skipped` in the audit log), and there are no students. An agent keeps nothing.
 
 Add a student by adding a folder. Change one by editing her files. The prompts are plain text files, so a change
@@ -31,11 +31,13 @@ to a character is a change to a file, not to code.
 | Capabilities | `students.alias`, `students.bond`, `students.callme`, `students.link` | `$alias`, `$bond`, `$callme` and `$link` (typed only) |
 | Prompt part | `card` | Her Character Card, once it is on: in the system prompt ([Her Character Card](#starting-over-and-her-character-card)) |
 | Capabilities | `students.card`, `students.new` | `$card` and `$new`: her Character Card, and starting over deeper than `/new` (see below) |
+| Capability | `students.settings` | `$settings`: a save from her settings page ([Her page](#her-page)) |
 | Capabilities | `students.gut`, `students.side`, `students.tune` | With `gut` on: `$gut`, `$side` and `$tune` ([Her gut](#her-gut)) |
+| Views | `students.settings` | The owner's: her settings in four tabs, for her page ([Her page](#her-page)) |
 | Views | `students.gut`, `students.starmap` | With `gut` on, the owner's: her gut and her star map for her page ([Her page](#her-page)) |
 | Capabilities | `students.search_memory`, `students.read_memory` | Her tools to look through everything said before with the person (offered to the students' turns only) |
 | Facts | `students.alias`, `students.bond`, `students.mood`, `students.plans`, `students.called`, `students.accounts` | Where she stands with each person, what she calls them and their accounts, for the pages |
-| Declares | `requires=("package:mneme-llm>=0.7.1",)` | Her memory is mneme-llm's |
+| Declares | `requires=("package:mneme-llm>=0.7.2",)` | Her memory is mneme-llm's |
 | Provider | `grok` | `openai_compatible` at `https://api.x.ai/v1`, key in `GROK_API_KEY`, `schema_mode: native`, `effort_param: true`; `$model` offers models released since 2026-06-01, excluding IDs matching `imagine` |
 | Setting | `grok_api_key` | `secret`, env `GROK_API_KEY`: "API key for Grok (`grok`; without it, GPT's model answers for her)" |
 
@@ -263,8 +265,8 @@ it keeps it. `surface: false` leaves every chat to the engine.
 | --- | --- | --- |
 | `/new` | The context, for every student here | What she remembers, and her gut |
 | `/new <student>` | The context, for her alone | What she remembers, and her gut |
-| `$new deep <student>` | The context and everything she remembers of everyone: notes and every word | Her gut, and who people are to her |
-| `$new gut <student>` | All of that, and what people taught her gut: her lessons, tone and sides | Her character, and who people are to her |
+| `$new deep <student>` | The context and everything she remembers of everyone: notes and every word | Her gut, who people are to her, and her Character Card |
+| `$new gut <student>` | All of that, and what people taught her gut: her lessons, tone and sides | Her character, who people are to her, and her Character Card |
 
 `$new` takes a student or `everyone`, with no default: naming who is the safeguard, and there is no confirmation. It is
 the creator's alone and critical to any model, and it stays out of command menus, so `/new` is always the plain message
@@ -294,6 +296,7 @@ At the top level of this module's `config.yml` (and `extension_config.students` 
 | `writer_profile` | her own | The model profile for mneme-llm's own calls (a fixed cheap model, say). |
 | `reflect_after_notes` | 5 | Her impression of a person is rewritten once a day, once she has this many notes. |
 | `language` | mneme-llm's (`en`) | The language of the lines it adds (`en` or `zh`). The students' prompts are Chinese, so `zh` fits them. |
+| `reply_language` | `auto` | The language she answers in, whatever people write in: `auto` (each person's own), `english`, `chinese`, `cantonese` or `japanese` (or `en`, `zh`, `yue`, `ja`). Her gut says it beside the message (without one, her memory's part does), and the lines her memory adds are in it too (Chinese for Cantonese). |
 | `memory_language` | none | Notes are also kept in this language (a gloss each, written with the note), so a note is found by your words whatever language either was in (`Chinese`, `English`). |
 | `call_owner` | none | What her memory calls the bot's owner (`主人`), instead of their name. |
 | `episodes` | true | Keep each exchange word for word too. |
@@ -307,7 +310,7 @@ At the top level of this module's `config.yml` (and `extension_config.students` 
 | `surface_window` | mneme-llm's (1,048,576) | The tokens her model reads at most; the surface fills 80% of it at most. |
 | `gut` | true | What stays of her without her memory or her model ([Her gut](#her-gut)). |
 | `config` | none | A mneme-llm config file (TOML: prompts, sentences, roles, settings), read when her file is first made; relative to `data/extensions/students/`. |
-| `students` | her `memory:` | Settings of one student's own, over these, for when one should differ: `students: {grok: {learn: false}}`. A student may set `learn`, `notes`, `mood`, `classmates`, `met_role`, `owner_role`, `writer_profile`, `reflect_after_notes`, `language`, `memory_language`, `call_owner`, `config`, `episodes`, `said`, `embed`, `search`, `gut`, `surface`, `surface_days`, `surface_floor`, `surface_cap` and `surface_window`. Her student.yml `memory:` has her own, under these: DeepSeek's are `call_owner: 主人`, `language: zh` and `memory_language: Chinese`, as Whale-chan's were. |
+| `students` | her `memory:` | Settings of one student's own, over these, for when one should differ: `students: {grok: {learn: false}}`. A student may set `learn`, `notes`, `mood`, `classmates`, `met_role`, `owner_role`, `writer_profile`, `reflect_after_notes`, `language`, `reply_language`, `memory_language`, `call_owner`, `config`, `episodes`, `said`, `embed`, `search`, `gut`, `surface`, `surface_days`, `surface_floor`, `surface_cap` and `surface_window`. Her student.yml `memory:` has her own, under these: DeepSeek's are `call_owner: 主人`, `language: zh` and `memory_language: Chinese`, as Whale-chan's were. |
 | `platforms` | what the modules declare | Interfaces that share people: a Discord user is one person on both bots. A module says so of its own interfaces (`Extension.platforms`: Whale-chan's bot is Discord's); this adds to them. |
 | `people` | none | One person behind several accounts, by name: `{Leo: ["discord:7067…", "webui:creator"]}` (the web UI's owner is `webui:creator`, its `user_id`). Every student keeps them as one; the first account is where, and the name is what her memory calls them. |
 | `roles` | none | Who people are to every student, by subject (`"discord:<id>": creator`): `creator` (one), `family`, `friend` or `acquaintance`. A role is set by you, never by a model. |
@@ -400,18 +403,32 @@ flowchart TD
 
 ### Her page
 
-On the web UI's Students page, her own page shows the owner her gut ([`panel.py`](panel.py), the dsh-mneme-llm
-panel's): her star map ([`starmap.py`](starmap.py), the same map as that panel's and the mneme-llm tuner's), how grown
-up she is, SAN and self-esteem, her bars lately against usual, and her dials and locks: growing up, sensitivity, each
-feeling (nature −6 to 6, where she stands, and now), each person she knows (how much is theirs, a lock, closeness and
-its hold, a nudge to a feeling with them alone, forgetting them) and her sides (a sentence, a weight, locked in one and
-how often, removing one).
+On the web UI's Students page, her own page shows the owner her gut and her settings.
 
-* The page reads two views (`contracts.View`), `students.gut` and `students.starmap`: worked out when asked and never
-  stored, for the owner only.
-* It changes her with `$tune <student> <change>`, the change as JSON (`{tau, sensitivity, age, locked, tune, people,
-  sides, side}`, any of them, as panel.py says), checked whole before any of it lands. The owner alone may type it, and
-  it runs without asking (its permission rule). Its answer's data is her gut as the page shows it.
+* **Her gut**: her star map ([`starmap.py`](starmap.py), the same map as the dsh-mneme-llm panel's and the mneme-llm
+  tuner's), how grown up she is, SAN and self-esteem, and her bars lately against usual. It reads two views
+  (`contracts.View`), `students.gut` and `students.starmap`: worked out when asked and never stored, for the owner only.
+* **Her settings**, in four tabs, Her · People · Memory · Gut: the same page as the dsh-mneme-llm plugin's
+  (`page/settings.js` there, copied to the web UI's `static/mneme-settings.js` by its `tools/copies.mjs`). Her: her
+  name, the language she answers in, her zone, her Character Card, her models and her sides. People: everyone she knows
+  (who they are to her, closeness and its lock, and how she is with them in her gut), what she calls you, your accounts
+  and the role of people she meets. Memory: how much the surface keeps, her look, what she keeps, and starting over.
+  Gut: growing up, her heart's lock, sensitivity and each feeling.
+* The page reads the view `students.settings` ([`panel.py`](panel.py) `settings`) and saves with `$settings <student>
+  <save>`, the save as JSON (`settle`): every tab's changes at once, checked whole before any of it lands; starting over
+  is sent alone, after the page asks. The owner alone may type it.
+* What lives in her files is written there: her zone, card, roles, closeness, her memory's own settings (through
+  mneme-llm's `Mneme.change`, used at once) and her gut. Your accounts are joined for every student, as `$link` joins
+  them (accounts `people:` joins are shown and stay); what she calls you is set for her alone, over what you asked of
+  her with `$callme`.
+* The module's own settings the page changes (her name, `reply_language`, `call_owner`, `met_role`, `said`, the
+  surface's size, `learn`, `notes`, `episodes`, `mood`, `surface`, `classmates`, and a role `roles:` gives) are kept in
+  this module's data folder, `settings.json` ([`kept.py`](kept.py)), over the settings: the latest word wins. A value
+  set on the page stands until the settings for it say something else; then that is the latest word. Her name is used
+  everywhere from the next start (her student.yml is not written: the files of the checkout stay as git has them);
+  everything else at once.
+* `$tune <student> <change>` changes her gut alone, as the Gut tab does (`{tau, sensitivity, age, locked, tune, people,
+  sides, side}`, any of them), for typing.
 
 ## Does a student know the other students?
 
@@ -426,11 +443,12 @@ file, one line in her turn (`classmates`).
 | File | Role |
 | --- | --- |
 | [`extension.py`](extension.py) | `EXTENSION`, with a key setting for each provider a student brings. `read_students` reads the folders, `compose` builds each prompt, `pictures` finds her picture files (inside her folder only), `profiles` builds the fallback lists and her tiers (`tiers`), and `setup` merges `config.yml`'s `providers` and `profiles` over them and adds her memory. |
-| [`memory.py`](memory.py) | Her memory. `Settings` reads its settings; `Book` opens each student's file when first needed (with the links of `people:`, `link`), finds a student by name, says where she stands with someone (`stand`) and publishes it for each account (`publish`, `publish_all`); `make_part` builds the turn part (async: her look waits on an embedding), `make_context` the surface, `make_learner` the watcher (with `their_words`, what the person said since her last exchange, `writer`, her model calls, `hear`, a group chat's exchange for the classmates there, and `share`, its notes), `make_recall` her two search tools (one mneme-llm `Toolbox` per run, `Book.toolbox`), `make_alias`, `make_bond`, `make_callme`, `make_link`, `make_first`, `make_new`, `make_gut`, `make_side` and `make_tune` the commands, `make_views` her page's views (`Book.calling` is what her memory calls a person and why; the names asked and the accounts joined are kept in `people.json`); `contributions` wires them in for the students, with a permission rule letting `$alias`, `$callme`, `$link`, `$first` and `$tune` run without asking. |
+| [`memory.py`](memory.py) | Her memory. `Settings` reads its settings; `Book` opens each student's file when first needed (with the links of `people:`, `link`), finds a student by name, says where she stands with someone (`stand`) and publishes it for each account (`publish`, `publish_all`); `make_part` builds the turn part (async: her look waits on an embedding), `make_context` the surface, `make_learner` the watcher (with `their_words`, what the person said since her last exchange, `writer`, her model calls, `hear`, a group chat's exchange for the classmates there, and `share`, its notes), `make_recall` her two search tools (one mneme-llm `Toolbox` per run, `Book.toolbox`), `make_alias`, `make_bond`, `make_callme`, `make_link`, `make_first`, `make_new` (with `deeper`, which `$settings` uses too), `make_gut`, `make_side`, `make_tune` and `make_settings` the commands, `Page` her settings page for the owner (what `panel.settings` reads and `panel.settle` changes), `make_settings_view` and `make_views` her page's views (`Book.calling` is what her memory calls a person and why; the names asked and the accounts joined are kept in `people.json`); `contributions` wires them in for the students, with a permission rule letting `$alias`, `$callme`, `$link`, `$first` and `$tune` run without asking. |
 | `<name>/student.yml` | One student: name, display name, other names, order, description, models, strong models, fallback, providers, pictures, prompt files. |
 | `<name>/*.md`, [`shared/`](shared) | The prompt text. |
 | [`gut.py`](gut.py) | A thin host over `mneme_llm.gut`: one gut for each student (`Guts`), woken beside her first message, and her turns between her reading and her note. |
-| [`panel.py`](panel.py) | Her gut on her page: `view` (her settings, bars, ends, people with closeness from her memory, sides), `change` (one change, checked whole, then made to her gut and her memory) and `stamp` (what changes her star map). |
+| [`panel.py`](panel.py) | Her page: `settings` (the four tabs) and `settle` (a save, checked whole, then made); her gut's `view` (her settings, bars, ends, people with closeness from her memory, sides), `change` (one change, checked whole, then made to her gut and her memory; `prepare` checks it and gives the work) and `stamp` (what changes her star map). |
+| [`kept.py`](kept.py) | What her settings page set of the module's settings, kept over them in `settings.json` until they say something new (`Kept`). |
 | [`starmap.py`](starmap.py) | Her heart as a star map: dsh-mneme-llm's `lib/starmap.js` in Python (each row a star, her arms against her birth, a star for each person; in 3D her bars on a sphere). |
 | [`config.example.yml`](config.example.yml) | The documented settings. |
 

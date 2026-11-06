@@ -30,9 +30,12 @@ from contracts import (IMPULSE, Capability, Command, Context, ModelRequest, Opti
 
 import mneme_llm
 from mneme_llm.gut import GROWS
+from mneme_llm.gut import LANGUAGES as GUT_LANGUAGES
 from mneme_llm.tools import SPECS, Toolbox
 
+from . import panel
 from .gut import Guts
+from .kept import ROLE, Kept
 
 RESET = {"reset", "remove", "clear", "none"}
 DAY = 86400
@@ -44,8 +47,8 @@ ENGINES = ("momochat",)
 # What `students: <persona>:` (or her student.yml `memory:`, under it) may set for one student, over the settings for
 # all.
 OWN = ("learn", "notes", "mood", "classmates", "met_role", "owner_role", "writer_profile", "reflect_after_notes", "language",
-       "memory_language", "config", "call_owner", "episodes", "said", "embed", "search", "gut", "surface", "surface_days",
-       "surface_floor", "surface_cap", "surface_window")
+       "reply_language", "memory_language", "config", "call_owner", "episodes", "said", "embed", "search", "gut", "surface",
+       "surface_days", "surface_floor", "surface_cap", "surface_window")
 DEEPER = ("deep", "gut")  # what `$new` clears: what she remembers; and what people taught her gut
 EVERYONE = "everyone"
 STARTER = "gut-starter.json.gz"  # in her folder: the lessons she is born with (tools/gut_starter.py)
@@ -64,8 +67,11 @@ def key(text: str) -> str:
 
 
 class Settings:
-    def __init__(self, config, folder: Path | None = None):
-        self.raw, self.folder = dict(config), folder
+    """The students' settings, and one student's (`of`): hers under `students:` (or her student.yml `memory:`) over the
+    settings for all, and what her settings page set over both (`kept`, kept.py), where it stands."""
+
+    def __init__(self, config, folder: Path | None = None, kept: Kept | None = None):
+        self.raw, self.folder, self.kept = dict(config), folder, kept
         self.personas = tuple(config.get("personas") or ())
         self.engines = tuple(str(name) for name in config.get("engines") or ENGINES)
         self.learn = flag(config.get("learn"), True)
@@ -76,7 +82,12 @@ class Settings:
         self.owner_role = str(config.get("owner_role", "creator") or "")  # the bot's owner, when they first talk
         self.writer_profile = str(config.get("writer_profile") or "") or None
         self.reflect_after = int(config.get("reflect_after_notes", 5))
-        self.language = str(config.get("language") or "")
+        self.language = str(config.get("language") or "")  # the language of the lines her memory adds to her prompt
+        # The language she answers in, whatever people write in (`auto`: each person's own), and her memory's lines in it.
+        try:
+            self.reply_language = panel.language_name(config.get("reply_language"))
+        except ValueError:
+            self.reply_language = "auto"
         self.call_owner = str(config.get("call_owner") or "")  # what her memory calls the owner (else their name)
         self.memory_language = str(config.get("memory_language") or "") or None  # notes also glossed in it
         # What was said, word for word: each exchange kept (`episodes`), a look of `said` characters of it for each
@@ -100,13 +111,29 @@ class Settings:
         self._own: dict[str, Settings] = {}
 
     def of(self, persona: str) -> "Settings":
-        """One student's settings: hers under `students:`, over the settings for all."""
-        if persona not in self.students:
-            return self
+        """One student's settings: hers under `students:`, over the settings for all, and her page's over both."""
         if persona not in self._own:
-            own = {key: value for key, value in self.students[persona].items() if key in OWN}
-            self._own[persona] = Settings({**self.raw, **own, "students": {}}, self.folder)
+            own = {key: value for key, value in self.students.get(persona, {}).items() if key in OWN}
+            if self.kept is not None:
+                own.update(self.kept.over(persona, {key: self.given(persona, key) for key in OWN}))
+            self._own[persona] = Settings({**self.raw, **own, "students": {}}, self.folder) if own else self
         return self._own[persona]
+
+    def given(self, persona: str, key: str):
+        """What the settings files say of `key` for her: hers, else the one for all (None: neither says)."""
+        own = self.students.get(persona, {})
+        return own[key] if key in own and key in OWN else self.raw.get(key)
+
+    def alone(self, persona: str, key: str):
+        """`key` set for her alone: by her page, else under `students:` (None: neither)."""
+        own = self.students.get(persona, {}).get(key)
+        if self.kept is not None and self.kept.standing(persona, key, self.given(persona, key)):
+            return self.kept.value(persona, key, None)
+        return own
+
+    def changed(self, persona: str) -> None:
+        """Her page set something: her settings are worked out again."""
+        self._own.pop(persona, None)
 
 
 class Book:
@@ -162,6 +189,10 @@ class Book:
     def shown(self, persona: str) -> str:
         return self.names.get(persona, {}).get("display_name") or persona
 
+    def given_name(self, persona: str) -> str:
+        """Her name as her student.yml has it (her page's, when it stands, is hers from the next start)."""
+        return self.names.get(persona, {}).get("given_name") or self.shown(persona)
+
     def subject(self, interface: str, sender_id: str) -> str:
         """One person, whichever bot they talk to: `<platform>:<id>` (`whale_chan` counts as `discord`, say)."""
         return f"{self.platforms.get(interface, interface)}:{sender_id}"
@@ -205,6 +236,23 @@ class Book:
             self.link(memory)
         for joined in self.joined:  # (her gut, which knows people as her memory does)
             joined()
+        return True
+
+    def unjoin(self, account: str) -> bool:
+        """`account` is its own person again (to every student, from now on); False when it was not joined by `$link`
+        or a page (`people:` keeps its own). What it kept stays with the person it was joined to."""
+        person = self.links.pop(account, None)
+        if person is None:
+            return False
+        accounts = self.accounts.get(person, [])
+        if account in accounts:
+            accounts.remove(account)
+        if accounts == [person] and person not in self.person_names:
+            del self.accounts[person]
+            self.person_of.pop(person, None)
+        self.person_of.pop(account, None)
+        for memory in self.opened.values():
+            self.link(memory)
         return True
 
     def save(self) -> None:
@@ -260,18 +308,24 @@ class Book:
         if not path.exists() and not create and not self.roles:
             return None
         self.folder.mkdir(parents=True, exist_ok=True)
+        memory = self.make(path, persona)
+        self.link(memory)
+        for subject, role in self.roles.items():
+            if self.settings.kept is None or not self.settings.kept.standing(persona, f"{ROLE}{subject}", role):
+                memory.relate(subject, role)  # (the same role again changes nothing; her page's, set later, wins)
+        self.opened[persona] = memory
+        return memory
+
+    def make(self, path, persona: str):
+        """Her mneme-llm at `path` (":memory:" for one that keeps nothing: what a new file would have)."""
         own = self.settings.of(persona)
         # Notes are found by their words (and their glosses in `memory_language`); what was said, by meaning too
         # (`embed`: embeddings with OPENAI_API_KEY, the query's waited for a few seconds at most).
         language = own.memory_language or (mneme_llm.STORED if own.config_file else None)
-        memory = mneme_llm.Mneme(str(path), persona, config=own.config_file, companion_name=self.shown(persona),
-                                 display_language=own.language or mneme_llm.STORED, embed=own.embed,
-                                 memory_language=language, **own.surface_limits)
-        self.link(memory)
-        for subject, role in self.roles.items():
-            memory.relate(subject, role)  # (the same role again changes nothing)
-        self.opened[persona] = memory
-        return memory
+        return mneme_llm.Mneme(str(path), persona, config=own.config_file, companion_name=self.shown(persona),
+                               display_language=panel.written(own.reply_language) or own.language or mneme_llm.STORED,
+                               embed=own.embed and str(path) != ":memory:", memory_language=language,
+                               **own.surface_limits)
 
     def link(self, memory) -> None:
         """Her file's links as `people:` has them: each account of a person is that person (what it kept joins
@@ -312,7 +366,7 @@ class Book:
         they `asked` of her (`$callme <student> <name>`), `call_owner` set for her alone (the owner), what they asked of
         `everyone` (`$callme <name>`), `call_owner` for all (the `setting`, the owner's), their name in `people:`."""
         asked, everyone = self.call(subject, persona), self.call(subject)
-        alone = str(self.settings.students.get(persona, {}).get("call_owner") or "")
+        alone = str(self.settings.alone(persona, "call_owner") or "")  # (her page's, or `students:`)
         setting = alone or self.settings.call_owner
         name = asked or (alone if owner else "") or everyone or (self.settings.call_owner if owner else "") \
             or self.name_of(subject)
@@ -434,14 +488,17 @@ def make_part(book: Book, settings: Settings, guts: Guts | None = None):
         own = settings.of(persona.name)
         subject = book.subject(context.address.interface, trigger.sender.id)
         person = called(book, persona.name, subject, context.owner, trigger.sender)
-        turn = guts.begin(context, subject) if guts is not None and own.gut and not impulse(trigger) else None
+        speaks = panel.spoken(own.reply_language)  # (the language she answers in: "" for each person's own)
+        turn = guts.begin(context, subject, speaks) if guts is not None and own.gut and not impulse(trigger) else None
         memory = book.open(persona.name)
         started_over(memory, subject, context)
 
         async def with_gut(kept: str) -> str:
-            """What she keeps of them, and the line from her gut, which reads it first."""
+            """What she keeps of them, and the line from her gut, which reads it first (and says the language she
+            answers in, when she has one; without her gut, it is said here)."""
             if turn is None:
-                return kept
+                reply = f"Reply in {GUT_LANGUAGES[speaks]}." if speaks else ""
+                return "\n\n".join(part for part in (kept, reply) if part)
             relationship = memory.relations.get(subject) if memory is not None else None
             exchanges = memory.episodes.count(subject) if memory is not None else 0
             line = await turn.feel(memory.surface.slice(subject) if memory is not None else [], kept,
@@ -736,6 +793,16 @@ def card_holder(memory, own: Settings, asking: str | None = None) -> str | None:
     return asking or creator_of(memory, own)
 
 
+def turn_card(memory, holder: str, on: bool) -> bool:
+    """Her Character Card on or off; on, it is the only one."""
+    if not memory.surface.card_on(holder, on):
+        return False
+    for other in memory.surface.subjects() if on else ():
+        if other != holder and (card := memory.surface.card(other)) and card.on:
+            memory.surface.card_on(other, False)
+    return True
+
+
 def make_card_part(book: Book, settings: Settings):
     def text(context) -> str:
         """Her Character Card, once it is on: who she is, in her creator's words, with everyone she talks with. In the
@@ -757,15 +824,6 @@ def make_card(book: Book, settings: Settings):
             return f"{name}: no Character Card yet"
         return (f"{name}: {card.text}\n  ({'you set this' if card.by_command else 'the first thing you said'}; "
                 f"{'in her system prompt, every turn' if card.on else 'only kept'})")
-
-    def turn_on(memory, holder: str, on: bool) -> bool:
-        """Hers on or off; on, it is the only one."""
-        if not memory.surface.card_on(holder, on):
-            return False
-        for other in memory.surface.subjects() if on else ():
-            if other != holder and (card := memory.surface.card(other)) and card.on:
-                memory.surface.card_on(other, False)
-        return True
 
     async def card(arguments, context) -> ToolResult:
         """`$card` shows each student's Character Card, `$card <text>` sets it for every student, `$card on` puts it in
@@ -789,7 +847,7 @@ def make_card(book: Book, settings: Settings):
             if word == "clear":
                 taken = [memory.surface.drop_card(holder(memory, item)) for item, memory in kept]
                 return ToolResult.ok(f"Taken away, for {shown_as}." if any(taken) else f"Nothing is kept, for {shown_as}.")
-            if not any([turn_on(memory, holder(memory, item), word == "on") for item, memory in kept]):
+            if not any([turn_card(memory, holder(memory, item), word == "on") for item, memory in kept]):
                 return ToolResult.fail("There is no Character Card yet: set one with `$card <text>`.", "no_card")
             return ToolResult.ok(f"It is in her system prompt from now on, for {shown_as}." if word == "on"
                                  else f"It is only kept now, for {shown_as}.")
@@ -800,11 +858,34 @@ def make_card(book: Book, settings: Settings):
     return card
 
 
+async def deeper(book: Book, settings: Settings, guts: "Guts | None", facts, context, personas, tier: str):
+    """What each of `personas` remembers of everyone gone for good (`deep`), and with `gut` what people taught her gut
+    as well: she is as she was born. Who they are to her stays, and so does her Character Card (who she is, not something
+    she remembers); her context goes too, in every chat. Returns (exchanges, lessons) gone."""
+    kept, lessons = 0, 0
+    for name in personas:
+        memory = book.open(name)
+        if memory is not None:
+            holder = card_holder(memory, settings.of(name))
+            card = memory.surface.card(holder) if holder else None
+            for someone in memory.everyone():
+                kept += memory.wipe(someone)
+                book.publish(facts, name, someone)  # (what she had coming with them is gone from the pages too)
+            if card is not None and (card.by_command or card.on):
+                memory.surface.set_card(holder, card.text)
+                turn_card(memory, holder, card.on)
+        context.start_over(name, everywhere=True)
+        if tier == "gut" and guts is not None and settings.of(name).gut:
+            lessons += await asyncio.to_thread((await guts.woken(name)).wipe)
+    return kept, lessons
+
+
 def make_new(book: Book, settings: Settings, guts: "Guts | None", facts):
     async def new(arguments, context) -> ToolResult:
         """`$new deep <student>` clears what she remembers of everyone, for good; `$new gut <student>` clears what people
-        taught her gut as well, and she is as she was born. `everyone` in place of a student is every student. Naming
-        who is the safeguard: there is no default. `/new` is the everyday one, which clears the context only."""
+        taught her gut as well, and she is as she was born (`deeper`: her card stays). `everyone` in place of a student
+        is every student. Naming who is the safeguard: there is no default. `/new` is the everyday one, which clears the
+        context only."""
         words = str(arguments.get("text") or "").split()
         if len(words) != 2 or words[0] not in DEEPER:
             return ToolResult.fail("Use `$new deep <student>` or `$new gut <student>`, or `everyone` for every student. "
@@ -813,16 +894,8 @@ def make_new(book: Book, settings: Settings, guts: "Guts | None", facts):
                                                                                      context.sender.id))
         if persona is None and words[1] != EVERYONE:
             return ToolResult.fail(f"No student called {words[1]!r} here. Name one, or say `everyone`.", "unknown_student")
-        kept, lessons = 0, 0
-        for name in [persona] if persona else book.known():
-            memory = book.open(name)
-            if memory is not None:
-                for someone in memory.everyone():
-                    kept += memory.wipe(someone)
-                    book.publish(facts, name, someone)  # (what she had coming with them is gone from the pages too)
-            context.start_over(name, everywhere=True)  # (her context goes with it, in every chat)
-            if words[0] == "gut" and guts is not None and settings.of(name).gut:
-                lessons += await asyncio.to_thread((await guts.woken(name)).wipe)
+        kept, lessons = await deeper(book, settings, guts, facts, context, [persona] if persona else book.known(),
+                                     words[0])
         shown = book.shown(persona) if persona else "Every student"
         told = f"{shown}: {kept} exchanges gone for good, with the notes"
         return ToolResult.ok(told + (f", and {lessons} lessons of the gut." if words[0] == "gut" else "."))
@@ -905,6 +978,226 @@ def make_tune(book: Book, settings: Settings, guts: Guts):
     return tune
 
 
+# ---- her settings page: four tabs, Her · People · Memory · Gut (panel.settings, panel.settle) -----------------------
+
+APP = {"en": "In ChimeraArchive", "zh": "在 ChimeraArchive 里"}
+MODELS = {"en": "Her models", "zh": "她的模型"}
+# The app's own settings for her, on the page's tabs beside its own (a host's rows, as page/settings.js draws them).
+ROWS = (
+    {"tab": "her", "key": "models", "kind": "info", "group": MODELS, "label": {"en": "Everyday", "zh": "日常"},
+     "hint": {"en": "Tried in this order. They are set in her student.yml.",
+              "zh": "按这个顺序使用。在她的 student.yml 里设置。"}},
+    {"tab": "her", "key": "strong", "kind": "info", "group": MODELS, "label": {"en": "Heavy work", "zh": "繁重的工作"}},
+    {"tab": "memory", "key": "learn", "kind": "bool", "group": APP,
+     "label": {"en": "She learns from what people say", "zh": "她从别人说的话里学习"},
+     "hint": {"en": "Off, she keeps nothing new of anyone.", "zh": "关掉后，她不会再记住任何人的新东西。"}},
+    {"tab": "memory", "key": "notes", "kind": "bool", "group": APP,
+     "label": {"en": "Notes about each person", "zh": "关于每个人的笔记"}},
+    {"tab": "memory", "key": "episodes", "kind": "bool", "group": APP,
+     "label": {"en": "What was said, word for word", "zh": "说过的话，一字不差"}},
+    {"tab": "memory", "key": "mood", "kind": "bool", "group": APP,
+     "label": {"en": "Her mood with each person", "zh": "她对每个人的心情"}},
+    {"tab": "memory", "key": "surface", "kind": "bool", "group": APP,
+     "label": {"en": "Lately, from her memory", "zh": "从记忆里读最近的话"},
+     "hint": {"en": "In a chat with her alone, she reads the newest of what she keeps of the person, wherever it was "
+                    "said, in place of the chat's own window.",
+              "zh": "单独和她聊天时，她读的是她保留的、和这个人最近说过的话（不管是在哪个聊天里说的），而不是这个聊天窗口里的消息。"}},
+    {"tab": "memory", "key": "classmates", "kind": "bool", "group": APP,
+     "label": {"en": "How her classmates seem today", "zh": "同学们今天看起来怎么样"},
+     "hint": {"en": "Told before she answers: how the others seem with the same person today.",
+              "zh": "在她回答之前告诉她：其他同学今天和这个人相处时看起来怎么样。"}},
+)
+
+
+class Page:
+    """One student's settings page, as the owner reads it (`panel.settings`) and saves it (`panel.settle`). What lives
+    in her files is written there (her zone, card, roles, closeness, her memory's settings, her gut); the students'
+    settings the page changes are kept over them (kept.py: her name, from the next start, and the rest at once); and
+    what is the app's for every student goes where `$link` and `$callme` keep it (your accounts, your own name for her).
+    `context`, a command's, is what starting over needs."""
+
+    def __init__(self, book: Book, settings: Settings, guts: "Guts | None", facts, persona: str, you: str, gut=None,
+                 context=None):
+        self.book, self.settings, self.guts, self.facts = book, settings, guts, facts
+        self.persona, self.you, self.gut, self.context = persona, you, gut, context
+        found = book.open(persona)
+        self.memory = found if found is not None else book.make(":memory:", persona)  # (what a new file would have)
+        self.kept = found is not None
+
+    @property
+    def own(self) -> Settings:
+        return self.settings.of(self.persona)
+
+    def open(self):
+        """Her file, made if there is none yet."""
+        if not self.kept:
+            self.memory, self.kept = self.book.open(self.persona, create=True), True
+        return self.memory
+
+    def given(self, key: str):
+        """What the settings say of `key` now, which a word of the page stands over."""
+        if key == "display_name":
+            return self.book.given_name(self.persona)
+        if key.startswith(ROLE):
+            return self.book.roles.get(key[len(ROLE):])
+        return self.settings.given(self.persona, key)
+
+    # what the page shows
+    @property
+    def name(self) -> str:
+        """Her name: her page's, from the next start, or her student.yml's."""
+        kept = self.settings.kept
+        given = self.book.given_name(self.persona)
+        return kept.value(self.persona, "display_name", given) if kept is not None else given
+
+    @property
+    def language(self) -> str:
+        return self.own.reply_language
+
+    @property
+    def me_name(self) -> str:
+        return self.book.calling(self.persona, self.you)["name"] or ""
+
+    @property
+    def accounts(self) -> list[str]:
+        return [account for account in self.book.accounts.get(self.you, []) if account != self.you]
+
+    @property
+    def fixed(self) -> list[str]:
+        """Your accounts that `people:` joins: the page shows them and leaves them be."""
+        return [account for account in self.accounts if account not in self.book.links]
+
+    @property
+    def others(self) -> str:
+        return self.own.met_role
+
+    @property
+    def names(self) -> dict:
+        """What she calls each person she knows, where it is a name (else the page shows their account)."""
+        subjects = {item.subject for item in self.memory.relations.all()}
+        if self.gut is not None:
+            subjects |= set(self.gut.net.people)
+        return {subject: name for subject in subjects
+                if (name := self.book.calling(self.persona, subject, owner=False)["name"])}
+
+    def card(self) -> dict | None:
+        holder = card_holder(self.memory, self.own, self.you)
+        card = self.memory.surface.card(holder) if holder else None
+        return {"text": card.text, "on": bool(card.on), "how": "set" if card.by_command else "said"} if card else None
+
+    def limits(self) -> dict:
+        surface = self.memory.surface
+        return {"surface_days": surface.span, "surface_floor": surface.floor, "surface_cap": surface.cap,
+                "surface_window": surface.window, "said_budget": self.own.said, "said_words": self.memory.said_words}
+
+    def rows(self) -> list[dict]:
+        hers, own = self.book.names.get(self.persona, {}), self.own
+        values = {"models": list(hers.get("models") or ()), "strong": list(hers.get("strong") or ())}
+        return [{**row, "value": values[row["key"]] if row["kind"] == "info" else getattr(own, row["key"])}
+                for row in ROWS if row["kind"] != "info" or values[row["key"]]]
+
+    def given_role(self, subject: str) -> str | None:
+        """Who `roles:` says someone is to every student (None: it says nothing of them)."""
+        return self.book.roles.get(subject)
+
+    def whose(self, account: str) -> str:
+        """Why `account` cannot be joined to you ("" when it can)."""
+        named = self.book.named(account)
+        person = self.book.person(named)
+        if named == self.you:
+            return f"{account} is you"
+        if person != named and person != self.you:
+            return f"{account} is {person}'s: unlink it there first"
+        if named in self.book.accounts and named != self.you:
+            return f"{account} has accounts of its own joined to it"
+        return ""
+
+    # what a save does
+    def set_card(self, card) -> None:
+        memory = self.open()
+        holder = card_holder(memory, self.own, self.you)
+        if card is None:
+            memory.surface.drop_card(holder)
+            return
+        if card.get("text") is not None:
+            memory.surface.set_card(holder, card["text"].strip())
+        if card.get("on") is not None:
+            turn_card(memory, holder, card["on"])
+
+    def called(self) -> None:
+        """What she calls you, set on her page: the latest word, over what you asked of her with `$callme`."""
+        if self.book.call(self.you, self.persona):
+            self.book.set_call(self.you, self.persona, None)
+
+    def relink(self, linking: list[str], unlinking: list[str]) -> None:
+        for account in unlinking:
+            self.book.unjoin(account)
+        for account in linking:
+            self.book.join(self.book.named(account), self.you)
+        self.book.save()
+
+    def keep(self, values: dict) -> None:
+        self.settings.kept.set(self.persona, values, {key: self.given(key) for key in values})
+        self.settings.changed(self.persona)
+        if "reply_language" in values:
+            own = self.own
+            self.memory.display_language = (panel.written(own.reply_language) or own.language
+                                            or self.memory.config.get("companion.display_language"))
+
+    def published(self, moved=()) -> None:
+        """The pages' facts, after a save: for you, on each of your accounts, and for whoever was moved."""
+        publish_person(self.book, self.facts, self.you)
+        for subject in moved:
+            if subject != self.you:
+                self.book.publish(self.facts, self.persona, subject)
+
+    async def start(self, tier: str) -> None:
+        """`fresh`: what she keeps of lately with you starts over; `deep`, `gut`: as `$new` (`deeper`)."""
+        if tier == "fresh":
+            if self.kept:
+                self.memory.surface.clear(self.you)
+            return
+        await deeper(self.book, self.settings, self.guts, self.facts, self.context, [self.persona], tier)
+
+
+def make_settings_view(book: Book, settings: Settings, guts: "Guts | None", facts, personas) -> View:
+    """Her settings for her page, the owner's alone (`students.settings`): the four tabs, worked out when asked."""
+    async def read(persona: str, person: tuple[str, str]) -> dict:
+        gut = await guts.woken(persona) if guts is not None and settings.of(persona).gut else None
+        you = book.person(book.subject(*person))
+
+        def made() -> dict:
+            return panel.settings(Page(book, settings, guts, facts, persona, you, gut))
+        return {"student": persona, "display": book.shown(persona), **await asyncio.to_thread(made)}
+    return View("settings", read, "Her settings, in four tabs: Her, People, Memory, Gut", personas=personas,
+                timeout_s=60)
+
+
+def make_settings(book: Book, settings: Settings, guts: "Guts | None", facts):
+    async def change(arguments, context) -> ToolResult:
+        """`$settings <student> <save>`: her settings page's save, as JSON (extensions/students/panel.py), checked whole
+        before any of it lands; the answer's data is her settings as the page shows them then."""
+        who, _, given = str(arguments.get("text") or "").strip().partition(" ")
+        persona = book.find(who, book.subject(context.address.interface, context.sender.id)) if who else None
+        if persona is None:
+            return ToolResult.fail("Use `$settings <student> <save>`, the save as JSON (her, me, people, others, memory, "
+                                   "rows, gut; or start alone).", "invalid_settings")
+        try:
+            asked = json.loads(given)
+        except ValueError:
+            return ToolResult.fail("The save is JSON: {\"her\": {\"zone\": \"UTC+8\"}}, say.", "invalid_settings")
+        gut = await guts.woken(persona) if guts is not None and settings.of(persona).gut else None
+        you = book.person(book.subject(context.address.interface, context.sender.id))
+        page = Page(book, settings, guts, facts, persona, you, gut, context)
+        try:
+            shown = await panel.settle(page, asked)
+        except ValueError as error:
+            return ToolResult.fail(f"Not saved: {error}.", "invalid_settings")
+        return ToolResult.ok(f"{book.shown(persona)}'s settings: saved.",
+                             data={"settings": {"student": persona, "display": book.shown(persona), **shown}})
+    return change
+
+
 def weight_of(text: str) -> float | None:
     """A weight for `$side`: a number above nothing, or None for a sentence."""
     try:
@@ -940,15 +1233,17 @@ def make_side(book: Book, settings: Settings, guts: Guts):
     return side
 
 
-def contributions(context, students: dict[str, dict]) -> dict:
+def contributions(context, students: dict[str, dict], kept: Kept | None = None) -> dict:
     """The memory's prompt part, watcher, commands and facts, for these students (persona → display name and other
-    names), or those of them `personas:` names."""
+    names, her student.yml's name, models and memory settings), or those of them `personas:` names. `kept`: what her
+    settings page set (kept.py), in the module's data folder unless given."""
     config = dict(context.config)
     # Each student's own memory settings (her student.yml `memory:`), under this module's `students: <name>:`.
     given = dict(config.get("students") or {})
     config["students"] = {name: {**dict((students.get(name) or {}).get("memory") or {}), **dict(given.get(name) or {})}
                           for name in [*given, *(name for name in students if (students[name] or {}).get("memory"))]}
-    settings = Settings(config, Path(context.data_dir))
+    kept = kept if kept is not None else Kept(Path(context.data_dir) / "settings.json")
+    settings = Settings(config, Path(context.data_dir), kept)
     keep = tuple(name for name in settings.personas or students if name in students)
     settings.personas = keep
     book = Book(context.data_dir, personas=keep, names=students,
@@ -987,6 +1282,12 @@ def contributions(context, students: dict[str, dict]) -> dict:
                        make_card(book, settings),
                        {"text": {"type": "string", "description": "<text>, on, off, clear, a student first, or nothing"}},
                        risk=Risk.WRITE, access="creator", internal=True, command="card", command_argument="text"),
+            Capability("students.settings", "Save a student's settings page: her, the people she knows, her memory, her "
+                       "gut; or start her over.", make_settings(book, settings, guts, facts),
+                       {"text": {"type": "string", "description": "<student> <save as JSON>"}},
+                       risk=Risk.CRITICAL, access="creator", internal=True, command_argument="text",
+                       command=Command("settings", "Save a student's settings page", (Option("text", "<student> <save as "
+                                                                                           "JSON>"),), menu=False)),
             Capability("students.new", "Start over deeper than /new, for one student or everyone: what they remember, "
                        "for good.", make_new(book, settings, guts, facts),
                        {"text": {"type": "string", "description": "deep or gut, then a student or everyone"}},
@@ -1016,6 +1317,6 @@ def contributions(context, students: dict[str, dict]) -> dict:
         # code from the account it joins), and only you can type them (models are not offered them).
         "permissions": {"*": {"rules": {"students.alias": "auto", "students.callme": "auto", "students.link": "auto",
                                         "students.card": "auto", "students.tune": "auto"}}},
-        # Her gut for her page (the owner's alone): what it shows, worked out when asked.
-        "views": make_views(book, guts, felt) if felt else [],
+        # Her settings and her gut for her page (the owner's alone): what it shows, worked out when asked.
+        "views": [make_settings_view(book, settings, guts, facts, keep), *(make_views(book, guts, felt) if felt else [])],
     }

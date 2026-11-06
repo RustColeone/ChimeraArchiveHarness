@@ -58,8 +58,9 @@ class Guts:
             await asyncio.shield(self.wake(gut))
         return gut
 
-    def begin(self, context, subject: str) -> Turn | None:
-        """Her turn, or None until her gut has woken (the first message after a start: it wakes beside it)."""
+    def begin(self, context, subject: str, language: str = "") -> Turn | None:
+        """Her turn, or None until her gut has woken (the first message after a start: it wakes beside it). `language`
+        is the one she answers in, whatever they write in ("": theirs)."""
         persona, trigger = context.persona, context.trigger
         gut = self.of(persona.name)
         if not gut.awake:
@@ -70,7 +71,7 @@ class Guts:
             return (await context.models.generate(ModelRequest(messages, persona=persona.name, effort="none",
                                                                max_tokens=tokens, timeout_s=timeout))).text
         turn = self.turns[(persona.name, trigger.id)] = Turn(gut, ask, persona.prompt, trigger.text,
-                                                             self.person(subject))
+                                                             self.person(subject), language)
         while len(self.turns) > WAITING:
             self.turns.popitem(last=False)
         return turn

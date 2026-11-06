@@ -180,6 +180,7 @@ window.I18N_ZH = {
  "Her own company's key isn't set, so she answers on a classmate's model.": "她自己公司的密钥未设置，所以她会用同学的模型回答。",
  "Her own name for you comes first, then a setting of hers (call_owner in the students' settings), then the name you give everyone, then your name here.": "她为你起的专属称呼优先，其次是她的设置（学生设置中的 call_owner），然后是你给所有人设定的称呼，最后是你在这里填写的名字。",
  "Her seat": "她的席位",
+ "Her settings": "她的设置",
  "Her star map: each dot is one thing she notices, placed toward the feeling it pulls her to. The big stars are people.": "她的星图：每个点是她注意到的一件事，摆在它会把她带向的那种感觉一侧。大星星是人。",
  "Her student card": "她的学生档案",
  "Here, in MomoChat": "在 MomoChat 这里",
