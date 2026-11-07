@@ -41,6 +41,8 @@ SETTINGS = DATA / "cli.json"  # what `club install` recorded: the Classroom's ad
 LAB = "http://127.0.0.1:4157"
 REST = {"review", "approved", "answered", "failed", "landed", "discarded", "cancelled"}
 CLOSED = {"landed", "discarded"}
+REFUSED = {"no_seats": "nobody is in the Classroom (no students are loaded, and team: has no seats)",
+           "invalid": "pick a project and write something first"}  # why the Classroom refused a task
 WORKFLOWS = ("auto", "single", "cascade", "critique")  # the built-in ones; the Classroom sends its full list
 ICONS = {"read_file": "📄", "list_files": "📁", "search": "🔎", "write_file": "✏️", "edit_file": "✏️",
          "delete_file": "🗑", "run": "▶", "test": "🧪", "diff": "±", "probe_file": "📝", "probe": "⚖"}
@@ -364,7 +366,7 @@ class Session:
             self.absorb(event)
             if event["type"] == "ack" and event.get("id") == client:
                 if not event.get("ok"):
-                    self.note(f"Not started: {event.get('reason')}", "red")
+                    self.note(f"Not started: {REFUSED.get(event.get('reason'), event.get('reason'))}", "red")
                     return False
                 self.task = event["task"]
                 self.catch_up()

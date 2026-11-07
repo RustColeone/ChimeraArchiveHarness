@@ -126,6 +126,12 @@ class LoadingTests(Base):
         self.assertEqual([event["extension"] for event in core.audit.events if event["event"] == "module_skipped"],
                          ["room", "web", "box"])
 
+    async def test_settings_that_need_a_module_left_out_say_why_it_is_not_there(self):
+        box = self.module("box", declared=', requires=("package:no-such-package-here",)')
+        with self.assertRaisesRegex(ConfigError, r"unknown personas \['nina'\]; the box module is not loaded: it "
+                                                 r"requires the Python package no-such-package-here"):
+            await self.build(box, assignments={"chat:room": {"engine": "probe", "personas": ["nina"]}})
+
     async def test_a_module_whose_setup_fails_is_left_out_and_the_core_runs(self):
         broken = self.module("broken", body="from contracts import Extension\n"
                                             "def setup(context):\n    raise RuntimeError('no disk')\n"

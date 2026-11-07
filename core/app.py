@@ -93,6 +93,8 @@ class Core:
         if config.control is not None and config.control.interface not in self.gateway.interfaces:
             problems.append(f"control route {config.control} uses an interface that is not loaded")
         if problems:
+            if self.skipped:  # (what a module left out would have brought, its personas say, is missing: say why)
+                problems.extend(f"the {name} module is not loaded: {why}" for name, why in self.skipped.items())
             raise ConfigError("; ".join(problems))
         for warning in self.manager.prompt_part_warnings():
             self.audit.record("prompt_part_problem", problem=warning)

@@ -198,7 +198,8 @@
         state.sent.delete(event.id);
         if (event.ok) { if (event.task) open(event.task); return; }
         toast({ invalid: "Pick a project and write something first.",
-                not_here: "This task belongs to another conversation; answer it there." }[event.reason] || `Not sent: ${event.reason}`);
+                not_here: "This task belongs to another conversation; answer it there.",
+                no_seats: "Nobody is in the Classroom yet: it needs the students, or seats under team: in its settings." }[event.reason] || `Not sent: ${event.reason}`);
         if (sent?.text && !input.value.trim()) { input.value = sent.text; autosize(); }
         if (sent?.accept && sent.accept === state.current) render();
         return;

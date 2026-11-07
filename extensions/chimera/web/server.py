@@ -48,6 +48,7 @@ AVATAR = re.compile(r"^[a-z0-9_-]{1,40}$")
 KIND = re.compile(r"^[a-z0-9_-]{1,80}$")  # a picture of a student's (`ladder-2-koukousei-gpt-6-1-sol`)
 PICTURES = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 TASK_ID = re.compile(r"^t-[a-z0-9]{4,40}$")
+NO_SEATS = "no_seats"  # a task refused: no students and no seats under team:, so nobody could take it up
 LOCAL_SUFFIXES = (".local", ".lan", ".home.arpa", ".internal")
 COOKIE = "classroom_session"
 # What a browser may load before it has signed in: the sign-in page and what it uses, and whether a Classroom runs.
@@ -539,6 +540,9 @@ class ClassroomUI(Interface):
         if not text or project not in self.registry.all() or workflow not in self._workflows() or team is False:
             self._tell(socket_, {"type": "ack", "id": client_id, "ok": False, "reason": "invalid"})
             return
+        if not self.team.seats:  # nobody would ever take it up: refused, never left waiting
+            self._tell(socket_, {"type": "ack", "id": client_id, "ok": False, "reason": NO_SEATS})
+            return
         task_id = new_id()
         title = text.splitlines()[0][:80]
         crew = list(dict.fromkeys(team["seats"].values())) if team else self._crew(event.get("crew"))
@@ -562,6 +566,9 @@ class ClassroomUI(Interface):
         if task is None or task["status"] != "invited" or not text or project not in self.registry.all() \
                 or workflow not in self._workflows():
             self._tell(socket_, {"type": "ack", "id": client_id, "ok": False, "reason": "invalid"})
+            return
+        if not self.team.seats:
+            self._tell(socket_, {"type": "ack", "id": client_id, "ok": False, "reason": NO_SEATS})
             return
         if "crew" in event:  # who comes along, as picked on the arrival card (her suggestion by default)
             self.board.update_task(task["id"], data={"crew": self._crew(event.get("crew"))})

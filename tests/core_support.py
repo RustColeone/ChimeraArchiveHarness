@@ -133,7 +133,21 @@ async def start_core(tmp: Path, overrides: dict | None = None, adapter: FakeAdap
     core = Core(make_config(tmp, overrides), provider_adapters={"fake": adapter or FakeAdapter()},
                 tick_seconds=3600, clock=clock)
     await core.start()
+    await whole(core)
     return core
+
+
+async def whole(core: Core) -> None:
+    """The modules of this repository that a test loads must all load: one left out (its Python package too old,
+    say) fails the test here, with the reason, rather than later as an answer that never comes or a wait that never
+    ends. (A test's own made-up modules may be left out on purpose.)"""
+    own = (ROOT / "extensions", ROOT / "plugins")
+    left = [f"the {event['extension']} module: {event['reason']}" for event in core.audit.events
+            if event["event"] == "module_skipped"
+            and any(Path(event["path"]).resolve().is_relative_to(folder) for folder in own)]
+    if left:
+        await core.stop()
+        raise RuntimeError("not loaded, so this test cannot run: " + "; ".join(left))
 
 
 async def settle(core: Core) -> None:

@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import aiohttp
 
 from contracts import AdapterResult, Address, Request, Sender
-from tests.core_support import FIXTURES, ROOT, iface, settle, start_core
+from tests.core_support import FIXTURES, ROOT, iface, settle, start_core, whole
 
 from extensions.chimera.extension import assemble
 from core.app import Core
@@ -87,6 +87,7 @@ class Club:
         self.core = Core(CoreConfig(raw, self.tmp), provider_adapters={name: self.adapter for name in names},
                          tick_seconds=3600)
         await self.core.start()
+        await whole(self.core)
         self.page = iface(self.core, "classroom")
         self.board = self.page.board
         self.parts = {"registry": self.page.registry, "board": self.board, "page": self.page}
@@ -1331,6 +1332,30 @@ class CliTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(project.path, root)
             self.assertEqual(club.task(result["task"])["data"].get("crew"), None)  # flash is not on the demo team
             self.assertEqual(club.approvals(result["task"])[-1]["data"]["capability"], "chimera.review")  # yours
+        finally:
+            await club.stop()
+
+    async def test_with_nobody_to_work_a_task_is_refused_rather_than_left_waiting(self):
+        import io
+        import shutil
+        from extensions.chimera import cli
+        club = await Club(self.tmp, DemoAdapter(),
+                          team={name: False for name in ("gpt", "gemini", "claude", "deepseek", "grok")}).start()
+        try:
+            folder = self.tmp / "app"
+            shutil.copytree(ROOT / "extensions" / "chimera" / "sample", folder)
+            root = cli.workplace(folder, True, lambda text: None)
+            out, err = io.StringIO(), io.StringIO()
+            lab = await asyncio.to_thread(cli.Lab, club.page.url)
+            try:
+                session = cli.Session(lab, root, SimpleNamespace(json=False, crew=None, workflow=None), out, err)
+                self.assertTrue(await asyncio.to_thread(session.ensure_project))
+                code = await asyncio.to_thread(cli.once, session, SUNDAY)
+            finally:
+                await asyncio.to_thread(lab.close)
+            self.assertEqual(code, 1)
+            self.assertIn("Not started: nobody is in the Classroom", err.getvalue())
+            self.assertEqual(club.board.tasks(), [])  # (none made, so none waits)
         finally:
             await club.stop()
 

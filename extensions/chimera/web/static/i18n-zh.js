@@ -295,6 +295,7 @@ window.I18N_ZH = {
  "Peak": "高峰",
  "People she knows": "她认识的人",
  "Pick a project and write something first.": "先选一个项目并写点什么。",
+ "Nobody is in the Classroom yet: it needs the students, or seats under team: in its settings.": "教室里还没有人：要先有学生，或者在设置的 team: 下安排座位。",
  "Pick someone": "选一位",
  "Places": "地点",
  "Plan": "计划",
