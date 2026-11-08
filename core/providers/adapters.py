@@ -370,11 +370,17 @@ class Anthropic:
             params["max_tokens"] = max_tokens + int(self.settings.get("thinking_reserve", 2048))
         if native:
             params.setdefault("output_config", {})["format"] = {"type": "json_schema", "schema": claude_schema(schema)}
+        if self.settings.get("cache", True):
+            # Anthropic caches only when asked: the conversation so far is then read from its cache on the next call
+            # (a tenth of the price), as other providers do by themselves
+            params["cache_control"] = {"type": "ephemeral"}
         response = await self.client().with_options(timeout=timeout_s).messages.create(**params)
         text = "\n".join(block.text for block in response.content if getattr(block, "type", None) == "text")
         usage = getattr(response, "usage", None)
-        read = getattr(usage, "cache_read_input_tokens", 0) or 0  # (Anthropic counts cache reads apart from input)
-        return AdapterResult(text, (getattr(usage, "input_tokens", 0) or 0) + read,
+        # Anthropic counts what it read from its cache and what it wrote to it apart from the rest of the input
+        read = getattr(usage, "cache_read_input_tokens", 0) or 0
+        written = getattr(usage, "cache_creation_input_tokens", 0) or 0
+        return AdapterResult(text, (getattr(usage, "input_tokens", 0) or 0) + read + written,
                              getattr(usage, "output_tokens", 0) or 0,
                              str(getattr(response, "stop_reason", "")) == "max_tokens",
                              "native" if native else "instruction" if schema else "", read)

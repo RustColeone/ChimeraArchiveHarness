@@ -256,6 +256,22 @@ class AdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["output_config"]["format"]["schema"], SCHEMA)
         self.assertEqual(result.text, '{"answer": "x"}')
 
+    async def test_anthropic_asks_for_its_cache_and_counts_what_it_read_and_wrote(self):
+        captured = {}
+
+        async def create(**params):
+            captured.update(params)
+            return SimpleNamespace(content=[SimpleNamespace(type="text", text="ok")], stop_reason="end_turn",
+                                   usage=SimpleNamespace(input_tokens=10, output_tokens=6, cache_read_input_tokens=900,
+                                                         cache_creation_input_tokens=90))
+        client = SimpleNamespace(with_options=lambda **options: SimpleNamespace(messages=SimpleNamespace(create=create)))
+        result = await Anthropic({}, client).complete("claude", REQUEST.messages, None, "reply", "low", 50, 30)
+        self.assertEqual(captured["cache_control"], {"type": "ephemeral"})
+        self.assertEqual((result.input_tokens, result.cached_input_tokens), (1000, 900))
+        captured.clear()
+        await Anthropic({"cache": False}, client).complete("claude", REQUEST.messages, None, "reply", "low", 50, 30)
+        self.assertNotIn("cache_control", captured)
+
     async def test_an_answer_costs_what_the_provider_says_it_charged(self):
         from core.providers.adapters import charge
         self.assertEqual(charge(SimpleNamespace(cost=0.0001)), 0.0001)
