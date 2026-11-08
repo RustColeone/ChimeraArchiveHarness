@@ -39,7 +39,11 @@ def schema_instruction(schema: Mapping[str, Any]) -> str:
             + json.dumps(schema, ensure_ascii=False))
 
 
-def with_schema_instruction(messages: Sequence[Mapping[str, str]], schema: Mapping[str, Any]) -> list[dict]:
+def with_schema_instruction(messages: Sequence[Mapping[str, str]], schema: Mapping[str, Any],
+                            remind: bool = True) -> list[dict]:
+    """The schema asked for in the system prompt. `remind`: the last message also asks for the JSON object again
+    (DeepSeek's JSON mode needs it); never for a provider whose cache keys on whole messages, such as Anthropic: the
+    reminder is gone from that message on the next call, so no turn could ever be read back from the cache."""
     instruction = schema_instruction(schema)
     result = [dict(message) for message in messages]
     if result and result[0].get("role") == "system":
@@ -48,7 +52,7 @@ def with_schema_instruction(messages: Sequence[Mapping[str, str]], schema: Mappi
         result.insert(0, {"role": "system", "content": instruction})
     # DeepSeek's JSON mode answers only whitespace after an assistant JSON turn unless the final
     # message asks for the JSON object again (reproduced: 0/3 valid without, 3/3 with).
-    if result[-1].get("role") == "user":
+    if remind and result[-1].get("role") == "user":
         result[-1]["content"] = result[-1]["content"] + "\n\n(Reply with one JSON object.)"
     return result
 
@@ -351,7 +355,7 @@ class Anthropic:
         native = bool(schema) and closed(schema)
         if schema and not native:
             # Open objects (free-form tool arguments) cannot be enforced natively: ask in the prompt.
-            messages = with_schema_instruction(messages, schema)
+            messages = with_schema_instruction(messages, schema, remind=False)
         system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
         params: dict[str, Any] = {
             "model": model, "max_tokens": max_tokens,

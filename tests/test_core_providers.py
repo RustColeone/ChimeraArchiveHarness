@@ -314,6 +314,8 @@ class AdapterTests(unittest.IsolatedAsyncioTestCase):
                   "required": ["tool", "arguments"], "additionalProperties": False}
         result = await Anthropic({}, client).complete("claude", REQUEST.messages, schema, "turn", "low", 100, 30)
         self.assertNotIn("output_config", captured)
+        # the last message stays as it was: next call it is no longer last, and the cache keys on whole messages
+        self.assertEqual(captured["messages"][-1]["content"], REQUEST.messages[-1]["content"])
         self.assertIn("JSON schema", captured["system"])
         self.assertEqual(result.schema_mode, "instruction")
 
