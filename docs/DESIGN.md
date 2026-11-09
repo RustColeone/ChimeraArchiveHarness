@@ -1,9 +1,7 @@
 # Design: students, agents, harnesses and interfaces
 
-These are the conclusions the owner and Claude reached on 2026-10-27, after a review of the whole project. Read them
-before you change an engine, a student, an agent, the memory or the web UI. The detailed reasoning is in the project
-notes (`DISCUSSION-2026-10-26.md`, sections 9g to 9j, outside this repository). Where the code does not match yet, the
-**Status** column says so.
+How the project is put together: students, agents, harnesses and interfaces. Read it before you change an engine, a
+student, an agent, the memory or the web UI. Where the code does not match yet, the **Status** column says so.
 
 ## Three layers
 
