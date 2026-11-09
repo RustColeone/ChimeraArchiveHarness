@@ -454,6 +454,21 @@ class WebUITests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((PLUGIN / "static" / name).read_bytes(),
                              (ROOT / "extensions/chimera/web/static" / name).read_bytes(), name)
 
+    def test_every_word_the_pages_show_has_its_chinese(self):
+        # tools/translate_ui.py finds the words on every page; each must be in the dictionary (a new word: run the
+        # tool, or add it by hand), and the dictionary keeps no word that no page shows any more.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("translate_ui", ROOT / "tools" / "translate_ui.py")
+        tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tool)
+        text = (PLUGIN / "static" / "i18n-zh.js").read_text(encoding="utf-8")
+        dictionary = json.loads(text[text.index("{"):text.rindex("}") + 1])
+        shown = tool.collect()
+        self.assertEqual([word for word in shown if word not in dictionary], [])
+        self.assertEqual(sorted(set(dictionary) - set(shown)), [])
+        self.assertIn(PLUGIN / "static" / "students.js", tool.SOURCES)  # (every page, none listed by hand)
+        self.assertNotIn(PLUGIN / "static" / "mneme-settings.js", tool.SOURCES)  # (it has its own Chinese)
+
     # ---- files ----------------------------------------------------------------------------------
     async def test_files_go_both_ways_and_only_pictures_and_media_open_in_the_page(self):
         await self.start()

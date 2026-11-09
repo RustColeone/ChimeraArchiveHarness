@@ -1,6 +1,7 @@
 """Translate the pages' own words into Chinese with DeepSeek (python tools/translate_ui.py [--dry-run]).
 
-    the pages' sources (the web UI's and the Classroom's scripts and HTML) ──► their interface text: string literals
+    the pages' sources (every script and HTML page in the web UI's and the Classroom's static folders) ──► their
+    interface text: string literals
     and template literals that read as words (`${...}` becomes {0}, {1}), the HTML's text and its placeholder,
     aria-label, title and alt values, and EXTRA (words the servers send) ──► those not in the dictionary yet ──►
     DeepSeek, in batches, asked for the style of a Chinese anime gacha game's interface (二游: 体力, 好感度, 立绘…) ──►
@@ -21,10 +22,13 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCES = [ROOT / "plugins/webui/static" / name for name in
-           ("app.js", "cafe.js", "students.js", "gut.js", "places.js", "me.js", "index.html", "cafe.html", "students.html",
-            "login.html", "me.html")] + \
-          [ROOT / "extensions/chimera/web/static" / name for name in ("app.js", "index.html")]
+STATIC = (ROOT / "plugins/webui/static", ROOT / "extensions/chimera/web/static")
+# Not scanned: the dictionary and its reader, and the shared settings page (mneme-llm's, word for word), which carries
+# its own words in English and Chinese and is shown in the page's language.
+NOT_SCANNED = {"i18n.js", "i18n-zh.js", "mneme-settings.js"}
+# Every page and script there, so a page added later is scanned without being listed here.
+SOURCES = sorted(path for folder in STATIC for pattern in ("*.js", "*.html") for path in folder.glob(pattern)
+                 if path.name not in NOT_SCANNED)
 TARGETS = [ROOT / "plugins/webui/static/i18n-zh.js", ROOT / "extensions/chimera/web/static/i18n-zh.js"]
 # Words the servers send that the pages show as they are (place names, the stamina card, the core's notices).
 EXTRA = ["stamina<br>today", "Cafe", "MomoChat", "Classroom", "Students", "Logbook", "Study Room", "Club Room", "The club",
@@ -37,7 +41,7 @@ EXTRA = ["stamina<br>today", "Cafe", "MomoChat", "Classroom", "Students", "Logbo
          "landed", "open", "discarded", "group", "creator", "family", "friend", "acquaintance", "of", "builds", "drafts",
          "plans", "judges", "takes over", "reviews", "tests", "mood: {0}", "great", "good", "ok", "worry", "sad",
          "happy", "calm", "worried", "you", "today", "spent", "left", "stamina", "bond", "level", "her key", "their keys",
-         "Stage {0} at Lv {1}", "{0} builds", "{0} drafts", "{0} plans", "{0} judges", "{0} takes over", "{0} reviews",
+         "Stage {0} at Lv {1}", "everyday", "{0} builds", "{0} drafts", "{0} plans", "{0} judges", "{0} takes over", "{0} reviews",
          "{0} tests"]
 KEEP = ["MomoChat", "ChimeraArchive", "DeepSeek", "GPT", "Claude", "Gemini", "Grok", "Luna", "Sol", "mneme-llm",
         "OpenAI", "Anthropic", "Google", "xAI", "OpenRouter", "Lv", "polyglot", "Artificial Analysis"]
@@ -104,15 +108,24 @@ def literals(source: str):
 
 
 CODE = re.compile(r"=>|\(\)|;|#|<|>|^\.|^\[|https?:|^[a-z0-9_.:/-]+$|^[A-Z_]+$|\\n|^\$|\.(js|css|png|webp|json)\b|"
-                  r"^[a-z]+(\.[a-z_]+)+|^[a-z-]+: |^\(|^[a-z-]+\(|\d+px|\}s linear")
+                  r"^[a-z]+(\.[a-z_]+)+|^[a-z-]+: |^\(|^[a-z-]+\(|\d+px|\{\d+\}px|\}s linear")
 
 
 CLASS = re.compile(r"[a-z0-9{}]+(-[a-z0-9{}]+)*")
 NOT_WORDS = {"use strict", "chip wf", "avatar small", "card {0}", "chip {0}", "act {0}", "criterion {0}"}
 
 
+# Already in Chinese or Japanese (a page's own words in its language): nothing to translate.
+CJK = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]")
+# A page's own words in English beside their Chinese (`{ en: {…}, zh: {…} }`, as the settings page takes its host's
+# words): translated where they stand, so not in the dictionary.
+WORD_TABLE = re.compile(r"\ben:\s*\{[^{}]*\}\s*,\s*zh:\s*\{[^{}]*\}")
+
+
 def words(text: str) -> bool:
     """Whether a literal reads as interface words, not code."""
+    if CJK.search(text):
+        return False
     bare = re.sub(r"\{\d+\}", "", text).strip()
     tokens = text.split()
     if text in NOT_WORDS or (all(CLASS.fullmatch(token) for token in tokens) and any("-" in token for token in tokens)):
@@ -128,6 +141,7 @@ def collect() -> list[str]:
         source = path.read_text(encoding="utf-8")
         if path.suffix == ".js":
             source = re.sub(r"([\"'`])[ \t]*\+[ \t]*\n\s*\1", "", source)  # "a long " +⏎ "line": one string
+            source = WORD_TABLE.sub("", source)
             for text in literals(source):
                 text = " ".join(text.split())
                 for part in [text, *(text.split(" · ") if " · " in text else ())]:  # (and its pieces, as i18n.js)
