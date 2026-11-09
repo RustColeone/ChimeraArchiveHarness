@@ -9,6 +9,7 @@ from pathlib import Path
 
 import mneme_llm.gut as G
 import mneme_llm.surface as surface
+from mneme_llm.config import known
 
 from contracts import ViewError
 from tests import test_momochat as room
@@ -133,6 +134,22 @@ class SettingsPage(unittest.IsolatedAsyncioTestCase):
         # The language back to each person's own: her memory's lines in the settings' language again.
         await self.save(chat, {"her": {"language": "auto"}, "me": {"unlink": ["discord:42"]}})
         self.assertEqual((memory.display_language, book.person("discord:42")), ("en", "discord:42"))
+
+    async def test_mirroring_is_off_until_the_page_turns_it(self):
+        script = room.Script(GPT=[room.turn(str(n)) for n in range(4)])
+        chat = await self.start(Head(script))
+        await self.say(chat, "hello")
+        shown = await chat.port.view("students.settings", "gpt", "alice")
+        if not known("mood.mirror"):  # (a mneme-llm before 0.7.4: the page leaves the dial out)
+            self.assertIsNone(shown["her"]["mirror"])
+            self.assertIn("Not saved: mirroring needs mneme-llm 0.7.4", await self.save(chat, {"her": {"mirror": .5}}))
+            return
+        self.assertEqual(shown["her"]["mirror"], 0.0)
+        self.assertIn("GPT's settings: saved", await self.save(chat, {"her": {"mirror": .5}}))
+        memory = self.book().open("gpt")
+        self.assertEqual((memory.config.get("mood.mirror"), memory.mood.settings.mirror), (.5, .5))
+        self.assertEqual(memory.mood.questions()[-1].name, "user_mood")  # (asked from now on)
+        self.assertIn("Not saved: mood.mirror", await self.save(chat, {"her": {"mirror": 2}}))
 
     async def test_the_page_keeps_its_word_until_the_settings_say_something_new(self):
         script = room.Script(GPT=[room.turn(str(n)) for n in range(6)])

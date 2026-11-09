@@ -2,6 +2,12 @@
 
 What each release of ChimeraArchiveHarness changed. `venv/bin/python -m core --version` says which one you run.
 
+## Unreleased
+
+- **Mirroring on a student's settings page:** a dial in a Her mood card on the Her tab, for how far her mood follows
+  the mood of the person she talks with (mneme-llm's `mood.mirror`, 0 to 1, off as she ships). It shows with mneme-llm
+  0.7.4 or newer; with 0.7.3 the page leaves it out.
+
 ## 0.9.0 (2026-11-08)
 
 The first numbered release: a small plug-in core, and around it the students, MomoChat, Chimera and the interfaces, as

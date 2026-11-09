@@ -262,8 +262,8 @@ window.SITE = (() => {
         "we should be happy!\", she should be happy, and remember that this is the kind of thing that makes her happy. " +
         "Two things are different here. Catching your mood is a moment: her mood moves toward yours, more the closer you " +
         "are. Learning from it is lasting: the moment becomes a lesson for her gut, so next time she reacts that " +
-        "way without being told. How far she mirrors you is for whoever deploys her to decide: it is their code and " +
-        "their judging questions."],
+        "way without being told. How far she mirrors you is a dial on her settings page (mneme-llm's mood.mirror), " +
+        "off as she ships: whoever deploys her sets it."],
       ["Habits", "How she talks should be measured, not described. If she has picked up saying 喵 at the end of sentences, " +
         "that is a number: how often, where in the sentence, in what mood. Counted from her own replies, it costs no model " +
         "call, it goes into her prompt as one short line, and it can be checked: if she drifts, the count shows it."],

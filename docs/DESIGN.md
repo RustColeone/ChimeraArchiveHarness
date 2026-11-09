@@ -101,7 +101,8 @@ A student is kept in separate parts, so that a long friendship fits a fixed cont
 4. **You make her yours.** Assisted training comes mostly from what you say: corrections, playing along. A 👍 or 👎 is one
    more way to say it where a platform has reactions; nobody rates every reply. Strangers teach nothing.
 5. **She learns from your mood.** Catching it is a moment, her mood moving toward yours, more the closer you are. Learning
-   from it is lasting, a lesson for her gut. How far she mirrors is for whoever deploys her to decide.
+   from it is lasting, a lesson for her gut. How far she mirrors is a dial on her settings page (`mood.mirror`), off as
+   she ships: whoever deploys her sets it.
 6. **The test is the transplant.** Remove her memory, replace her model, and from personality alone you should get a very
    similar student. The same messages go to the original and the transplant, and you judge.
 

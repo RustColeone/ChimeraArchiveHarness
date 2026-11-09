@@ -5,7 +5,7 @@ change it makes, `change`).
 
 The page reads her view `students.settings` and saves with `$settings <student> <save>`, a save as JSON:
 
-    {her: {name, language, zone, card: {text, on} | null}, me: {name, link, unlink},
+    {her: {name, language, zone, mirror, card: {text, on} | null}, me: {name, link, unlink},
      people: [{subject, role, closeness, hold, tune, weight, locked, forget}], others, memory: {surface_days, ...},
      rows: {learn, ...}, gut: <a change, as below, without people>}
 
@@ -30,7 +30,7 @@ import math
 import re
 
 import mneme_llm.gut as G
-from mneme_llm.config import check
+from mneme_llm.config import check, known
 
 
 def stamp(gut) -> str:
@@ -217,6 +217,7 @@ GUT_ONLY = ("tune", "weight", "locked", "forget")  # of a person, what lives in 
 LONGEST = 80  # characters of her name
 CALLED = 40  # and of yours (as `$callme` takes it)
 SAID = 50_000  # the look's characters at most (memory.py `said`)
+MIRROR = "mood.mirror"  # how far her mood follows theirs: 0 (as mneme-llm ships it) not at all, to 1
 
 
 def language_name(language) -> str:
@@ -263,16 +264,17 @@ def people_of(memory, gut, gut_view, you: str, names: dict) -> list:
 
 def settings(page) -> dict:
     """Every setting the page shows, for one student and the owner reading (`page`, memory.py's `Page`): her name, the
-    language she answers in, her zone and Character Card (Her); you, your accounts, the role of people she meets and
-    everyone she knows (People); the surface's size and the look (Memory); her gut, when she has one (Gut); and the
-    app's own settings for her (`rows`, each on a tab, with its words)."""
+    language she answers in, her zone, how far her mood follows theirs (with a mneme-llm that has it) and her Character
+    Card (Her); you, your accounts, the role of people she meets and everyone she knows (People); the surface's size
+    and the look (Memory); her gut, when she has one (Gut); and the app's own settings for her (`rows`, each on a tab,
+    with its words)."""
     memory, gut, you = page.memory, page.gut, page.you
     gut_view = view(gut, you, memory, page.names) if gut is not None else None
     roles = [{"key": role.key, "floor": role.floor, "ceiling": role.ceiling, "start": role.start,
               "unique": role.unique, "names": dict(role.names)} for role in memory.relations.roles.values()]
     return {"version": 1, "companion": page.name, "you": you,
             "her": {"name": page.name, "language": page.language, "zone": memory.config.get("companion.zone"),
-                    "card": page.card()},
+                    "mirror": memory.config.get(MIRROR) if known(MIRROR) else None, "card": page.card()},
             "me": {"name": page.me_name, "accounts": page.accounts, "fixed": page.fixed},
             "others": page.others, "roles": roles, "people": people_of(memory, gut, gut_view, you, page.names),
             "memory": page.limits(), "rows": page.rows(), "starts": list(STARTS if gut is not None else STARTS[:2]),
@@ -329,6 +331,10 @@ async def settle(page, asked) -> dict:
         keep["reply_language"] = language_name(her["language"])
     if her.get("zone") is not None:
         config["companion.zone"] = check("companion.zone", her["zone"])
+    if her.get("mirror") is not None:
+        if not known(MIRROR):
+            raise ValueError("mirroring needs mneme-llm 0.7.4 or newer")
+        config[MIRROR] = check(MIRROR, her["mirror"])
     if "card" in her:
         card = her["card"]
         if card is not None and not isinstance(card, dict):

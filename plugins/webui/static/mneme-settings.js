@@ -74,6 +74,10 @@
     'card.how.settings': 'From her settings file.',
     'card.how.said': 'The first thing you said to her.',
     'card.needsText': 'Write the card before putting it in her system prompt.',
+    'mood.title': 'Her mood',
+    'mood.hint': 'How far her mood follows the mood of whoever she is talking with: 0 not at all; at 1, how they ' +
+      'feel moves her mood as much as her own reaction does. The closer they are, the more it counts.',
+    'mood.mirror': 'Mirroring',
     // People
     'people.title': 'People she knows',
     'people.hint': 'Who each person is to her and how close; with her gut, how she is with them too.',
@@ -226,6 +230,10 @@
     'card.how.settings': '来自她的设置文件。',
     'card.how.said': '这是你对她说的第一句话。',
     'card.needsText': '先写好角色卡，再放进她的系统提示。',
+    'mood.title': '她的心情',
+    'mood.hint': '她的心情会在多大程度上跟着聊天对象的心情走：0 表示完全不跟；1 表示对方的心情对她的影响和她自己的反应一样大。' +
+      '越亲近的人，影响越大。',
+    'mood.mirror': '跟着对方的心情',
     'people.title': '她认识的人',
     'people.hint': '每个人对她来说是谁、有多亲近；有直觉的话，还有她和这个人相处的样子。',
     'people.none': '还没有人。',
@@ -792,8 +800,19 @@
             } }), t('her.zoneHint'), 'zone' in staged)]
       const who = fields.some(Boolean) ? card(t('her.title'), '', ...fields) : null
       const cardNode = her.card === undefined ? null : characterCard()
+      const mood = typeof her.mirror === 'number' ? moodCard() : null
       const sides = view.gut ? sidesCard() : null
-      return [who, cardNode, ...(hostRows('her') || []), sides]
+      return [who, cardNode, mood, ...(hostRows('her') || []), sides]
+    }
+
+    function moodCard () {
+      const saved = view.her.mirror, staged = Object.hasOwn(draft.her, 'mirror')
+      return card(t('mood.title'), t('mood.hint'), slider({ text: t('mood.mirror'),
+        value: staged ? draft.her.mirror : saved, low: 0, high: 1, step: 0.05, plain: true, changed: staged,
+        key: 'her:mirror', put: item => {
+          if (item === saved) delete draft.her.mirror
+          else draft.her.mirror = item
+        } }))
     }
 
     function characterCard () {
