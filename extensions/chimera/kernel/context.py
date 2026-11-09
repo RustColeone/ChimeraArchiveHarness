@@ -32,11 +32,22 @@ class Suspend(Exception):
 
 
 class SeatUnavailable(Exception):
-    """This seat's models cannot be called (no key): another classmate takes the role."""
+    """This seat's models cannot be called (no key): another classmate takes the role. `rejected`: calls billed on
+    the way, whose answers could not be used (rows as `rejected_rows` gives them)."""
 
-    def __init__(self, seat: Seat, reason: str, stuck: bool = False):
+    def __init__(self, seat: Seat, reason: str, stuck: bool = False, rejected=()):
         super().__init__(reason)
         self.seat, self.reason, self.stuck = seat, reason, stuck  # stuck: she answered, but could not finish
+        self.rejected = list(rejected)
+
+
+def rejected_rows(calls) -> list[dict]:
+    """Calls billed whose answers could not be used (`ModelResult.rejected`, `ModelError.rejected`), as answers the
+    call rows take: so the session's cost is what was billed."""
+    return [{"provider": call.provider, "model": call.model, "input_tokens": call.input_tokens,
+             "output_tokens": call.output_tokens, "cached_input_tokens": call.cached_input_tokens,
+             "seconds": round(call.duration_s, 3), "cost": call.cost, "price": None, "fallbacks": [],
+             "rejected": call.reason} for call in calls]
 
 
 class Context:
@@ -130,11 +141,22 @@ class Context:
         """One call to `seat`'s models of `tier`. An answer that is not the requested JSON (or, with `tools`, whose
         calls do not fit them) is corrected once."""
         effort = seat.capped(effort)
+        wasted = f"{key}~rejected"  # calls billed for this key in tries that failed: kept, so a replay shows them
         if key in self.done:
             answer = self.done[key]
         else:
-            answer = await self._generate(seat, tier, messages, schema, schema_name, effort, max_tokens, timeout_s,
-                                          tools)
+            try:
+                answer = await self._generate(seat, tier, messages, schema, schema_name, effort, max_tokens,
+                                              timeout_s, tools)
+            except Exception as error:
+                rows = (error.rejected if isinstance(error, SeatUnavailable) else
+                        rejected_rows(getattr(error, "rejected", ())))
+                if rows:
+                    self.done[wasted] = [*(self.done.get(wasted) or []), *rows]
+                    await self.save()
+                    if step:
+                        self._show_calls(step, key, None, seat, tier, role, effort)
+                raise
             answer["seat"] = seat.persona  # whose answer it is, even when a replay is driven by whoever took over
             answer["effort"] = effort  # and how hard she thought (the one replaying may have another limit)
             # Priced by the core and kept with the answer: a later price list never rewrites what a past step cost.
@@ -143,11 +165,21 @@ class Context:
                 self.done[self.staffing] = seat.persona
             await self.save()
         if step:
-            author = self.team.seats.get(answer.get("seat", ""), seat)
-            self._calls.setdefault(step, {})[key] = self._call_row(answer, author, tier, role,
-                                                                   answer.get("effort", effort))
-            self.step(step, data={"calls": list(self._calls[step].values())})
+            self._show_calls(step, key, answer, seat, tier, role, effort)
         return answer
+
+    def _show_calls(self, step: str, key: str, answer: dict | None, seat: Seat, tier: str, role: str,
+                    effort: str) -> None:
+        """The step's call rows: the answer's (when there is one), after the calls billed on the way to it whose
+        answers could not be used (each marked `rejected` with why)."""
+        rows = self._calls.setdefault(step, {})
+        author = self.team.seats.get(answer.get("seat", ""), seat) if answer else seat
+        for number, wasted in enumerate([*(self.done.get(f"{key}~rejected") or []),
+                                         *((answer or {}).get("rejected") or [])]):
+            rows[f"{key}~rejected{number}"] = self._call_row(wasted, seat, tier, role, effort)
+        if answer is not None:
+            rows[key] = self._call_row(answer, author, tier, role, answer.get("effort", effort))
+        self.step(step, data={"calls": list(rows.values())})
 
     async def _generate(self, seat, tier, messages, schema, schema_name, effort, max_tokens, timeout_s,
                         tools=()) -> dict:
@@ -155,13 +187,15 @@ class Context:
                                effort=effort, max_tokens=max_tokens, timeout_s=timeout_s, persona=seat.persona
                                if seat.persona in self.present else None, tools=tuple(tools))
         started = time.monotonic()
+        wasted: list[dict] = []  # calls billed whose answers could not be used, the correction's included
         try:
             result = await self.session.models.generate(request)
         except ModelError as error:
+            wasted = rejected_rows(error.rejected)
             if error.kind in ("not_configured", "unavailable"):  # no key, or her provider is down: someone else
                 if error.kind == "not_configured":
                     self.team.mark_unavailable(seat.persona, _reason(str(error)))
-                raise SeatUnavailable(seat, _reason(str(error))) from None
+                raise SeatUnavailable(seat, _reason(str(error)), rejected=wasted) from None
             if error.kind != "invalid_output" or (schema is None and not tools):
                 raise
             # One correction, as the room does: say what was wrong and ask for the whole object again. An answer cut
@@ -183,10 +217,12 @@ class Context:
                     else max_tokens, timeout_s=timeout_s * (1.5 if cut else 1), persona=request.persona,
                     tools=request.tools))
             except ModelError as again:
+                wasted += rejected_rows(again.rejected)
                 if again.kind in ("not_configured", "unavailable", "invalid_output"):  # stuck: a classmate takes over
                     reason = ("her answer was cut off twice, too long" if "truncated" in str(again) else
                               "her answer could not be read" if again.kind == "invalid_output" else _reason(str(again)))
-                    raise SeatUnavailable(seat, reason, stuck=True) from None
+                    raise SeatUnavailable(seat, reason, stuck=True, rejected=wasted) from None
+                again.rejected = (*error.rejected, *again.rejected)  # (both tries' billed calls go with it)
                 raise
         return {"text": result.text, "data": result.data, "provider": result.provider, "model": result.model,
                 "input_tokens": result.input_tokens, "output_tokens": result.output_tokens,
@@ -198,14 +234,16 @@ class Context:
                 "fallbacks": list(result.fallbacks),
                 # priced by the core, cache hits at their price
                 "price": dict(result.price) if result.price else None,
-                "cost": result.cost}
+                "cost": result.cost,
+                "rejected": wasted + rejected_rows(result.rejected)}
 
     def _call_row(self, answer: dict, seat: Seat, tier: str, role: str, effort: str) -> dict:
         return {"seat": seat.persona, "role": role, "tier": seat.tier_of(tier), "effort": effort, "provider": answer["provider"],
                 "model": answer["model"], "family": self.family(answer["provider"]),
                 "input_tokens": answer["input_tokens"], "output_tokens": answer["output_tokens"],
                 "cached_input_tokens": answer.get("cached_input_tokens", 0), "seconds": answer["seconds"], "cost": self.cost(answer), "price": answer.get("price"),
-                "fallbacks": answer.get("fallbacks", [])}
+                "fallbacks": answer.get("fallbacks", []), **({"rejected": answer["rejected"]}
+                                                             if isinstance(answer.get("rejected"), str) else {})}
 
     def crew(self) -> list[Seat]:
         """The classmates who came along to the Classroom for this task (besides the one who brought you, who leads and

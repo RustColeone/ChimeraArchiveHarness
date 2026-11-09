@@ -644,3 +644,197 @@ class SettleToolMessagesTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FlatPrices:
+    """A price book with one price for every model: $1,000 a million tokens in and out."""
+
+    @staticmethod
+    def stale():
+        return False
+
+    @staticmethod
+    def price(provider, model):
+        return {"input": 1000.0, "output": 1000.0}
+
+    from core.providers.prices import PriceBook as _Book
+    cost = staticmethod(_Book.cost)
+
+
+class RejectedCallTests(unittest.IsolatedAsyncioTestCase):
+    """A call whose answer is not used was billed all the same: the core counts it and keeps what it said, for
+    every provider alike (the registry, not an adapter, does it)."""
+
+    def providers(self, *adapters):
+        records = []
+        providers = Providers({}, {"default": [{"provider": f"p{index}", "model": f"m{index}"}
+                                               for index, _ in enumerate(adapters)]},
+                              adapters={f"p{index}": adapter for index, adapter in enumerate(adapters)},
+                              record=lambda event, **fields: records.append((event, fields)))
+        providers.prices = FlatPrices()
+        return providers, records
+
+    async def test_a_rejected_answer_is_counted_with_the_one_that_answered_and_kept_in_the_audit(self):
+        providers, records = self.providers(FakeAdapter(["I'll answer in a moment."]),
+                                            FakeAdapter(['{"answer": "ok"}']))
+        result = await providers.generate(REQUEST)
+        self.assertEqual((result.provider, result.cost), ("p1", 0.015))
+        self.assertEqual(len(result.rejected), 1)
+        rejected = result.rejected[0]
+        self.assertEqual((rejected.provider, rejected.model, rejected.input_tokens, rejected.output_tokens,
+                          rejected.cost), ("p0", "m0", 10, 5, 0.015))
+        self.assertIn("valid JSON", rejected.reason)
+        audit = next(fields for event, fields in records if event == "provider_rejected")
+        self.assertEqual((audit["text"], audit["input_tokens"], audit["cost"]),
+                         ("I'll answer in a moment.", 10, 0.015))
+
+    async def test_a_request_that_fails_carries_what_its_rejected_calls_cost(self):
+        providers, _ = self.providers(FakeAdapter(["no"]), FakeAdapter([AdapterResult('{"answer": "cu', 7, 3,
+                                                                                       truncated=True)]))
+        with self.assertRaises(ModelError) as raised:
+            await providers.generate(REQUEST)
+        self.assertEqual(raised.exception.kind, "invalid_output")
+        self.assertEqual([(call.provider, call.cost) for call in raised.exception.rejected],
+                         [("p0", 0.015), ("p1", 0.01)])
+        self.assertEqual(raised.exception.rejected[1].reason, "answer cut off at the token limit")
+        providers, _ = self.providers(FakeAdapter([ConnectionError("down")]))
+        with self.assertRaises(ModelError) as raised:
+            await providers.generate(REQUEST)
+        self.assertEqual((raised.exception.kind, raised.exception.rejected), ("unavailable", ()))  # nothing billed
+
+    async def test_a_rejected_tool_answer_keeps_its_calls(self):
+        request = ModelRequest([{"role": "user", "content": "go"}], tools=TOOLS)
+        providers, records = self.providers(ToolAdapter([("", [("rm", {"path": "/"})]), ("", [("run", {"command": "ls"})])]))
+        providers._profiles["default"] = [{"provider": "p0", "model": "m0"}, {"provider": "p0", "model": "m0b"}]
+        result = await providers.generate(request)
+        self.assertEqual((result.tool_calls[0].name, len(result.rejected)), ("run", 1))
+        audit = next(fields for event, fields in records if event == "provider_rejected")
+        self.assertEqual(json.loads(audit["calls"]), [{"name": "rm", "arguments": {"path": "/"}}])
+
+    async def test_words_before_the_object_do_not_lose_the_answer(self):
+        for text in ('I\'ll read the file first.\n{"answer": "ok"}',
+                     'Here it is:\n```json\n{"answer": "ok"}\n```\nDone.'):
+            providers, _ = self.providers(FakeAdapter([text]))
+            result = await providers.generate(REQUEST)
+            self.assertEqual((result.data, result.rejected), ({"answer": "ok"}, ()), text)
+        providers, _ = self.providers(FakeAdapter(['Let me see. {"answer": 1}']))
+        with self.assertRaises(ModelError):
+            await providers.generate(REQUEST)  # an object that does not fit is still no answer
+
+
+def claude_client(*responses):
+    """A fake Anthropic client: answers in turn (each a list of blocks, or an exception); `sent` keeps each request."""
+    sent, answers = [], list(responses)
+
+    async def create(**params):
+        sent.append(json.loads(json.dumps(params, default=str)))
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return SimpleNamespace(content=answer, stop_reason="tool_use",
+                               usage=SimpleNamespace(input_tokens=20, output_tokens=8))
+    client = SimpleNamespace(with_options=lambda **options: SimpleNamespace(messages=SimpleNamespace(create=create)))
+    return client, sent
+
+
+def block(kind, **fields):
+    return SimpleNamespace(type=kind, **fields)
+
+
+DOTTED = (ToolSpec("files.read", "Read a file.", {"type": "object", "properties": {"path": {"type": "string"}},
+                                                  "required": ["path"]}),)
+
+
+class ClaudeToolTests(unittest.IsolatedAsyncioTestCase):
+    """Claude calls tools as Anthropic's API has it: tool_use blocks out, tool_result blocks back, and her own answer
+    (thinking first) sent back as she wrote it while the engine leaves it as it was."""
+
+    async def test_her_calls_come_back_under_the_tools_own_names_with_her_whole_answer(self):
+        client, sent = claude_client([block("thinking", thinking="The README first.", signature="sig1"),
+                                      block("text", text="Reading."),
+                                      block("tool_use", id="toolu_1", name="files__read", input={"path": "README.md"})])
+        adapter = Anthropic({"adaptive_thinking": True}, client)
+        self.assertTrue(adapter.supports_tools)
+        result = await adapter.complete("claude", [{"role": "system", "content": "sys"},
+                                                   {"role": "user", "content": "go"}], None, "turn", "high", 100, 30,
+                                        tools=DOTTED)
+        request = sent[0]
+        self.assertEqual(request["tools"], [{"name": "files__read", "description": "Read a file.",
+                                             "input_schema": dict(DOTTED[0].parameters)}])
+        self.assertNotIn("tool_choice", request)  # (Opus 5.5 refuses a forced choice; auto is the default)
+        self.assertEqual((request["system"], request["messages"]), ("sys", [{"role": "user", "content": [
+            {"type": "text", "text": "go"}]}]))
+        self.assertNotIn("extra_headers", request)  # (nothing of hers to send back yet)
+        self.assertEqual(result.tool_calls, (ToolCall("toolu_1", "files.read", {"path": "README.md"}),))
+        self.assertEqual((result.text, result.schema_mode), ("Reading.", "tools"))
+        self.assertEqual(result.replay["content"][0], {"type": "thinking", "thinking": "The README first.",
+                                                       "signature": "sig1"})
+
+    def history(self, replay, arguments=None):
+        return [{"role": "system", "content": "sys"}, {"role": "user", "content": "go"},
+                {"role": "assistant", "content": "Reading.", "replay": replay,
+                 "tool_calls": [{"id": "toolu_1", "name": "files.read",
+                                 "arguments": arguments or {"path": "README.md"}}]},
+                {"role": "tool", "tool_call_id": "toolu_1", "content": "# Hello"},
+                {"role": "user", "content": "Keep going."}]
+
+    REPLAY = {"content": [{"type": "thinking", "thinking": "The README first.", "signature": "sig1"},
+                          {"type": "text", "text": "Reading."},
+                          {"type": "tool_use", "id": "toolu_1", "name": "files__read", "input": {"path": "README.md"}}]}
+
+    async def test_her_answer_goes_back_as_she_wrote_it_and_the_results_after_it(self):
+        client, sent = claude_client([block("text", text="Done.")])
+        await Anthropic({"adaptive_thinking": True}, client).complete(
+            "claude", self.history(self.REPLAY), None, "turn", "high", 100, 30, tools=DOTTED)
+        request = sent[0]
+        self.assertEqual(request["messages"][1], {"role": "assistant", "content": self.REPLAY["content"]})
+        self.assertEqual(request["messages"][2], {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "toolu_1", "content": "# Hello"},
+            {"type": "text", "text": "Keep going."}]})  # (the club's word after the results, in the same message)
+        # Thinking that may be bound to a past an engine shortened since: dropped by the API, not refused.
+        self.assertEqual(request["thinking"]["block_binding"], {"prefix_mismatch_behavior": "drop_block"})
+        self.assertEqual(request["extra_headers"], {"anthropic-beta": "thinking-binding-controls-2026-08-01"})
+
+    async def test_an_answer_the_engine_shortened_goes_back_without_her_thinking(self):
+        client, sent = claude_client([block("text", text="Done.")])
+        await Anthropic({"adaptive_thinking": True}, client).complete(
+            "claude", self.history(self.REPLAY, {"path": "README.md", "note": "shortened"}), None, "turn", "high",
+            100, 30, tools=DOTTED)
+        self.assertEqual(sent[0]["messages"][1], {"role": "assistant", "content": [
+            {"type": "text", "text": "Reading."},
+            {"type": "tool_use", "id": "toolu_1", "name": "files__read",
+             "input": {"path": "README.md", "note": "shortened"}}]})
+
+    async def test_where_the_beta_is_refused_her_thinking_stays_out_from_then_on(self):
+        class Refused(Exception):
+            status_code = 400
+
+        client, sent = claude_client(Refused("block_binding: Extra inputs are not permitted"),
+                                     [block("text", text="Done.")], [block("text", text="Again.")])
+        adapter = Anthropic({"adaptive_thinking": True}, client)
+        result = await adapter.complete("claude", self.history(self.REPLAY), None, "turn", "high", 100, 30,
+                                        tools=DOTTED)
+        self.assertEqual(result.text, "Done.")
+        self.assertEqual([block["type"] for block in sent[1]["messages"][1]["content"]], ["text", "tool_use"])
+        self.assertNotIn("extra_headers", sent[1])
+        self.assertEqual(sent[1]["thinking"], {"type": "adaptive"})
+        await adapter.complete("claude", self.history(self.REPLAY), None, "turn", "high", 100, 30, tools=DOTTED)
+        self.assertNotIn("extra_headers", sent[2])  # remembered
+        other = Exception("overloaded")
+        client, _ = claude_client(other)
+        with self.assertRaises(Exception):  # any other failure is the registry's, as ever
+            await Anthropic({"adaptive_thinking": True}, client).complete(
+                "claude", self.history(self.REPLAY), None, "turn", "high", 100, 30, tools=DOTTED)
+
+    async def test_without_tools_a_schema_is_still_asked_as_before(self):
+        client, sent = claude_client([block("text", text='{"answer": "x"}')])
+        result = await Anthropic({}, client).complete("claude", REQUEST.messages, SCHEMA, "reply", "low", 50, 30)
+        self.assertEqual((sent[0]["output_config"]["format"]["schema"], result.schema_mode), (SCHEMA, "native"))
+        self.assertNotIn("tools", sent[0])
+
+    async def test_the_registry_lets_claude_call_tools_in_place(self):
+        client, _ = claude_client([block("tool_use", id="toolu_2", name="run", input={"command": "ls"})])
+        providers = Providers({"claude": {"kind": "anthropic"}}, {"default": [{"provider": "claude", "model": "c"}]},
+                              adapters={"claude": Anthropic({}, client)})
+        result = await providers.generate(ModelRequest([{"role": "user", "content": "go"}], tools=TOOLS))
+        self.assertEqual((result.tool_calls[0].arguments, result.replay["provider"]), ({"command": "ls"}, "claude"))

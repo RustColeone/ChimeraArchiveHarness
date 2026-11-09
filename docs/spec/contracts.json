@@ -1,7 +1,7 @@
 {
- "version": "2.1",
+ "version": "2.2",
  "constants": {
-  "CONTRACTS_VERSION": "2.1",
+  "CONTRACTS_VERSION": "2.2",
   "IMPULSE": "⟨speak-up⟩ ",
   "LEVELS": {
    "member": 0,
@@ -749,7 +749,7 @@
    ]
   },
   "ModelError": {
-   "doc": "A model call failed. `kind` is one of: `unavailable` (no candidate answered), `invalid_output` (the answer did not match the schema or was truncated), `budget_exceeded`, `not_configured`, and (for a request with `tools`) `tools_unsupported`: the next candidate in the profile cannot call tools, so the request should be asked again in a form without them (the engine's JSON turns), where that candidate and those after it count.",
+   "doc": "A model call failed. `kind` is one of: `unavailable` (no candidate answered), `invalid_output` (the answer did not match the schema or was truncated), `budget_exceeded`, `not_configured`, and (for a request with `tools`) `tools_unsupported`: the next candidate in the profile cannot call tools, so the request should be asked again in a form without them (the engine's JSON turns), where that candidate and those after it count. `rejected`: the calls made and billed before it failed, whose answers could not be used.",
    "error": true,
    "fields": [
     {
@@ -817,7 +817,7 @@
    ]
   },
   "ModelResult": {
-   "doc": "ModelResult(text: 'str', data: 'Any' = None, provider: 'str' = '', model: 'str' = '', input_tokens: 'int' = 0, output_tokens: 'int' = 0, duration_s: 'float' = 0.0, schema_mode: 'str' = '', fallbacks: 'tuple[str, ...]' = (), cached_input_tokens: 'int' = 0, tool_calls: 'tuple[ToolCall, ...]' = (), replay: 'Mapping[str, Any] | None' = None, price: 'Mapping[str, Any] | None' = None, cost: 'float | None' = None)",
+   "doc": "ModelResult(text: 'str', data: 'Any' = None, provider: 'str' = '', model: 'str' = '', input_tokens: 'int' = 0, output_tokens: 'int' = 0, duration_s: 'float' = 0.0, schema_mode: 'str' = '', fallbacks: 'tuple[str, ...]' = (), cached_input_tokens: 'int' = 0, tool_calls: 'tuple[ToolCall, ...]' = (), replay: 'Mapping[str, Any] | None' = None, price: 'Mapping[str, Any] | None' = None, cost: 'float | None' = None, rejected: 'tuple[RejectedCall, ...]' = ())",
    "fields": [
     {
      "name": "text",
@@ -887,6 +887,11 @@
      "name": "cost",
      "type": "float | none",
      "default": null
+    },
+    {
+     "name": "rejected",
+     "type": "list[RejectedCall]",
+     "default": "()"
     }
    ]
   },
@@ -1145,6 +1150,48 @@
      "name": "personas",
      "type": "list[str]",
      "default": "()"
+    }
+   ]
+  },
+  "RejectedCall": {
+   "doc": "A call that was made and billed, but whose answer could not be used (not the requested JSON, calls that did not fit the tools, cut off at the token limit). The request went on to the next candidate, or failed. `cost` is in dollars at the core's price (None when no price is known).",
+   "fields": [
+    {
+     "name": "provider",
+     "type": "str"
+    },
+    {
+     "name": "model",
+     "type": "str"
+    },
+    {
+     "name": "reason",
+     "type": "str"
+    },
+    {
+     "name": "input_tokens",
+     "type": "int",
+     "default": 0
+    },
+    {
+     "name": "output_tokens",
+     "type": "int",
+     "default": 0
+    },
+    {
+     "name": "cached_input_tokens",
+     "type": "int",
+     "default": 0
+    },
+    {
+     "name": "duration_s",
+     "type": "float",
+     "default": 0.0
+    },
+    {
+     "name": "cost",
+     "type": "float | none",
+     "default": null
     }
    ]
   },

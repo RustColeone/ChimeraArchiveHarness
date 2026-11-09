@@ -51,7 +51,7 @@
 #     cheap: [deepseek/deepseek-flash]
 #     effort: high                                       # the most she thinks, whatever turn/review_effort ask
 #     tool_calls: true                                   # work through the API's own function calls (OpenAI-
-#                                                        # compatible providers), not one JSON object per turn
+#                                                        # compatible providers, Claude), not one JSON object per turn
 #   pro:
 #     name: Pro-chan
 #     family: deepseek

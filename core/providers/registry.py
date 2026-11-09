@@ -11,12 +11,13 @@ from typing import Any, Callable, Mapping, Sequence
 
 import jsonschema
 
-from contracts import ModelError, ModelRequest, ModelResult
+from contracts import ModelError, ModelRequest, ModelResult, RejectedCall
 from core.providers.adapters import ADAPTERS, NotConfigured, api_key, load_images
 
 FENCE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.S)
 RETRY_DELAYS_S = (2.0, 8.0)  # a momentary failure: the same model again after these pauses, then the next candidate
 MAX_RETRY_AFTER_S = 30.0
+REJECTED_TEXT = 4000  # characters of a rejected answer kept in the audit log, so why it failed can be read
 
 
 def transient(error: Exception) -> bool:
@@ -103,9 +104,10 @@ def parse_json(text: str, schema: Mapping[str, Any]) -> Any:
     try:
         values = [json.loads(body)]
     except json.JSONDecodeError as error:
-        # A complete object followed by more (a second object, a sentence): every object in it is a candidate, and
-        # the last one that matches the schema is the answer (a model that writes two usually corrects the first).
-        values = _objects(body) if error.msg == "Extra data" else []
+        # A complete object followed by more (a second object, a sentence), or words before it ("I'll read the file
+        # first." and then the object, a fenced block among them): every object in it is a candidate, and the last
+        # one that matches the schema is the answer (a model that writes two usually corrects the first).
+        values = _objects(body) if error.msg in ("Extra data", "Expecting value") else []
         if not values:
             raise ModelError("invalid_output", f"The model did not return valid JSON: {error.msg}", text) from None
     problem = None
@@ -341,6 +343,7 @@ class Providers:
         failures: list[str] = []
         skipped: list[str] = []  # why each candidate before the one that answered did not (ModelResult.fallbacks)
         invalid: ModelError | None = None
+        spent: list[RejectedCall] = []  # calls billed whose answers could not be used
         images = await asyncio.to_thread(load_images, request.images) if request.images else []
         attempts = [(candidate, bool(images) and self._sees(candidate)) for candidate in candidates]
         # Candidates that can see the images go first; the others get a note instead of the images.
@@ -410,26 +413,34 @@ class Providers:
                     invalid = error
                     failures.append(f"{provider}/{model}: invalid output")
                     rejected = "blank answer (not JSON)" if not result.text.strip() else str(error)[:200]
-            if rejected:
-                # The call itself worked; its answer is not used, so say why (a fallback is never silent).
-                skipped.append(f"{provider}/{model}: {rejected}")
-                self._record("provider_rejected", profile=name, provider=provider, model=model, reason=rejected,
-                             duration_s=duration, output_tokens=result.output_tokens)
-                continue
             price = self.prices.price(provider, model) if self.prices is not None else None
+            cost = result.cost if result.cost is not None else self.prices.cost(
+                price, result.input_tokens, result.output_tokens, result.cached_input_tokens) if price else None
+            if rejected:
+                # The call itself worked and was billed; its answer is not used, so say why (a fallback is never
+                # silent), keep what it said, and count what it cost (`rejected` on the result or the error).
+                skipped.append(f"{provider}/{model}: {rejected}")
+                calls = [{"name": call.name, "arguments": call.arguments} for call in result.tool_calls]
+                self._record("provider_rejected", profile=name, provider=provider, model=model, reason=rejected,
+                             duration_s=duration, input_tokens=result.input_tokens,
+                             cached_input_tokens=result.cached_input_tokens, output_tokens=result.output_tokens,
+                             cost=cost, text=(result.text or "")[:REJECTED_TEXT],
+                             **({"calls": json.dumps(calls, ensure_ascii=False, default=str)[:REJECTED_TEXT]}
+                                if calls else {}))
+                spent.append(RejectedCall(provider, model, rejected, result.input_tokens, result.output_tokens,
+                                          result.cached_input_tokens, duration, cost))
+                continue
             return ModelResult(text=result.text, data=data, provider=provider, model=model,
                                input_tokens=result.input_tokens, output_tokens=result.output_tokens,
                                duration_s=duration, schema_mode=result.schema_mode, fallbacks=tuple(skipped),
                                cached_input_tokens=result.cached_input_tokens,
                                tool_calls=tuple(result.tool_calls),
                                replay={"provider": provider, "fields": dict(result.replay)} if result.replay else None,
-                               price=price, cost=result.cost if result.cost is not None else
-                               self.prices.cost(price, result.input_tokens, result.output_tokens,
-                                                result.cached_input_tokens) if price else None)
+                               price=price, cost=cost, rejected=tuple(spent))
         if unsupported:
             raise ModelError("tools_unsupported", f"{unsupported} cannot call tools" + (
-                f"; before it: {'; '.join(failures)}" if failures else ""))
+                f"; before it: {'; '.join(failures)}" if failures else ""), rejected=spent)
         if invalid is not None:
-            raise invalid
+            raise ModelError(invalid.kind, str(invalid), invalid.raw_text, rejected=spent)
         kind = "not_configured" if failures and all("not configured" in item for item in failures) else "unavailable"
-        raise ModelError(kind, "No model candidate answered: " + "; ".join(failures))
+        raise ModelError(kind, "No model candidate answered: " + "; ".join(failures), rejected=spent)

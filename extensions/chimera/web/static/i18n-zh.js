@@ -157,6 +157,7 @@ window.I18N_ZH = {
  "Everyone's spending each day, all students and agents together. At the total, work stops and asks you (0: no total).": "全体学生与智能体的每日消耗合计。达到总额时停止工作并询问你（0：不设总额）",
  "Exact arguments": "精确参数",
  "Fell back: {0}": "回退：{0}",
+ "Not used, billed all the same: {0}": "未被采用，照常计费：{0}",
  "Files": "文件",
  "Find a session": "查找委托",
  "Find a session…": "查找委托…",

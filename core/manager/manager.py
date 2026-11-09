@@ -799,13 +799,26 @@ class Manager:
         return [request_from_dict(event.data["request"]) for event in events]
 
     # ---- models -----------------------------------------------------------------------------------
+    def _count_rejected(self, run_id: str, persona: str | None, rejected) -> None:
+        """Calls billed whose answers could not be used (`ModelResult.rejected`, `ModelError.rejected`): in the run's
+        usage and on her day like any other, so what a run cost is what was billed."""
+        for call in rejected:
+            self._add_usage(run_id, rejected_calls=1, input_tokens=call.input_tokens,
+                            output_tokens=call.output_tokens, cost=call.cost or 0.0)
+            self.stamina.record(persona, call.provider, call.cost)
+
     async def generate(self, run_id: str, request: ModelRequest, profile: str, *, watcher: bool = False) -> ModelResult:
         if watcher:  # a watcher's call: counted in the run's usage, outside its budget, and no one's answer
-            result = await self.providers.generate(request, profile)
+            persona = request.persona if request.persona in self.personas else None
+            try:
+                result = await self.providers.generate(request, profile)
+            except ModelError as error:
+                self._count_rejected(run_id, persona, error.rejected)
+                raise
+            self._count_rejected(run_id, persona, result.rejected)
             self._add_usage(run_id, watcher_calls=1, input_tokens=result.input_tokens,
                             output_tokens=result.output_tokens, cost=result.cost or 0.0)
-            self.stamina.record(request.persona if request.persona in self.personas else None, result.provider,
-                                result.cost)  # (counted on her day, never stopped)
+            self.stamina.record(persona, result.provider, result.cost)  # (counted on her day, never stopped)
             self.audit.record("model_call", run=run_id, profile=profile, provider=result.provider, model=result.model,
                               duration_s=result.duration_s, input_tokens=result.input_tokens,
                               output_tokens=result.output_tokens, watcher=True)
@@ -817,19 +830,21 @@ class Manager:
         persona = self._model_persona(record, request, profile)
         await self._stamina_check(record, persona)
         self._add_usage(run_id, model_calls=1)
+        whose = persona or (request.persona if request.persona in self.personas else None)
         try:
             result = await self.providers.generate(request, profile,
                                                    first=self.model_choices.first(record.address, persona))
         except ModelError as error:
+            self._count_rejected(run_id, whose, error.rejected)
             if error.kind == "tools_unsupported":  # the engine asks this step again at once, without tools:
                 self._add_usage(run_id, model_calls=-1)  # one step stays one model call
             raise
         if persona:
             self._answered.setdefault(run_id, {})[persona] = result
+        self._count_rejected(run_id, whose, result.rejected)
         self._add_usage(run_id, input_tokens=result.input_tokens, output_tokens=result.output_tokens,
                         cost=result.cost or 0.0)
-        self.stamina.record(persona or (request.persona if request.persona in self.personas else None),
-                            result.provider, result.cost)
+        self.stamina.record(whose, result.provider, result.cost)
         self.audit.record("model_call", run=run_id, profile=profile, provider=result.provider, model=result.model,
                           duration_s=result.duration_s, input_tokens=result.input_tokens,
                           output_tokens=result.output_tokens)

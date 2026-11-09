@@ -2218,6 +2218,7 @@
         if (call.price) notes.push(`$${call.price.input} in / $${call.price.output} out per 1M tokens, ` +
           (call.price.source === "config" ? "from your config" : `${call.price.slug} on Artificial Analysis, ${call.price.as_of}`));
         if (call.fallbacks?.length) notes.push(`Fell back: ${call.fallbacks.join("; ")}`);
+        if (call.rejected) { notes.push(`Not used, billed all the same: ${call.rejected}`); row.classList.add("rejected"); }
         if (notes.length) row.title = notes.join("\n");
         table.append(row);
       }

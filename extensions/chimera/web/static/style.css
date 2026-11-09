@@ -365,6 +365,7 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .ledger th { color: var(--muted); font-weight: 700; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
 .ledger td.num, .ledger th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .ledger tr.total td { font-weight: 800; border-bottom: 0; }
+.ledger tr.rejected td { opacity: 0.6; }
 .ledger .model { font-family: var(--mono); font-size: .74rem; color: var(--muted); }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; font-size: .84rem; margin: 6px 0 14px; }
 .facts dt { color: var(--muted); font-weight: 700; }

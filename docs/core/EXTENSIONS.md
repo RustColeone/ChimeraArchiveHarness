@@ -158,7 +158,12 @@ used (blank, not the requested JSON, cut off at the token limit). A transient fa
 dropped connection) is asked again after 2 and 8 seconds, or after the provider's `Retry-After` (at most 30), before
 the next candidate; each retry is `provider_retry` in the audit log. Refusals such as no balance (402) move on at once. A switch is never silent: the result's
 `fallbacks` say why each earlier candidate did not answer, the audit log records `provider_failed` or
-`provider_rejected` with the reason, and the persona's message carries it (`reply.data["fallback"]`).
+`provider_rejected` with the reason, and the persona's message carries it (`reply.data["fallback"]`). A rejected
+answer was billed all the same: `provider_rejected` keeps its tokens, cost and what it said (its first 4,000
+characters, and its calls), the result (`ModelResult.rejected`) or the error (`ModelError.rejected`) carries each
+such call (`RejectedCall`: provider, model, reason, tokens, cost), and the core counts them in the run's usage
+(`rejected_calls`, tokens, cost) and on the persona's day, whichever provider made them. Words around the JSON
+object do not lose the answer: every object in the text is a candidate, and the last that matches the schema is it.
 `inline_history: true` (on for DeepSeek) sends a JSON request's earlier turns written into one message,
 because DeepSeek's JSON mode often answers blank after an assistant turn; a blank JSON-mode answer is
 asked once more. `schema_mode` says how an OpenAI-compatible provider is held to the requested JSON: `native`
@@ -170,8 +175,12 @@ messages with `tool_call_id`). A replay reaches only the provider that wrote it 
 never another provider after a fallback), and never overwrites the message's own fields. Before any adapter
 sees them, the core places each call's `tool` message right after it, answers a call left without one "did not
 run", and drops a `tool` message that answers no call, because the APIs refuse such a request. Only adapters with
-`supports_tools` take tools (the OpenAI-compatible one, which maps dotted names such as `web.search` to what the
-API allows and back). Candidates are tried in order while they can call tools (one without a key is passed over,
+`supports_tools` take tools: the OpenAI-compatible one and Anthropic's (Gemini's not yet), each mapping dotted names
+such as `web.search` to what its API allows and back. Anthropic's sends Claude's answer back as she wrote it
+(thinking, words and calls, its `replay`) while the engine leaves her words and calls as they were, and as words and
+calls alone once an engine has shortened them; because a shortened earlier turn leaves her later thinking bound to a
+past the request no longer shows, it asks the API to drop such thinking rather than refuse the request (the beta
+`thinking-binding-controls-2026-08-01`; where that is refused, her earlier thinking stays out). Candidates are tried in order while they can call tools (one without a key is passed over,
 as ever): the first that cannot ends the request with `ModelError("tools_unsupported")`, rather than letting
 a later candidate answer in its place, so the engine can ask that step in its JSON form; that attempt reached
 no provider for its own sake and does not count against the run's `model_calls`. An extension may ship default

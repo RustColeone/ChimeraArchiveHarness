@@ -64,6 +64,22 @@ class ModelRequest:
 
 
 @dataclass(frozen=True)
+class RejectedCall:
+    """A call that was made and billed, but whose answer could not be used (not the requested JSON, calls that did not
+    fit the tools, cut off at the token limit). The request went on to the next candidate, or failed. `cost` is in
+    dollars at the core's price (None when no price is known)."""
+
+    provider: str
+    model: str
+    reason: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached_input_tokens: int = 0
+    duration_s: float = 0.0
+    cost: float | None = None
+
+
+@dataclass(frozen=True)
 class ModelResult:
     text: str
     data: Any = None
@@ -88,6 +104,9 @@ class ModelResult:
     # None when no price is known.
     price: Mapping[str, Any] | None = None
     cost: float | None = None
+    # The calls tried before this answer whose answers could not be used: billed all the same, so count them too.
+    # `cost` above is this answer's alone.
+    rejected: tuple[RejectedCall, ...] = ()
 
 
 class ModelError(RuntimeError):
@@ -97,12 +116,14 @@ class ModelError(RuntimeError):
     match the schema or was truncated), `budget_exceeded`, `not_configured`, and (for a request with `tools`)
     `tools_unsupported`: the next candidate in the profile cannot call tools, so the request should be asked again
     in a form without them (the engine's JSON turns), where that candidate and those after it count.
+    `rejected`: the calls made and billed before it failed, whose answers could not be used.
     """
 
-    def __init__(self, kind: str, message: str, raw_text: str = ""):
+    def __init__(self, kind: str, message: str, raw_text: str = "", rejected: Sequence[RejectedCall] = ()):
         super().__init__(message)
         self.kind = kind
         self.raw_text = raw_text
+        self.rejected = tuple(rejected)
 
 
 class Models(Protocol):

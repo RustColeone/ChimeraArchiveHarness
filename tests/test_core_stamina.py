@@ -6,7 +6,7 @@ import time
 import unittest
 from pathlib import Path
 
-from contracts import Address, ModelRequest, Request, Sender
+from contracts import Address, ModelError, ModelRequest, Request, Sender
 from core.manager.handles import WatcherModels
 from tests.core_support import FakeAdapter, iface, settle, start_core
 
@@ -82,6 +82,21 @@ class StaminaTests(unittest.IsolatedAsyncioTestCase):
         before = stamina.spent_today("p")
         models = WatcherModels(self.core.manager, self.run_of("spend 1").id, self.core.manager.personas["p"])
         await models.generate(ModelRequest([{"role": "user", "content": "how did that go?"}]))
+        self.assertAlmostEqual(stamina.spent_today("p"), before + 0.015)
+
+    async def test_a_call_whose_answer_was_not_used_is_counted_all_the_same(self):
+        await self.start({})
+        await self.chat.say("spend 1")
+        await settle(self.core)
+        run = self.run_of("spend 1")
+        stamina, before = self.core.manager.stamina, self.core.manager.stamina.spent_today("p")
+        schema = {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]}
+        with self.assertRaises(ModelError):  # the fake answers "ok": no JSON, so the answer is not used
+            await self.core.manager.generate(run.id, ModelRequest([{"role": "user", "content": "json please"}],
+                                                                  output_schema=schema, persona="p"), "default")
+        usage = self.core.tank.run(run.id).usage
+        self.assertEqual(usage["rejected_calls"], 1)
+        self.assertAlmostEqual(usage["cost"], run.usage["cost"] + 0.015)
         self.assertAlmostEqual(stamina.spent_today("p"), before + 0.015)
 
     async def test_a_run_at_her_daily_allowance_waits_and_carries_on_when_you_let_her(self):

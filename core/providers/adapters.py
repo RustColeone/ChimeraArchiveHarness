@@ -339,10 +339,88 @@ def claude_schema(value: Any) -> Any:
     return value
 
 
+THINKING_BLOCKS = ("thinking", "redacted_thinking")
+# Claude's thinking is bound to the conversation before it: the engines shorten older turns (in blocks, to keep caches
+# warm), which leaves a later thinking block bound to a past the request no longer shows. With this beta the API drops
+# such a block (and those after it) and answers, rather than refusing the request.
+THINKING_BINDING_BETA = "thinking-binding-controls-2026-08-01"
+
+
+def claude_block(block: Any) -> dict:
+    """One block of Claude's answer as the API takes it back: only the fields an input block has."""
+    kind = getattr(block, "type", None)
+    if kind == "thinking":
+        return {"type": "thinking", "thinking": block.thinking, "signature": block.signature}
+    if kind == "redacted_thinking":
+        return {"type": "redacted_thinking", "data": block.data}
+    if kind == "text":
+        return {"type": "text", "text": block.text}
+    if kind == "tool_use":
+        return {"type": "tool_use", "id": block.id, "name": block.name, "input": block.input}
+    return block.model_dump(mode="json", exclude_none=True) if hasattr(block, "model_dump") else dict(block)
+
+
+def claude_calls(content: Sequence[Mapping[str, Any]]) -> list[tuple[str, str, Any]]:
+    return [(block.get("id"), block.get("name"), block.get("input")) for block in content
+            if block.get("type") == "tool_use"]
+
+
+def claude_messages(messages: Sequence[Mapping[str, Any]], names: Mapping[str, str],
+                    thinking: bool = True) -> list[dict]:
+    """The core's tool-call messages in Anthropic's form. An assistant message goes back as Claude wrote it (her
+    `replay`: thinking, words and calls in their order) while its words and calls are unchanged; one an engine has
+    shortened goes as its words and calls alone. `tool` messages become `tool_result` blocks in one user message, and
+    a user message after them joins it as a text block after the results (Anthropic's order). `thinking` False: no
+    thinking block goes back."""
+    result: list[dict] = []
+
+    def user(blocks: list[dict]) -> None:
+        if result and result[-1]["role"] == "user":
+            result[-1]["content"].extend(blocks)
+        else:
+            result.append({"role": "user", "content": blocks})
+
+    for message in messages:
+        role = message.get("role")
+        if role == "system":
+            continue
+        if role == "tool":
+            user([{"type": "tool_result", "tool_use_id": str(message.get("tool_call_id")),
+                   "content": str(message.get("content") or "") or "(no output)"}])
+        elif role == "assistant":
+            text = str(message.get("content") or "")
+            calls = [(str(call["id"]), names.get(call["name"]) or function_name(call["name"]),
+                      dict(call.get("arguments") or {})) for call in message.get("tool_calls") or ()]
+            replayed = [dict(block) for block in (dict(message.get("replay") or {}).get("content") or ())
+                        if isinstance(block, Mapping)]
+            words = "\n".join(str(block.get("text") or "") for block in replayed if block.get("type") == "text")
+            if replayed and claude_calls(replayed) == calls and words == text:
+                content = [block for block in replayed if thinking or block.get("type") not in THINKING_BLOCKS]
+            else:
+                content = [*([{"type": "text", "text": text}] if text.strip() else []),
+                           *({"type": "tool_use", "id": id, "name": name, "input": arguments}
+                             for id, name, arguments in calls)]
+            result.append({"role": "assistant", "content": content or [{"type": "text", "text": "(nothing)"}]})
+        else:
+            user([{"type": "text", "text": str(message.get("content") or "") or "(empty)"}])
+    return result
+
+
+def without_thinking(messages: Sequence[Mapping[str, Any]]) -> list[dict]:
+    return [{**message, "content": [block for block in message["content"] if block.get("type") not in THINKING_BLOCKS]
+             or [{"type": "text", "text": "(nothing)"}]} if isinstance(message.get("content"), list) else dict(message)
+            for message in messages]
+
+
 class Anthropic:
+    """Anthropic's Messages API, with Claude's own tool calls (tool_use blocks, results as tool_result blocks)."""
+
+    supports_tools = True
+
     def __init__(self, settings: Mapping[str, Any], client: Any = None):
         self.settings = dict(settings)
         self._client = client
+        self._binding = True  # the thinking-binding beta is taken (set False when the endpoint refuses it)
 
     def client(self):
         if self._client is None:
@@ -351,23 +429,34 @@ class Anthropic:
         return self._client
 
     async def complete(self, model, messages, schema, schema_name, effort, max_tokens, timeout_s,
-                       images: Sequence[Image] = ()) -> AdapterResult:
-        native = bool(schema) and closed(schema)
-        if schema and not native:
+                       images: Sequence[Image] = (), tools=()) -> AdapterResult:
+        native = bool(schema) and not tools and closed(schema)
+        if schema and not tools and not native:
             # Open objects (free-form tool arguments) cannot be enforced natively: ask in the prompt.
             messages = with_schema_instruction(messages, schema, remind=False)
+        names = function_names(tools) if tools else {}
+        back = {api: name for name, api in names.items()}
         system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+        thinking = bool(self.settings.get("adaptive_thinking")) and effort != "none"
         params: dict[str, Any] = {
             "model": model, "max_tokens": max_tokens,
-            "messages": [{"role": m["role"], "content": m["content"]} for m in messages if m["role"] != "system"]}
-        if images and params["messages"] and params["messages"][-1]["role"] == "user":
-            last = params["messages"][-1]
-            last["content"] = [*({"type": "image", "source": {"type": "base64", "media_type": image.mime,
-                                                              "data": image.base64}} for image in images),
-                               {"type": "text", "text": last["content"]}]
+            "messages": claude_messages(messages, names, thinking) if tools else
+            [{"role": m["role"], "content": m["content"]} for m in messages if m["role"] != "system"]}
+        if tools:
+            params["tools"] = [{"name": names[tool.name], "description": tool.description,
+                                "input_schema": dict(tool.parameters)} for tool in tools]
+        if images:
+            at = next((index for index in range(len(params["messages"]) - 1, -1, -1)
+                       if params["messages"][index]["role"] == "user"), None)
+            if at is not None:
+                last = params["messages"][at]
+                shown = [*({"type": "image", "source": {"type": "base64", "media_type": image.mime,
+                                                        "data": image.base64}} for image in images)]
+                last["content"] = (shown + [{"type": "text", "text": last["content"]}] if isinstance(
+                    last["content"], str) else [*last["content"], *shown])
         if system:
             params["system"] = system
-        if self.settings.get("adaptive_thinking") and effort != "none":
+        if thinking:
             params["thinking"] = {"type": "adaptive"}
             params["output_config"] = {"effort": effort}
             # Thinking consumes output tokens; keep the visible budget intact.
@@ -378,16 +467,42 @@ class Anthropic:
             # Anthropic caches only when asked: the conversation so far is then read from its cache on the next call
             # (a tenth of the price), as other providers do by themselves
             params["cache_control"] = {"type": "ephemeral"}
-        response = await self.client().with_options(timeout=timeout_s).messages.create(**params)
+        replays = tools and thinking and any(block.get("type") in THINKING_BLOCKS for message in params["messages"]
+                                             if isinstance(message["content"], list) for block in message["content"])
+        client = self.client().with_options(timeout=timeout_s)
+        if replays and self._binding:
+            params["thinking"] = {"type": "adaptive", "block_binding": {"prefix_mismatch_behavior": "drop_block"}}
+            params["extra_headers"] = {"anthropic-beta": THINKING_BINDING_BETA}
+        try:
+            response = await client.messages.create(**params)
+        except Exception as error:
+            said = str(error)
+            if not replays or getattr(error, "status_code", None) != 400 or not any(
+                    part in said for part in ("block_binding", "anthropic-beta", THINKING_BINDING_BETA, "signature")):
+                raise
+            # The beta refused here, or a thinking block that cannot be read: her earlier thinking stays out (once
+            # and from now on), her words and calls go as they are.
+            self._binding = False
+            params.pop("extra_headers", None)
+            params["thinking"] = {"type": "adaptive"}
+            params["messages"] = without_thinking(params["messages"])
+            response = await client.messages.create(**params)
         text = "\n".join(block.text for block in response.content if getattr(block, "type", None) == "text")
         usage = getattr(response, "usage", None)
         # Anthropic counts what it read from its cache and what it wrote to it apart from the rest of the input
         read = getattr(usage, "cache_read_input_tokens", 0) or 0
         written = getattr(usage, "cache_creation_input_tokens", 0) or 0
-        return AdapterResult(text, (getattr(usage, "input_tokens", 0) or 0) + read + written,
-                             getattr(usage, "output_tokens", 0) or 0,
-                             str(getattr(response, "stop_reason", "")) == "max_tokens",
-                             "native" if native else "instruction" if schema else "", read)
+        truncated = str(getattr(response, "stop_reason", "")) == "max_tokens"
+        input_tokens = (getattr(usage, "input_tokens", 0) or 0) + read + written
+        output_tokens = getattr(usage, "output_tokens", 0) or 0
+        if not tools:
+            return AdapterResult(text, input_tokens, output_tokens, truncated,
+                                 "native" if native else "instruction" if schema else "", read)
+        calls = tuple(ToolCall(str(block.id), back.get(block.name, block.name),
+                               dict(block.input) if isinstance(block.input, Mapping) else str(block.input))
+                      for block in response.content if getattr(block, "type", None) == "tool_use")
+        return AdapterResult(text, input_tokens, output_tokens, truncated, "tools", read, tool_calls=calls,
+                             replay={"content": [claude_block(block) for block in response.content]})
 
 
     async def list_models(self) -> list[tuple[str, dt.datetime | None]]:

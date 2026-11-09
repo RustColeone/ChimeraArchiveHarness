@@ -9,14 +9,14 @@ from contracts.extension import Contributions, Extension, ExtensionContext, Sett
 from contracts.interface import PLACE_STATUS, Interface, InterfacePort, Operation, place_problems
 from contracts.messages import Action, Address, Delivery, Display, FileRef, Reply, Request, Sender, SubmitResult
 from contracts.models import (AdapterFactory, AdapterResult, Image, ModelAdapter, ModelError, ModelRequest,
-                              ModelResult, Models, NotConfigured, ToolCall, ToolSpec)
+                              ModelResult, Models, NotConfigured, RejectedCall, ToolCall, ToolSpec)
 from contracts.shared import (IMPULSE, NAME, chinese, code_style, fact, flag, impulse, impulse_line, is_command,
                               local_time, number, persona_names, place_key, split_text)
 from contracts.stores import Facts, Store
 from contracts.views import VIEW_MAX, View, ViewError
 from contracts.watchers import Exchange, WatchContext, Watcher
 
-CONTRACTS_VERSION = "2.1"
+CONTRACTS_VERSION = "2.2"
 
 __all__ = [
     "AdapterFactory", "AdapterResult", "Image", "ModelAdapter", "NotConfigured",
@@ -26,7 +26,7 @@ __all__ = [
     "HistoryItem",
     "HistorySummary", "LogEntry", "Logbook",
     "Interface", "InterfacePort", "PLACE_STATUS", "ModelError", "ModelRequest", "ModelResult", "Models", "Operation",
-    "PART_PLACES", "PartContext", "Persona", "PromptPart", "Reply", "Request", "Risk", "TIERS", "RunYield", "SHUTDOWN", "Sender", "Session", "Setting", "Store", "SubmitResult", "ToolContext",
+    "PART_PLACES", "PartContext", "Persona", "PromptPart", "RejectedCall", "Reply", "Request", "Risk", "TIERS", "RunYield", "SHUTDOWN", "Sender", "Session", "Setting", "Store", "SubmitResult", "ToolContext",
     "ToolCall", "ToolResult", "ToolSpec", "Tools",
     "VIEW_MAX", "View", "ViewError", "WatchContext", "Watcher", "IMPULSE", "LEVELS",
 ]

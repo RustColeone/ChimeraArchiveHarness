@@ -615,6 +615,36 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(club.task(task)["status"], "review")
         self.assertFalse(any("stuck" in text for _, text in club.said(task)))  # still her task
 
+    async def test_an_answer_that_could_not_be_read_is_on_the_step_and_in_the_cost(self):
+        class Unread(Scripted):
+            turns = 0
+
+            async def complete(self, model, messages, schema, schema_name, *args, **kwargs):
+                if schema_name == "chimera_turn":
+                    Unread.turns += 1
+                    if Unread.turns == 1:  # billed, but no JSON in it: corrected once
+                        return AdapterResult("Let me think about where to start.", 300, 30)
+                return await super().complete(model, messages, schema, schema_name, *args, **kwargs)
+
+        def answer(kind, system, messages, turns):
+            if kind == "route":
+                return route()
+            if kind == "turn":
+                return turn(("write_file", {"path": "DONE.md", "content": "done\n"})) if turns == 0 else \
+                    turn(status="done", summary="Wrote DONE.md.")
+            return {"verdict": "approve", "say": "", "summary": "Fine.", "issues": []}
+        club = await self.club(Unread(answer), **TEAM)
+        task = await club.new("Write DONE.md.", workflow="single")
+        calls = {step["id"]: step for step in club.board.steps(task)}["r1.single.1"]["data"]["calls"]
+        self.assertEqual(len(calls), 2)
+        self.assertIn("valid JSON", calls[0]["rejected"])
+        self.assertEqual((calls[0]["input_tokens"], calls[0]["output_tokens"]), (300, 30))
+        self.assertNotIn("rejected", calls[1])  # the answer used comes last, as the page labels the step by it
+        totals = club.board.totals(task)
+        self.assertEqual(totals["input_tokens"], sum(call["input_tokens"] for step in club.board.steps(task)
+                                                     for call in step["data"].get("calls", ())))
+        self.assertEqual(club.task(task)["status"], "review")
+
     async def test_seats_without_a_key_are_skipped_quietly_and_a_sibling_role_steps_in(self):
         team = {**TEAM, "team": {**TEAM["team"], "nokey": {"name": "Nokey", "family": "gamma", "cheap": ["gamma/g"]}},
                 "roles": {**TEAM["roles"], "strong": ["nokey", "checky"]},
