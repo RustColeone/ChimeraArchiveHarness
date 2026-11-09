@@ -8,8 +8,8 @@ talk and Chimera ([`extensions/chimera`](../chimera)) where they work, but any e
 
 **A student is an agent with her memory, always.** An agent is a persona with her models and nothing else: core.yml
 defines its own under `agents:`, and any module may add some. A student is the special agent this module defines, and
-she always has her memory, whichever engine she speaks in. So the module needs mneme-llm 0.7.2 or newer, and declares
-it (`requires=("package:mneme-llm>=0.7.2",)`): without it the core leaves the module out and says why (`--check`, and
+she always has her memory, whichever engine she speaks in. So the module needs mneme-llm 0.7.3 or newer, and declares
+it (`requires=("package:mneme-llm>=0.7.3",)`): without it the core leaves the module out and says why (`--check`, and
 `module_skipped` in the audit log), and there are no students. An agent keeps nothing.
 
 Add a student by adding a folder. Change one by editing her files. The prompts are plain text files, so a change
@@ -37,7 +37,7 @@ to a character is a change to a file, not to code.
 | Views | `students.gut`, `students.starmap` | With `gut` on, the owner's: her gut and her star map for her page ([Her page](#her-page)) |
 | Capabilities | `students.search_memory`, `students.read_memory` | Her tools to look through everything said before with the person (offered to the students' turns only) |
 | Facts | `students.alias`, `students.bond`, `students.mood`, `students.plans`, `students.called`, `students.accounts` | Where she stands with each person, what she calls them and their accounts, for the pages |
-| Declares | `requires=("package:mneme-llm>=0.7.2",)` | Her memory is mneme-llm's |
+| Declares | `requires=("package:mneme-llm>=0.7.3",)` | Her memory is mneme-llm's |
 | Provider | `grok` | `openai_compatible` at `https://api.x.ai/v1`, key in `GROK_API_KEY`, `schema_mode: native`, `effort_param: true`; `$model` offers models released since 2026-06-01, excluding IDs matching `imagine` |
 | Setting | `grok_api_key` | `secret`, env `GROK_API_KEY`: "API key for Grok (`grok`; without it, GPT's model answers for her)" |
 

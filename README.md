@@ -150,6 +150,9 @@ Runtime data (databases, module data, the audit log) lives in `data/core/`.
 venv/bin/python -m unittest discover -s tests -t .
 ```
 
+The tests run on GitHub at every push. Releases and what each one changed: [CHANGELOG.md](CHANGELOG.md)
+(`venv/bin/python -m core --version` says which one you run).
+
 `contracts/` is the only code shared between the core and modules; `core/` never imports a
 module and modules never import the core ([`tests/test_core_boundaries.py`](tests/test_core_boundaries.py)).
 

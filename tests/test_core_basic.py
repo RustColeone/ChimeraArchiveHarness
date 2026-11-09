@@ -35,3 +35,16 @@ class BasicTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_malformed_time_zone_is_explained(self):
         self.assertIn("Unknown IANA timezone", await self.say("$now ../etc"))
+
+
+class VersionTests(unittest.TestCase):
+    def test_the_core_says_which_release_it_is_and_the_changelog_has_it(self):
+        import subprocess
+        import sys
+
+        from core import __version__
+        from tests.core_support import ROOT
+        done = subprocess.run([sys.executable, "-m", "core", "--version"], cwd=ROOT, capture_output=True, text=True,
+                              timeout=60)
+        self.assertEqual(done.stdout.strip(), f"ChimeraArchiveHarness {__version__}")
+        self.assertIn(f"## {__version__} (", (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))

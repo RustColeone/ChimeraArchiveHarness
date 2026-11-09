@@ -9,7 +9,7 @@ import asyncio
 import signal
 import sys
 
-from core import supervised, supervisor
+from core import __version__, supervised, supervisor
 from core.app import Core, config_path
 from core.config import CoreConfig
 
@@ -97,6 +97,7 @@ if __name__ == "__main__":
     parser.add_argument("--check", action="store_true", help="load and validate extensions, then exit")
     parser.add_argument("--idle-exit", type=float, default=None,
                         help="exit after this many seconds with no activity (for scripted runs)")
+    parser.add_argument("--version", action="version", version=f"ChimeraArchiveHarness {__version__}")
     arguments = parser.parse_args()
     if arguments.command == "run" and not arguments.check:
         # The supervisor starts `serve` with the same options and restarts it when needed.
