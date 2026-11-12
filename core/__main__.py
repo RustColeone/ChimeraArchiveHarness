@@ -95,6 +95,9 @@ if __name__ == "__main__":
     parser.add_argument("--config", default=None,
                         help="configuration merged over the built-in defaults (default: ./core.yml if present)")
     parser.add_argument("--check", action="store_true", help="load and validate extensions, then exit")
+    parser.add_argument("--lifeline", action="store_true",
+                        help="stop when stdin ends: for an app that runs the core (the desktop app) and holds its "
+                             "other end, so the core never outlives the app")
     parser.add_argument("--idle-exit", type=float, default=None,
                         help="exit after this many seconds with no activity (for scripted runs)")
     parser.add_argument("--version", action="version", version=f"ChimeraArchiveHarness {__version__}")

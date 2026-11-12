@@ -1,5 +1,5 @@
-"""The core's side of the supervisor (core/supervisor.py): heartbeats, the parent's health, and saying why
-it restarted. Only active when the supervisor started this process (`CORE_HEARTBEAT` is set)."""
+"""The core's side of the supervisor (core/supervisor.py): heartbeats, the parent's health, a stop it asks for,
+and saying why it restarted. Only active when the supervisor started this process (`CORE_HEARTBEAT` is set)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from pathlib import Path
 from contracts import Address, Reply, local_time
 
 BEAT_S = 5.0
+TICK_S = 1.0  # how often a stop the supervisor asked for (CORE_STOP) is looked for
 
 
 def supervised() -> bool:
@@ -20,22 +21,29 @@ def supervised() -> bool:
 
 
 async def heartbeat(stop) -> None:
-    """Touch the heartbeat file from the event loop (so a blocked loop stops beating), and stop the core if
-    the supervisor is gone: an unsupervised bot must not keep running unwatched."""
+    """Touch the heartbeat file from the event loop (so a blocked loop stops beating), stop the core if the
+    supervisor is gone (an unsupervised bot must not keep running unwatched), and stop it when the supervisor asks
+    through the stop file (how a stop reaches it cleanly on Windows, which has no SIGTERM)."""
     path = Path(os.environ["CORE_HEARTBEAT"])
     parent = int(os.environ.get("CORE_SUPERVISOR_PID") or 0)
-    count = 0
+    asked = Path(os.environ["CORE_STOP"]) if os.environ.get("CORE_STOP") else None
+    count, beaten = 0, None
     while True:
-        count += 1
-        try:
-            path.write_text(str(count), encoding="utf-8")  # a counter: the supervisor watches it change
-        except OSError:
-            pass
-        if parent and not parent_alive(parent):
-            print("[core] The supervisor is gone; stopping.", flush=True)
+        if beaten is None or time.monotonic() - beaten >= BEAT_S:
+            count, beaten = count + 1, time.monotonic()
+            try:
+                path.write_text(str(count), encoding="utf-8")  # a counter: the supervisor watches it change
+            except OSError:
+                pass
+            if parent and not parent_alive(parent):
+                print("[core] The supervisor is gone; stopping.", flush=True)
+                stop()
+                return
+        if asked is not None and asked.exists():
+            print("[core] The supervisor asked me to stop; stopping.", flush=True)
             stop()
             return
-        await asyncio.sleep(BEAT_S)
+        await asyncio.sleep(TICK_S)
 
 
 def parent_alive(pid: int) -> bool:

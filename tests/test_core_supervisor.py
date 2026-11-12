@@ -14,7 +14,8 @@ from pathlib import Path
 from unittest import mock
 
 from core import supervised
-from core.supervisor import RESTART, Supervisor
+from contracts import TREE, handed_over
+from core.supervisor import ALREADY, RESTART, Supervisor, mark_of
 from tests.core_support import iface, settle, start_core
 
 # One fake core per run: it logs the reason it was handed, then behaves as the plan says for that run.
@@ -115,6 +116,146 @@ class SupervisorTests(unittest.TestCase):
             for name in ("SIGTERM", "SIGINT"):
                 signal.signal(getattr(signal, name), signal.default_int_handler if name == "SIGINT"
                               else signal.SIG_DFL)
+
+
+# A core that starts two background processes and exits: one of its own, one handed over to the person.
+LEAVES = textwrap.dedent("""
+    import os, subprocess, sys, pathlib
+    from contracts import handed_over
+    folder = pathlib.Path(sys.argv[1])
+    sleep = [sys.executable, "-c", "import time; time.sleep(60)"]
+    detached = {"creationflags": 0x00000008 | 0x00000200} if os.name == "nt" else {"start_new_session": True}
+    mine = subprocess.Popen(sleep, **detached)
+    given = subprocess.Popen(sleep, env=handed_over(), **detached)
+    (folder / "pids").write_text(f"{mine.pid} {given.pid}")
+""")
+
+# A core that ignores SIGTERM and stops only when asked through the stop file, saying so.
+POLITE = textwrap.dedent("""
+    import os, signal, sys, time, pathlib
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    beat, asked = pathlib.Path(os.environ["CORE_HEARTBEAT"]), pathlib.Path(os.environ["CORE_STOP"])
+    count = 0
+    while not asked.exists():
+        count += 1
+        beat.write_text(str(count))
+        time.sleep(0.05)
+    pathlib.Path(sys.argv[1]).write_text("stopped when asked")
+""")
+
+
+class ContainmentTests(unittest.TestCase):
+    """Nothing the core starts outlives it, one install runs one supervisor, and an app's lifeline stops it."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.mark = f"core-test-{os.getpid()}-{time.time_ns()}"
+        self.root = Path(__file__).resolve().parents[1]
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def supervisor(self, script: str, *arguments, **options):
+        (self.tmp / "child.py").write_text(script)
+        options = {"hang_s": 5, "grace_s": 10, "backoff": (0.05,), "poll_s": 0.05, "stop_grace_s": 5,
+                   "mark": self.mark, "lock_folder": self.tmp, **options}
+        supervisor = Supervisor([sys.executable, str(self.tmp / "child.py"), *arguments], **options)
+        supervisor._install = lambda: None
+        return supervisor
+
+    def sleeper(self, environment=None):
+        import subprocess
+        return subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"], env=environment)
+
+    def assertGone(self, pid, within=5.0):
+        import psutil
+        deadline = time.monotonic() + within
+        while time.monotonic() < deadline:
+            try:
+                if psutil.Process(pid).status() == psutil.STATUS_ZOMBIE:
+                    return
+            except psutil.NoSuchProcess:
+                return
+            time.sleep(0.05)
+        self.fail(f"process {pid} is still running")
+
+    def test_what_the_core_left_running_is_ended_and_what_it_handed_over_stays(self):
+        import psutil
+        supervisor = self.supervisor(LEAVES, str(self.tmp))
+        with mock.patch.dict(os.environ, {"PYTHONPATH": str(self.root)}):
+            self.assertEqual(supervisor.run(), 0)
+        mine, given = (int(pid) for pid in (self.tmp / "pids").read_text().split())
+        self.assertGone(mine)
+        try:
+            self.assertTrue(psutil.Process(given).is_running())
+            self.assertNotIn(TREE, psutil.Process(given).environ())
+        finally:
+            psutil.Process(given).kill()
+
+    def test_a_stop_reaches_the_core_through_the_file_and_it_stops_cleanly(self):
+        supervisor = self.supervisor(POLITE, str(self.tmp / "said"))
+        threading.Timer(1.0, supervisor._stop, args=(getattr(signal, "SIGTERM", 15), None)).start()
+        started = time.monotonic()
+        self.assertEqual(supervisor.run(), 0)
+        self.assertEqual((self.tmp / "said").read_text(), "stopped when asked")
+        self.assertLess(time.monotonic() - started, 4)  # asked, not killed after stop_grace_s
+
+    def test_the_core_stops_when_the_app_holding_the_lifeline_closes_it(self):
+        read, write = os.pipe()
+        supervisor = self.supervisor(POLITE, str(self.tmp / "said"), lifeline=read)
+        threading.Timer(1.0, os.close, args=(write,)).start()
+        try:
+            self.assertEqual(supervisor.run(), 0)
+        finally:
+            os.close(read)
+        self.assertEqual((self.tmp / "said").read_text(), "stopped when asked")
+
+    def test_one_install_runs_one_supervisor(self):
+        first = self.supervisor(POLITE, str(self.tmp / "said"))
+        runner = threading.Thread(target=first.run)
+        runner.start()
+        try:
+            deadline = time.monotonic() + 5
+            while first.child is None and time.monotonic() < deadline:
+                time.sleep(0.05)
+            second = self.supervisor(POLITE, str(self.tmp / "said"))
+            self.assertEqual(second.run(), ALREADY)
+            self.assertIsNone(second.child)
+        finally:
+            first._stop("test")
+            runner.join(10)
+        self.assertEqual(self.supervisor("", mark=self.mark).run(), 0)  # free again once the first has ended
+
+    def test_what_an_earlier_run_left_behind_is_ended_before_a_new_core_starts(self):
+        left = self.sleeper({**os.environ, TREE: self.mark})
+        other = self.sleeper({**os.environ, TREE: self.mark + "-another-install"})
+        try:
+            self.assertEqual(self.supervisor("").run(), 0)
+            self.assertGone(left.pid)
+            self.assertIsNone(other.poll())
+        finally:
+            for process in (left, other):
+                process.kill()
+                process.wait()
+
+    def test_an_install_and_its_configuration_have_one_mark(self):
+        root = self.tmp
+        self.assertEqual(mark_of([], root), mark_of(["--idle-exit", "5"], root))
+        self.assertEqual(mark_of(["--config", "a.yml"], root), mark_of(["--config=a.yml"], root))
+        self.assertNotEqual(mark_of([], root), mark_of(["--config", "a.yml"], root))
+        self.assertNotEqual(mark_of([], root), mark_of([], root / "elsewhere"))
+
+    def test_handed_over_leaves_only_the_mark_out(self):
+        self.assertEqual(handed_over({"A": "1", TREE: "core-x"}), {"A": "1"})
+
+    def test_the_lifeline_flag_is_the_supervisors_not_the_cores(self):
+        from core import supervisor as module
+        with mock.patch.object(module.Supervisor, "run", lambda self: (self.command, self.lifeline)):
+            command, lifeline = module.main(["--lifeline", "--config", "x.yml"])
+        self.assertEqual(command[-3:], ["serve", "--config", "x.yml"])
+        self.assertEqual(lifeline, sys.stdin.fileno())
 
 
 class ReportTests(unittest.TestCase):
@@ -228,6 +369,19 @@ class HeartbeatTests(unittest.IsolatedAsyncioTestCase):
                 task.cancel()
             with mock.patch.dict(os.environ, {"CORE_HEARTBEAT": str(beat), "CORE_SUPERVISOR_PID": "999999999"}):
                 await asyncio.wait_for(supervised.heartbeat(lambda: stopped.append(1)), 2)
+            self.assertEqual(stopped, [1])
+
+    async def test_it_stops_the_core_when_the_supervisor_asks_through_the_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            asked, stopped = Path(tmp) / "stop", []
+            environment = {"CORE_HEARTBEAT": str(Path(tmp) / "heartbeat"), "CORE_STOP": str(asked),
+                           "CORE_SUPERVISOR_PID": str(os.getppid())}
+            with mock.patch.dict(os.environ, environment), mock.patch.object(supervised, "TICK_S", 0.05):
+                task = asyncio.create_task(supervised.heartbeat(lambda: stopped.append(1)))
+                await asyncio.sleep(0.2)
+                self.assertEqual(stopped, [])
+                asked.write_text("stop")
+                await asyncio.wait_for(task, 2)
             self.assertEqual(stopped, [1])
 
 

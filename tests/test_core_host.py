@@ -169,6 +169,22 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         self.assertLess(time.monotonic() - started, 5)
         self.assertEqual(await desktop.clipboard(), "héllo ✓")
 
+    async def test_what_is_opened_and_the_clipboard_served_are_handed_over(self):
+        # Started without the core's mark (CORE_TREE), so the supervisor leaves them running when the core stops.
+        self.stub("xdg-open", f'export -p > "{self.tmp}/opened"\n')
+        self.stub("wl-copy", f'export -p > "{self.tmp}/copied"; cat > /dev/null; exit 0\n')
+        desktop = self.desktop(WAYLAND_DISPLAY="wayland-0", CORE_TREE="core-test")
+        self.assertEqual(desktop.environment["CORE_TREE"], "core-test")  # (the rest of what it runs keeps it)
+        await desktop.open("https://example.invalid/")
+        await desktop.clipboard("hi")
+        for name in ("opened", "copied"):
+            path, deadline = self.tmp / name, time.monotonic() + 5
+            while not path.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            seen = path.read_text()
+            self.assertIn("XDG_RUNTIME_DIR", seen)
+            self.assertNotIn("CORE_TREE", seen)
+
     async def test_wayland_screenshots_never_fall_back_to_x11(self):
         self.stub("scrot", f'echo x11 > "$2"\n')
         self.stub("grim", "echo 'grim: compositor does not support wlr-screencopy' >&2; exit 1\n")
@@ -179,6 +195,16 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await desktop.screenshot(self.tmp / "shot.png")).read_text(), "png\n")
         x11 = self.module.Desktop({"XDG_RUNTIME_DIR": str(self.bin), "WAYLAND_DISPLAY": "", "DISPLAY": ":0"})
         self.assertEqual((await x11.screenshot(self.tmp / "x.png")).read_text(), "x11\n")
+
+
+@unittest.skipUnless(__import__("os").name == "nt", "Windows opens through a helper")
+class WindowsOpenTests(unittest.IsolatedAsyncioTestCase):
+    async def test_a_file_that_cannot_be_opened_says_why(self):
+        _, _, module = host_modules()
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(module.DesktopError) as caught:
+                await module.Desktop().open(str(Path(tmp) / "missing.txt"))
+        self.assertIn("missing.txt", str(caught.exception))
 
 
 class HostPolicyTests(unittest.IsolatedAsyncioTestCase):

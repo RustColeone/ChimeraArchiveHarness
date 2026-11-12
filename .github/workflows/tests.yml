@@ -28,3 +28,28 @@ jobs:
           git config --global user.name "tests"
           git config --global user.email "tests@example.invalid"
           python -m unittest discover -s tests -t .
+
+  supervisor:
+    # What the desktop app relies on, where it will run: the core stops when the app ends, however it ends, and
+    # nothing the core started outlives it (the rest of the tests are Linux's, above).
+    name: Supervisor on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install the requirements
+        run: python -m pip install -r requirements.txt
+      - name: The supervisor, the lifeline, and what the core leaves running
+        env:
+          PYTHONIOENCODING: utf-8
+        run: >-
+          python -m unittest tests.test_core_supervisor.SupervisorTests tests.test_core_supervisor.ContainmentTests
+          tests.test_core_supervisor.HeartbeatTests tests.test_core_supervisor.SignalTests
+          tests.test_core_host.WindowsOpenTests

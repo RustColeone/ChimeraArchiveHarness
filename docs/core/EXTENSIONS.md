@@ -440,8 +440,12 @@ EXTENSION = Extension("my_extension", setup, description="...",
   any module is set up and told to every module as `context.platforms`, so one that keeps people apart by platform names
   no plugin.
 * What every module may share is in `contracts`: `flag`, `number`, `local_time`, `fact`, `place_key`, `split_text`,
-  `chinese`, `is_command`, `impulse` (`contracts/shared.py`), and `contracts.discord_bot` for a Discord bot. No module
-  imports another.
+  `chinese`, `is_command`, `impulse`, `handed_over` (`contracts/shared.py`), and `contracts.discord_bot` for a Discord
+  bot. No module imports another.
+* **Processes a module starts end with the core.** Under the supervisor, the core and everything it starts carry a mark
+  in their environment, and whatever still carries it is ended once the core has exited (a restart, a stop, a crash).
+  Something started for the person at this computer, which should stay (a document or a link opened, the clipboard
+  served), is started with `env=handed_over(...)`: its environment without the mark.
 * **Loading:** every folder with an `extension.py` in `extensions/` (built-in) and `plugins/`
   (external) loads at startup, built-in ones first; drop a folder into `plugins/` and restart. Folders
   in `plugins/` and every `config.yml` are git-ignored (except the tracked `whale_chan` example and

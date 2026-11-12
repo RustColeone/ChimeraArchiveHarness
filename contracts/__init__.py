@@ -10,8 +10,8 @@ from contracts.interface import PLACE_STATUS, Interface, InterfacePort, Operatio
 from contracts.messages import Action, Address, Delivery, Display, FileRef, Reply, Request, Sender, SubmitResult
 from contracts.models import (AdapterFactory, AdapterResult, Image, ModelAdapter, ModelError, ModelRequest,
                               ModelResult, Models, NotConfigured, RejectedCall, ToolCall, ToolSpec)
-from contracts.shared import (IMPULSE, NAME, chinese, code_style, fact, flag, impulse, impulse_line, is_command,
-                              local_time, number, persona_names, place_key, split_text)
+from contracts.shared import (IMPULSE, NAME, TREE, chinese, code_style, fact, flag, handed_over, impulse,
+                              impulse_line, is_command, local_time, number, persona_names, place_key, split_text)
 from contracts.stores import Facts, Store
 from contracts.views import VIEW_MAX, View, ViewError
 from contracts.watchers import Exchange, WatchContext, Watcher

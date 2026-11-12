@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from typing import Mapping, Sequence
 
+from contracts import handed_over
+
 WINDOWS = os.name == "nt"
 MAC = sys.platform == "darwin"
 
@@ -59,10 +61,12 @@ class Desktop:
         `capture=False` for tools that leave a background child serving the clipboard (wl-copy, xclip):
         it would keep captured pipes open, so only the exit of the tool itself is awaited."""
         try:
+            # A tool that stays to serve the clipboard is handed over: what was copied stays when the core stops.
             process = await asyncio.create_subprocess_exec(
                 *argv, stdin=subprocess.PIPE if data is not None else subprocess.DEVNULL,
                 stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
-                stderr=subprocess.PIPE if capture else subprocess.DEVNULL, env=self.environment)
+                stderr=subprocess.PIPE if capture else subprocess.DEVNULL,
+                env=self.environment if capture else handed_over(self.environment))
         except OSError as error:
             raise DesktopError(f"{Path(argv[0]).name} could not run: {error}")
         try:
@@ -177,15 +181,34 @@ class Desktop:
 
     # ---- opening ----------------------------------------------------------------------------------
     async def open(self, target: str) -> None:
-        """Open a URL or a file with the desktop's default app, without waiting for it."""
+        """Open a URL or a file with the desktop's default app, without waiting for it. What opens is handed over
+        (`contracts.handed_over`): it stays when the core stops."""
         if WINDOWS:
-            await asyncio.to_thread(os.startfile, target)  # type: ignore[attr-defined]
+            await self._start_file(target)
             return
         tool = "open" if MAC else "xdg-open"
         if not self.available(tool):
             raise DesktopError(f"{tool} is not installed")
         try:
-            subprocess.Popen([tool, target], env=self.environment, stdin=subprocess.DEVNULL,
+            subprocess.Popen([tool, target], env=handed_over(self.environment), stdin=subprocess.DEVNULL,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         except OSError as error:
             raise DesktopError(f"{tool} could not run: {error}")
+
+    async def _start_file(self, target: str) -> None:
+        """Windows: os.startfile from a short helper started without the core's mark, so the app it opens is not
+        the core's (whatever the core starts is ended with it). Its error, if any, is the helper's last line."""
+        helper = [sys.executable, "-c", "import os, sys; os.startfile(sys.argv[1])", target]
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *helper, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                env=handed_over(self.environment), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except OSError as error:
+            raise DesktopError(f"could not open {target}: {error}")
+        try:
+            _, error = await asyncio.wait_for(process.communicate(), 30)
+        except asyncio.TimeoutError:
+            return  # still opening (a slow app): it carries on by itself
+        if process.returncode:
+            lines = error.decode("utf-8", "replace").strip().splitlines()
+            raise DesktopError(lines[-1] if lines else f"could not open {target}")

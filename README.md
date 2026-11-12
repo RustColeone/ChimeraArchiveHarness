@@ -113,7 +113,9 @@ personas go by their names of now.
 console. When the bot crashes, stops responding for a minute, or the creator types `$admin restart`
 (or presses **Restart now** after a `$setup` change), the supervisor starts a fresh one that re-reads
 every setting and module, and the bot then tells you (in your DM, or the console) why and for how long
-it was down. After five crashes within ten minutes it stops trying and says why.
+it was down. After five crashes within ten minutes it stops trying and says why. Whatever the bot
+started (a shell command still running, a download) ends with it, except what it opened for you on
+the desktop. One copy runs per folder: a second `python -m core` there says so and exits.
 `python -m core serve` runs the bot alone, without the supervisor.
 
 To start it at boot, have the system run `python -m core`. On Linux, a systemd service (it only

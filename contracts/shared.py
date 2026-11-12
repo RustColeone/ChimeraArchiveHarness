@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import math
+import os
 import re
 from typing import Any, Callable, Mapping
 
@@ -11,6 +12,15 @@ NAME = re.compile(r"^[a-z][a-z0-9_]*$")  # a module's, a watcher's, a fact's or 
 # Starts the text of a turn a persona started herself, so history shows it as her impulse. Only a request with
 # `extra.speak_up` keeps it: the gateway takes it off anything else.
 IMPULSE = "⟨speak-up⟩ "
+TREE = "CORE_TREE"  # the supervisor's mark on the core and on everything it starts (core/supervisor.py)
+
+
+def handed_over(environment: Mapping[str, str] | None = None) -> dict[str, str]:
+    """The environment for a process started for the person at this computer (a document or link opened, the
+    clipboard served): without the core's mark, so it stays when the core stops. Whatever else a module starts
+    carries the mark and is ended with the core."""
+    environment = os.environ if environment is None else environment
+    return {key: value for key, value in environment.items() if key != TREE}
 
 
 def impulse(request) -> str:

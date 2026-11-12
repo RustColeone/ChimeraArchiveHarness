@@ -367,7 +367,7 @@ Config values for rules, routes and routines are written at startup; runtime edi
 
 ## Supervisor
 
-`python -m core` runs [`core/supervisor.py`](../../core/supervisor.py), a parent of about 200 lines that
+`python -m core` runs [`core/supervisor.py`](../../core/supervisor.py), a parent of under 400 lines that
 imports nothing from the core and never talks to a platform, and it runs the core as its child
 (`python -m core serve`), sharing the console. Like a hardware watchdog, the simple part watches the
 complicated one, and nothing watches the watchdog. The child touches a heartbeat file every 5 s from
@@ -379,7 +379,16 @@ minutes, when the supervisor gives up. Before each restart it writes why (reques
 end of the error, hang) for the new core, which reports it to the control route as a `restarted`
 notice once that interface is connected; a requested restart is also answered in the conversation that
 asked (for example 鲸酱's DM, where she said "Restarting"), from that bot. Durable runs, approvals, routines and reminders carry over as
-they always do; processes the core started (terminal shells, downloads) end with it. Starting at boot
+they always do; processes the core started (terminal shells, downloads) end with it: the core carries a mark in its
+environment (`CORE_TREE`) that everything it starts inherits, and once a core has exited the supervisor ends whatever
+still carries it, before it reads the rest of the core's error output (a leftover holding that pipe would otherwise
+hold the supervisor). A module hands over what it starts for the person at the computer (a document opened, the
+clipboard served) with `contracts.handed_over`, which leaves the mark out. One install (its folder and `--config`) runs
+one supervisor: a second one says so and exits with 73, and a supervisor starting ends what an earlier run of its
+install left behind, one killed outright, say. A stop reaches the core as SIGTERM and through a stop file
+(`CORE_STOP`, looked for every second), which is how it stops cleanly on Windows. `python -m core --lifeline` is for an
+app that runs the core, such as the desktop app: the supervisor reads its stdin until it ends, and the app holds the
+other end, so when the app closes it, or ends however it ends, the core is stopped. Starting at boot
 stays the job of the system (systemd, Task Scheduler). Under systemd with `Restart=on-failure`, a
 supervisor that gave up (exit 1) is started again after `RestartSec`; add `RestartPreventExitStatus=1`
 to the unit to keep a core that keeps crashing down until it is fixed.

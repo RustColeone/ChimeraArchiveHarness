@@ -4,6 +4,16 @@ What each release of ChimeraArchiveHarness changed. `venv/bin/python -m core --v
 
 ## Unreleased
 
+- **Nothing the bot starts outlives it.** The supervisor ends whatever the core left running once it has exited (a
+  shell command, a download, something started by a process that has since ended), and what an earlier run left
+  behind when the next one starts; what was opened for you on the desktop, and the clipboard, stay. A core that left
+  something holding its error output no longer holds the supervisor until that ends.
+- **One copy per folder:** a second `python -m core` in the same folder, with the same `--config`, says so and exits
+  with code 73.
+- **`python -m core --lifeline`**, for an app that runs the bot: it stops when the app closes its stdin, or ends, even
+  when it is killed outright.
+- **A clean stop on Windows:** the supervisor asks the core to stop through a file instead of ending it outright.
+
 - **Mirroring on a student's settings page:** a dial in a Her mood card on the Her tab, for how far her mood follows
   the mood of the person she talks with (mneme-llm's `mood.mirror`, 0 to 1, off as she ships). It shows with mneme-llm
   0.7.4 or newer; with 0.7.3 the page leaves it out.
