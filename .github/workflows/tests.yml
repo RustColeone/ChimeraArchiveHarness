@@ -30,7 +30,7 @@ jobs:
         run: |
           git config --global user.name "tests"
           git config --global user.email "tests@example.invalid"
-          python -m unittest discover -s tests -t .
+          python -X faulthandler -m unittest discover -s tests -t .
 
   supervisor:
     # What the desktop app relies on, where it will run: the core stops when the app ends, however it ends, and
