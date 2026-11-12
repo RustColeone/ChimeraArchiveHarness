@@ -35,7 +35,7 @@ from mneme_llm.gut import LANGUAGES as GUT_LANGUAGES
 from mneme_llm.tools import SPECS, Toolbox
 
 from . import panel
-from .gut import Guts
+from .gut import Busy, Guts
 from .kept import ROLE, Kept
 
 RESET = {"reset", "remove", "clear", "none"}
@@ -147,6 +147,7 @@ class Book:
         self.folder, self.personas = Path(folder), tuple(personas)
         self.names = {str(name): dict(value) for name, value in dict(names or {}).items()}  # her display name and others
         self.opened: dict[str, object] = {}
+        self.busy = Busy()  # work running on her files in threads (gut.Busy; shared with the guts when she has one)
         self.joined: list = []  # (called when an account is linked: what else knows people, such as her gut)
         self.platforms = {str(name): str(platform) for name, platform in (platforms or {}).items()}
         self.roles = {self.named(subject): str(role) for subject, role in (roles or {}).items()}
@@ -885,7 +886,7 @@ async def deeper(book: Book, settings: Settings, guts: "Guts | None", facts, con
                 turn_card(memory, holder, card.on)
         context.start_over(name, everywhere=True)
         if tier == "gut" and guts is not None and settings.of(name).gut:
-            lessons += await asyncio.to_thread((await guts.woken(name)).wipe)
+            lessons += await book.busy.run((await guts.woken(name)).wipe)
     return kept, lessons
 
 
@@ -951,11 +952,11 @@ def make_views(book: Book, guts: Guts, felt: tuple[str, ...]) -> list[View]:
         def made() -> dict:
             names = {subject: book.name_of(subject) for subject in found.net.people} if found is not None else {}
             return panel.view(found, you, memory, {subject: name for subject, name in names.items() if name})
-        return {"student": persona, "display": book.shown(persona), **await asyncio.to_thread(made)}
+        return {"student": persona, "display": book.shown(persona), **await book.busy.run(made)}
 
     async def stars(persona: str, person: tuple[str, str]) -> dict:
         found = await guts.woken(persona)
-        return {"stamp": panel.stamp(found), **await asyncio.to_thread(starmap.starmap, found)}
+        return {"stamp": panel.stamp(found), **await book.busy.run(starmap.starmap, found)}
     return [View("gut", gut, "Her gut: settings, bars lately against usual, the people she knows, her sides",
                  personas=felt, timeout_s=30),
             View("starmap", stars, "Her heart as a star map, and the people she knows", personas=felt, timeout_s=60)]
@@ -978,11 +979,11 @@ def make_tune(book: Book, settings: Settings, guts: Guts):
                                    "invalid_tune")
         gut, memory = await guts.woken(persona), book.open(persona)
         try:
-            await asyncio.to_thread(panel.change, gut, asked, memory)
+            await book.busy.run(panel.change, gut, asked, memory)
         except ValueError as error:
             return ToolResult.fail(f"Not changed: {error}.", "invalid_tune")
         subject = book.subject(context.address.interface, context.sender.id)
-        shown = await asyncio.to_thread(panel.view, gut, book.person_of.get(subject, subject), memory)
+        shown = await book.busy.run(panel.view, gut, book.person_of.get(subject, subject), memory)
         return ToolResult.ok(f"{book.shown(persona)}'s gut: changed.", data={"gut": shown})
     return tune
 
@@ -1177,7 +1178,7 @@ def make_settings_view(book: Book, settings: Settings, guts: "Guts | None", fact
 
         def made() -> dict:
             return panel.settings(Page(book, settings, guts, facts, persona, you, gut))
-        return {"student": persona, "display": book.shown(persona), **await asyncio.to_thread(made)}
+        return {"student": persona, "display": book.shown(persona), **await book.busy.run(made)}
     return View("settings", read, "Her settings, in four tabs: Her, People, Memory, Gut", personas=personas,
                 timeout_s=60)
 
@@ -1268,7 +1269,11 @@ def contributions(context, students: dict[str, dict], kept: Kept | None = None) 
                                                  if students[name].get("folder")}, person=book.person) if felt else None
     if guts is not None:
         book.joined.append(guts.relink)
-    def close() -> None:
+        book.busy = guts.busy  # one count of the work running on her files
+
+    async def close() -> None:
+        # The work still running on her files first (her gut waking, a page being made), then the files.
+        await asyncio.to_thread(book.busy.close, 30.0)
         book.close()
         if guts is not None:
             guts.close()

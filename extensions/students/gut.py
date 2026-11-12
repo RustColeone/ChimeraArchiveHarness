@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import threading
 from collections import OrderedDict
 from pathlib import Path
 
@@ -14,6 +15,34 @@ from mneme_llm.gut import Gut, Turn
 WAITING = 64  # turns kept between her reading and her note
 
 
+class Busy:
+    """Blocking work on her files running in threads (her gut waking, her pages), so that closing them waits for it:
+    closing a file under a thread still using it can crash SQLite. Once closing, no new work starts."""
+
+    def __init__(self):
+        self._count, self._closing, self._idle = 0, False, threading.Condition()
+
+    async def run(self, work, *arguments):
+        def counted():
+            with self._idle:
+                if self._closing:
+                    raise RuntimeError("her files are closing")
+                self._count += 1
+            try:
+                return work(*arguments)
+            finally:
+                with self._idle:
+                    self._count -= 1
+                    self._idle.notify_all()
+        return await asyncio.to_thread(counted)
+
+    def close(self, timeout_s: float) -> bool:
+        """Let no new work start, and wait for what is running (at most `timeout_s`): whether it all finished."""
+        with self._idle:
+            self._closing = True
+            return self._idle.wait_for(lambda: self._count == 0, timeout_s)
+
+
 class Guts:
     """`person`: whose account a subject is (`Book.person`), so her gut knows a person once, on all their accounts, as
     her memory does."""
@@ -22,6 +51,7 @@ class Guts:
         self.folder, self.starters = Path(folder), dict(starters or {})
         self.person = person or (lambda subject: subject)
         self.opened: dict[str, Gut] = {}
+        self.busy = Busy()
         self.turns: OrderedDict[tuple[str, str], Turn] = OrderedDict()
 
     def close(self) -> None:
@@ -43,7 +73,7 @@ class Guts:
             gut.wake()
             self.join(gut)
         if gut.waking is None or gut.waking.done():
-            gut.waking = asyncio.ensure_future(asyncio.to_thread(waking))
+            gut.waking = asyncio.ensure_future(self.busy.run(waking))
         return gut.waking
 
     def join(self, gut: Gut) -> int:
