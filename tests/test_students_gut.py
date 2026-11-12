@@ -1,6 +1,7 @@
 """Tests for a student's gut (extensions/students/gut.py): what stays of her without her memory or her model."""
 
 import asyncio
+import contextlib
 import json
 import sqlite3
 import tempfile
@@ -13,6 +14,12 @@ import mneme_llm.gut as G
 from tests import test_momochat as room
 from tests.core_support import ROOT, FakeAdapter, iface, make_config, settle, start_core
 from tests.test_students_memory import Mind
+
+
+def rows(path, sql: str) -> list:
+    """A query on her gut's file, closed after (Windows will not delete a file still open)."""
+    with contextlib.closing(sqlite3.connect(path)) as db:
+        return db.execute(sql).fetchall()
 
 
 FORM = {"people": ["coworker"], "gender": ["woman"], "topic": ["lunch"], "event": ["ate"], "sender_feels": "happy",
@@ -113,10 +120,10 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(head.reads, ["had lunch with a coworker"])  # no history in her reading
         self.assertIn("(Alice is ", head.votes[-1][-1]["content"])  # her memory in her vote
         self.assertEqual(gut.report()["lessons"], 1)
-        self.assertEqual(json.loads(sqlite3.connect(gut.path).execute("select feel from lessons").fetchone()[0]), JEALOUS)
+        self.assertEqual(json.loads(rows(gut.path, "select feel from lessons")[0][0]), JEALOUS)
         self.assertEqual(head.notes[-1][-2], {"role": "assistant", "content": "Oh, a coworker. Nice."})
         self.assertIn("Right now you feel", head.notes[-1][0]["content"])  # the line stays in view of her note
-        said = sqlite3.connect(gut.path).execute("select form, feel from lessons").fetchall()
+        said = rows(gut.path, "select form, feel from lessons")
         self.assertNotIn("had lunch", json.dumps(said))  # forms and feelings, never messages
 
     async def test_a_turn_without_a_gut_asks_nothing(self):
@@ -222,8 +229,7 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         chat = await self.start(Head(room.Script(GPT=[room.turn("Hi.")])), people={"Alice": ["chat:alice", "chat:bob"]})
         gut = await self.awake(chat)
         self.assertEqual(set(gut.net.people), {"chat:alice"})
-        self.assertEqual(sqlite3.connect(gut.path).execute("select count(*) from lessons where subject = 'chat:bob'")
-                         .fetchone()[0], 0)
+        self.assertEqual(rows(gut.path, "select count(*) from lessons where subject = 'chat:bob'")[0][0], 0)
 
     async def test_wiping_her_memory_leaves_her_gut(self):
         script = room.Script(GPT=[room.turn("a"), room.turn("b"), room.turn("c")])
@@ -355,10 +361,12 @@ class Turns(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_side_only_takes_a_name_on_the_list(self):
         gut = G.Gut(self.tmp / "list.db")
-        gut.wake()
-        self.addCleanup(gut.close)
-        gut.grow("草莓", {"name": "草莓", "what": "你很甜。"})
-        self.assertEqual(gut.grown, {})
+        try:
+            gut.wake()
+            gut.grow("草莓", {"name": "草莓", "what": "你很甜。"})
+            self.assertEqual(gut.grown, {})
+        finally:
+            gut.close()  # (before the folder goes: cleanups run after tearDown)
         self.assertIn("小绿茶", G.grow_messages("病娇", [], {})[0]["content"])
 
     async def test_only_the_owner_can_change_her_sides(self):

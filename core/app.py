@@ -43,9 +43,7 @@ class Core:
         try:
             await self._build()
         except Exception:
-            for store in (getattr(self, "tank", None), getattr(self, "bottle", None)):
-                if store is not None:
-                    store.close()
+            await self._close()  # what it opened before failing (Windows will not delete an open file)
             raise
 
     async def _build(self) -> None:
@@ -302,12 +300,21 @@ class Core:
         self.audit.record("core_started", extensions=[item.extension.name for item in self.extensions])
 
     async def stop(self) -> None:
-        if not self.started:
+        """Stop it if it runs, and close what it opened, whether it ever started or not (a build that failed, a test
+        that never started it)."""
+        if self.started:
+            self.started = False
+            await self.manager.stop()
+            await self.gateway.stop()
+            self.audit.record("core_stopped")
+        await self._close()
+
+    async def _close(self) -> None:
+        """What each module opened (the last loaded first), then the core's own stores. Once."""
+        if getattr(self, "_closed", False):
             return
-        self.started = False
-        await self.manager.stop()
-        await self.gateway.stop()
-        for loaded in reversed(self.extensions):  # what each module opened, the last loaded first
+        self._closed = True
+        for loaded in reversed(self.extensions):
             close = loaded.contributions.close
             if close is None:
                 continue
@@ -316,11 +323,11 @@ class Core:
                 if inspect.isawaitable(result):
                     await result
             except Exception as error:
-                self.audit.record("module_close_failed", extension=loaded.extension.name, error=str(error))
-        self.audit.record("core_stopped")
-        self.tank.close()
-        self.bottle.close()
-        self.audit.close()
+                if getattr(self, "audit", None) is not None:
+                    self.audit.record("module_close_failed", extension=loaded.extension.name, error=str(error))
+        for store in (getattr(self, "tank", None), getattr(self, "bottle", None), getattr(self, "audit", None)):
+            if store is not None:
+                store.close()
 
     def request_stop(self, exit_code: int = 0) -> None:
         """End run_forever cleanly; exit_code 75 asks the supervisor to start a fresh core."""

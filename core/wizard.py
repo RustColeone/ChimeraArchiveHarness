@@ -223,8 +223,7 @@ class Wizard:
             self.say(f"   ✓ interfaces: {', '.join(core.gateway.interfaces) or 'none'}")
             self.say(f"   ✓ model providers with keys: {', '.join(core.providers.configured()) or 'none'}")
         finally:
-            core.tank.close()
-            core.bottle.close()
+            await core.stop()  # (it never started: this closes what it opened)
         command = "venv/bin/python -m core"
         if self.setup.file.exists() and self.setup.file != Path("core.yml").resolve():
             command += f" --config {self.where(self.setup.file)}"

@@ -35,6 +35,7 @@ def step(message, status="complete", actions=()):
 class ChatEngineTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)  # last: after what a test closes (Windows will not delete an open file)
         self.tmp = Path(self._tmp.name)
         self.core = None
         environment = patch.dict(os.environ, {"DISCORD_BOT_TOKEN_WHALE_CHAN": "", "OPENAI_API_KEY": ""})
@@ -44,7 +45,6 @@ class ChatEngineTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         if self.core is not None:
             await self.core.stop()
-        self._tmp.cleanup()
 
     async def start(self, responses, options=None, plugin=None, handler=None, companion=None, owners=None):
         """Her engine through the real core; with `companion` (the students' memory settings), she learns from what

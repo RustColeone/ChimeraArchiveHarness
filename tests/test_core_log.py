@@ -18,13 +18,13 @@ MOMOCHAT = {"assignments": {"*": {"engine": "momochat", "personas": ["p"]}}}
 class LogTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)  # last: after what a test closes (Windows will not delete an open file)
         self.tmp = Path(self._tmp.name)
         self.cores = []
 
     async def asyncTearDown(self):
         for core in self.cores:
             await core.stop()
-        self._tmp.cleanup()
 
     async def core(self, overrides=None, responses=()):
         adapter = FakeAdapter(list(responses))

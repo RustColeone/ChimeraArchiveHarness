@@ -42,13 +42,13 @@ class Mind:
 class CompanionTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)  # last: after what a test closes (Windows will not delete an open file)
         self.tmp = Path(self._tmp.name)
         self.core = None
 
     async def asyncTearDown(self):
         if self.core is not None:
             await self.core.stop()
-        self._tmp.cleanup()
 
     async def start(self, handler, settings=None, assignments=None):
         extensions = [*make_config(self.tmp).raw["modules"]["paths"],
@@ -70,6 +70,7 @@ class CompanionTests(unittest.IsolatedAsyncioTestCase):
         memory = memory_module()
         settings = memory.Settings({"language": "en"}, self.tmp)
         book = memory.Book(self.tmp / "files", personas=NAMES, settings=settings)
+        self.addCleanup(book.close)
         book.names = {"gemini": {"display_name": "Gemini"}, "deepseek": {"display_name": "DeepSeek"}}
         book.open("gpt", create=True)
         subject = "chat:alice"

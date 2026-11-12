@@ -647,10 +647,11 @@ class DiscordInterface(Interface):
             reference = discord.MessageReference(message_id=int(reply.quote), channel_id=channel.id,
                                                  fail_if_not_exists=False)
         text = self.render(reply)
-        sent, items, view = [], [], None
+        sent, items, view, uploads = [], [], None, []
         try:
             if reply.kind == "file":
                 file = discord.File(reply.file.path, filename=reply.file.name or Path(reply.file.path).name)
+                uploads.append(file)
                 sent.append(await post(content=text[:MESSAGE_LIMIT] or None, file=file, reference=reference))
             else:
                 if not text.strip():
@@ -661,8 +662,8 @@ class DiscordInterface(Interface):
                 for index, (kind, value) in enumerate(items):
                     first, last = index == 0, index == len(items) - 1
                     if kind == "image":
-                        sent.append(await post(file=discord.File(value, filename="formula.png"),
-                                               reference=reference if first else None))
+                        uploads.append(discord.File(value, filename="formula.png"))
+                        sent.append(await post(file=uploads[-1], reference=reference if first else None))
                     else:
                         sent.append(await post(content=value, reference=reference if first else None,
                                                allowed_mentions=mentions if first else None,
@@ -675,6 +676,8 @@ class DiscordInterface(Interface):
         except (OSError, asyncio.TimeoutError) as error:
             return Delivery(False, detail=f"{type(error).__name__}: {error}"[:300], uncertain=True)
         finally:
+            for upload in uploads:  # (closed first: Windows will not delete a file still open)
+                upload.close()
             for kind, value in items:
                 if kind == "image":
                     Path(value).unlink(missing_ok=True)
