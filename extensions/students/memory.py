@@ -19,6 +19,7 @@ creator's alone: who she is, in their words, in her system prompt once it is on)
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import re
 import secrets
@@ -302,9 +303,11 @@ class Book:
         return None
 
     def close(self) -> None:
-        """Close every memory file opened (when the core stops)."""
+        """Close every memory file opened (when the core stops). Under mneme-llm's own lock: a write still running in
+        a thread finishes first (closing under it would crash SQLite), and a later one fails plainly."""
         for memory in self.opened.values():
-            memory.close()
+            with getattr(getattr(memory, "store", None), "_lock", None) or contextlib.nullcontext():
+                memory.close()
         self.opened.clear()
 
     def open(self, persona: str, *, create: bool = False):

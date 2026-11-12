@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections import OrderedDict
 from pathlib import Path
 
@@ -24,9 +25,10 @@ class Guts:
         self.turns: OrderedDict[tuple[str, str], Turn] = OrderedDict()
 
     def close(self) -> None:
-        """Close every gut file opened (when the core stops)."""
+        """Close every gut file opened (when the core stops), under its lock (see Book.close)."""
         for gut in self.opened.values():
-            gut.close()
+            with getattr(gut, "lock", None) or contextlib.nullcontext():
+                gut.close()
         self.opened.clear()
 
     def of(self, persona: str) -> Gut:
