@@ -301,6 +301,12 @@ class Book:
                 return persona
         return None
 
+    def close(self) -> None:
+        """Close every memory file opened (when the core stops)."""
+        for memory in self.opened.values():
+            memory.close()
+        self.opened.clear()
+
     def open(self, persona: str, *, create: bool = False):
         if persona in self.opened:
             return self.opened[persona]
@@ -1259,7 +1265,12 @@ def contributions(context, students: dict[str, dict], kept: Kept | None = None) 
                                                  if students[name].get("folder")}, person=book.person) if felt else None
     if guts is not None:
         book.joined.append(guts.relink)
+    def close() -> None:
+        book.close()
+        if guts is not None:
+            guts.close()
     return {
+        "close": close,
         "prompt_parts": [PromptPart("card", make_card_part(book, settings), place="stable", order=110, personas=keep),
                          PromptPart("memory", make_part(book, settings, guts), place="turn", order=50, personas=keep),
                          PromptPart("surface", make_context(book, settings), place="context", personas=keep)],

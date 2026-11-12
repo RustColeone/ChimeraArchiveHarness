@@ -1,7 +1,7 @@
 {
- "version": "2.2",
+ "version": "2.3",
  "constants": {
-  "CONTRACTS_VERSION": "2.2",
+  "CONTRACTS_VERSION": "2.3",
   "IMPULSE": "⟨speak-up⟩ ",
   "LEVELS": {
    "member": 0,
@@ -404,6 +404,11 @@
      "name": "views",
      "type": "Sequence",
      "default": "()"
+    },
+    {
+     "name": "close",
+     "type": "Callable | none",
+     "default": null
     }
    ]
   },

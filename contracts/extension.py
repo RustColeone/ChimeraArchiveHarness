@@ -73,6 +73,9 @@ class Contributions:
     watchers: Sequence[Watcher] = ()
     secrets: Sequence[str] = ()
     views: Sequence[View] = ()
+    # Called once when the core stops, after its runs and interfaces have: close what the module opened (its
+    # databases and files), so nothing holds them (Windows will not delete or replace a file still open). May be async.
+    close: Callable[[], Any] | None = None
 
 
 @dataclass(frozen=True)

@@ -40,7 +40,7 @@ def load_image_key(path) -> tuple[bytes, int] | None:
         return None
     if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600 or info.st_uid != os.getuid():
         raise ImageUnavailable("The WeChat image key file must be a private 0600 file owned by the bot user")
-    value = json.loads(path.read_text())
+    value = json.loads(path.read_text(encoding="utf-8"))
     return bytes.fromhex(value["aes_key"]), int(value["xor_key"])
 
 

@@ -16,7 +16,7 @@ from contracts.stores import Facts, Store
 from contracts.views import VIEW_MAX, View, ViewError
 from contracts.watchers import Exchange, WatchContext, Watcher
 
-CONTRACTS_VERSION = "2.2"
+CONTRACTS_VERSION = "2.3"
 
 __all__ = [
     "AdapterFactory", "AdapterResult", "Image", "ModelAdapter", "NotConfigured",

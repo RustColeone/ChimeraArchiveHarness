@@ -118,7 +118,7 @@ class MigrationTests(unittest.TestCase):
         return done.stdout
 
     def snapshot(self) -> dict:
-        return {str(path.relative_to(self.root)): path.read_bytes() for path in self.root.rglob("*")
+        return {path.relative_to(self.root).as_posix(): path.read_bytes() for path in self.root.rglob("*")
                 if path.is_file() and not path.name.endswith(("-wal", "-shm"))}
 
     def kv(self, tank, scope):

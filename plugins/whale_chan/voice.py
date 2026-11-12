@@ -31,6 +31,9 @@ from typing import Any, Mapping
 
 from contracts import Capability, FileRef, Risk, ToolResult
 
+# What her voice clip is sent as, the same on every system (Windows' table says audio/wav, Linux's audio/x-wav).
+AUDIO = {".wav": "audio/x-wav"}
+
 VOICE_NAME = "voice-message.ogg"  # the bot sends files of this name as a Discord voice message
 INSTRUCTIONS = ("A cute, playful, slightly tsundere young girl sending a voice message to someone close. Natural "
                 "and warm, light, not too fast. Speak the language of the text.")
@@ -107,7 +110,7 @@ class ClonedVoice:
         return "" if shutil.which("ffmpeg") else "ffmpeg is not installed"
 
     def _references(self) -> list[dict]:
-        kind = mimetypes.guess_type(self.reference.name)[0] or "audio/wav"
+        kind = AUDIO.get(self.reference.suffix.lower()) or mimetypes.guess_type(self.reference.name)[0] or "audio/wav"
         clip = base64.b64encode(self.reference.read_bytes()).decode()
         return [{"type": "input_audio", "input_audio": {"data": f"data:{kind};base64,{clip}"}},
                 *([{"type": "text", "text": self.reference_text}] if self.reference_text else [])]

@@ -23,6 +23,12 @@ class Guts:
         self.opened: dict[str, Gut] = {}
         self.turns: OrderedDict[tuple[str, str], Turn] = OrderedDict()
 
+    def close(self) -> None:
+        """Close every gut file opened (when the core stops)."""
+        for gut in self.opened.values():
+            gut.close()
+        self.opened.clear()
+
     def of(self, persona: str) -> Gut:
         if persona not in self.opened:
             self.opened[persona] = Gut(self.folder / f"{persona}.db", self.starters.get(persona))

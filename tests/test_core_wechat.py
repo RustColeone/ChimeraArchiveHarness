@@ -5,6 +5,7 @@ import hashlib
 import itertools
 import json
 import hmac
+import os
 import sqlite3
 import random
 import struct
@@ -690,6 +691,7 @@ class CopiedModuleTests(unittest.TestCase):
         with self.assertRaises(pages.DatabaseSnapshotError):
             pages.decrypt_snapshot(encrypted_fixture("hi"), b"", bytes(32))
 
+    @unittest.skipIf(os.name == "nt", "the WeChat bridge runs on the Linux desktop")
     def test_key_files_must_be_private_and_belong_to_the_account(self):
         keys = self.module("database_keys")
         with tempfile.TemporaryDirectory(dir=scratch()) as directory:
@@ -830,6 +832,7 @@ class SplitTests(unittest.TestCase):
 
 
 class SettingsAndReaderTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "the WeChat bridge runs on the Linux desktop")
     def test_settings_fall_back_to_the_environment(self):
         module = __import__("core.loader", fromlist=["import_extension"]).import_extension(
             ROOT / "plugins" / "wechat")[1]

@@ -66,6 +66,10 @@ def normalize(path: str) -> str:
     return os.path.normpath(str(value))
 
 
+def _windows(path: str) -> str:
+    return path.replace("\\", "/").casefold()
+
+
 class Secrets:
     def __init__(self, values: Mapping[str, str] | None = None, paths: Iterable[str] = ()):
         self.values: dict[str, str] = {}
@@ -151,4 +155,8 @@ class Secrets:
             candidates.add(os.path.realpath(normalize(path)))
         except OSError:
             pass
+        if os.name == "nt":  # (patterns are written with /; Windows paths use \ and ignore case)
+            candidates = {_windows(candidate) for candidate in candidates}
+            return any(fnmatch.fnmatchcase(candidate, _windows(pattern)) for candidate in candidates
+                       for pattern in self.paths)
         return any(fnmatch.fnmatchcase(candidate, pattern) for candidate in candidates for pattern in self.paths)

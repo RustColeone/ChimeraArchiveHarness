@@ -12,6 +12,9 @@ from tests import test_momochat as room
 from tests.core_support import ROOT, FakeAdapter, iface, make_config, settle, start_core
 from tests.test_students_gut import Head
 
+# Long ago, but a real time: Windows cannot turn a time on 1970-01-01 into local time.
+LONG_AGO = 1_600_000_000.0
+
 
 class Interrupted(FakeAdapter):
     """A person writes while her model thinks: `words` come in on the model calls they are numbered by."""
@@ -137,7 +140,7 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         script = room.Script(GPT=[room.turn("Hm."), room.turn("Hm.")])
         chat = await self.start(Head(script), gut=False, personas=("gpt", "gemini"))
         memory = self.book().open("gpt", create=True)
-        memory.episodes.keep("chat:alice", [("Alice", "said in private"), ("GPT", "ok")], at=1000.0, conversation="chat:dm")
+        memory.episodes.keep("chat:alice", [("Alice", "said in private"), ("GPT", "ok")], at=LONG_AGO, conversation="chat:dm")
         await chat.say("GPT, hello", conversation="page", sender="alice", is_direct=True, mentions_me=True)
         await settle(self.core)
         self.assertNotIn("said in private", str(script.prompts["GPT"][-1]))  # (like a web page's group chat)
@@ -146,7 +149,7 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         script = room.Script(GPT=[room.turn("Hm.")], Gemini=[room.turn("Hm.")])
         chat = await self.start(Head(script), gut=False, personas=("gpt", "gemini"))
         memory = self.book().open("gpt", create=True)
-        memory.episodes.keep("chat:alice", [("Alice", "said in private"), ("GPT", "ok")], at=1000.0, conversation="chat:dm")
+        memory.episodes.keep("chat:alice", [("Alice", "said in private"), ("GPT", "ok")], at=LONG_AGO, conversation="chat:dm")
         for text in ("/new", "GPT, hello"):
             await chat.say(text, conversation="room", sender="alice", is_direct=False, mentions_me=True)
             await settle(self.core)
@@ -157,7 +160,7 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         script = room.Script(GPT=[room.turn("Hello.")])
         chat = await self.start(Head(script), gut=False, options={"history_limit": 2})
         memory = self.book().open("gpt", create=True)
-        memory.episodes.keep("chat:alice", [("Alice", "from the other chat"), ("GPT", "ok")], at=1000.0, conversation="chat:dm")
+        memory.episodes.keep("chat:alice", [("Alice", "from the other chat"), ("GPT", "ok")], at=LONG_AGO, conversation="chat:dm")
         now = time.time()
         for number in range(5):
             await chat.port.observe(Address("chat", "new"), f"unanswered {number}", sender=Sender("alice", "Alice"),
@@ -194,7 +197,7 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         script = room.Script(GPT=[room.turn("One.", "continue", [("basic.now", {})]),
                                   room.turn("Two.", "continue", [("basic.now", {})]), room.turn("Three.")])
         chat = await self.start(Head(script), gut=False)
-        self.book().open("gpt", create=True).episodes.keep("chat:alice", [("Alice", "hi"), ("GPT", "hi")], at=1000.0)
+        self.book().open("gpt", create=True).episodes.keep("chat:alice", [("Alice", "hi"), ("GPT", "hi")], at=LONG_AGO)
         self.core.manager.watchers.clear()
         manager, tank = self.core.manager, self.core.tank
         kept, thread = [], []
@@ -373,7 +376,7 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         chat = await self.start(Head(script), gut=False)
         memory = self.book().open("gpt", create=True)
         for number in range(120):
-            memory.episodes.keep("chat:alice", [("Alice", f"message number {number} "), ("GPT", "ok")], at=1000.0 + number,
+            memory.episodes.keep("chat:alice", [("Alice", f"message number {number} "), ("GPT", "ok")], at=LONG_AGO + number,
                                  conversation="chat:dm")
         await self.say(chat, "latest")
         prompt = str(script.prompts["GPT"][-1])
@@ -384,7 +387,7 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         script = room.Script(GPT=[room.turn("Hm.")])
         chat = await self.start(Head(script), gut=False)
         memory = self.book().open("gpt", create=True)
-        memory.episodes.keep("chat:alice", [("Alice", "said in private"), ("GPT", "ok")], at=1000.0, conversation="chat:dm")
+        memory.episodes.keep("chat:alice", [("Alice", "said in private"), ("GPT", "ok")], at=LONG_AGO, conversation="chat:dm")
         await chat.say("GPT, hello", conversation="room", sender="alice", is_direct=False, mentions_me=True)
         await settle(self.core)
         self.assertNotIn("said in private", str(script.prompts["GPT"][-1]))  # (and no search brings it either)
@@ -393,7 +396,7 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         script = room.Script(GPT=[room.turn("Hm.")])
         chat = await self.start(Head(script), gut=False, surface=False)
         memory = self.book().open("gpt", create=True)
-        memory.episodes.keep("chat:alice", [("Alice", "said long ago"), ("GPT", "ok")], at=1000.0, conversation="chat:dm")
+        memory.episodes.keep("chat:alice", [("Alice", "said long ago"), ("GPT", "ok")], at=LONG_AGO, conversation="chat:dm")
         await self.say(chat, "hello")
         self.assertNotIn("said long ago", str(script.prompts["GPT"][-1][:-1]))
 
@@ -402,7 +405,7 @@ class SurfaceTests(unittest.IsolatedAsyncioTestCase):
         chat = await self.start(Head(script), gut=False)
         memory = self.book().open("gpt", create=True)
         memory.episodes.keep("chat:alice", [("", "(You messaged them on your own then: 想他了)"), ("GPT", "I missed you")],
-                             at=1000.0)
+                             at=LONG_AGO)
         await self.say(chat, "what did you say?")
         self.assertEqual(script.prompts["GPT"][-1][1:3], [
             {"role": "user", "content": "(You messaged them on your own then: 想他了)"},

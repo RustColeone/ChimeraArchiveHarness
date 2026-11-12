@@ -176,7 +176,7 @@ class Ledger:
         self.overrides: dict[str, Any] = {}
         if self.path.is_file():
             try:
-                data = json.loads(self.path.read_text())
+                data = json.loads(self.path.read_text(encoding="utf-8"))
                 self.people = {key: Person(**value) for key, value in data.get("people", {}).items()}
                 self.overrides = dict(data.get("overrides") or {})
             except (ValueError, TypeError):
@@ -204,7 +204,8 @@ class Ledger:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(".tmp")
         temporary.write_text(json.dumps({"people": {key: vars(value) for key, value in self.people.items()},
-                                         "overrides": self.overrides}, ensure_ascii=False, indent=1))
+                                         "overrides": self.overrides}, ensure_ascii=False, indent=1),
+                             encoding="utf-8")
         temporary.replace(self.path)
 
 

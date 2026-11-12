@@ -185,7 +185,7 @@ def start_lab(url: str, extra: list[str], err, data: str | None = None) -> bool:
     with log.open("ab") as handle:  # detached: closing this terminal (or Ctrl-C here) leaves the Classroom running
         process = subprocess.Popen(command, cwd=ROOT, stdout=handle, stderr=subprocess.STDOUT,
                                    stdin=subprocess.DEVNULL, **system.detached_options())
-    (folder / "lab.pid").write_text(str(process.pid))
+    (folder / "lab.pid").write_text(str(process.pid), encoding="utf-8")
     for _ in range(120):
         if reachable(url):
             err(f"Started the Classroom in the background at {url} (log: {log}; `club stop` stops it).")
@@ -894,7 +894,7 @@ def status(url: str) -> int:
 def stop(data: str | None = None) -> int:
     pid_file = lab_data(data) / "lab.pid"
     try:
-        pid = int(pid_file.read_text())
+        pid = int(pid_file.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         pid = 0
     folder = str(lab_data(data))

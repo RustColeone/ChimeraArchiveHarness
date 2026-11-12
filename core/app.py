@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import inspect
 from pathlib import Path
 from types import ModuleType
 
@@ -306,6 +307,16 @@ class Core:
         self.started = False
         await self.manager.stop()
         await self.gateway.stop()
+        for loaded in reversed(self.extensions):  # what each module opened, the last loaded first
+            close = loaded.contributions.close
+            if close is None:
+                continue
+            try:
+                result = close()
+                if inspect.isawaitable(result):
+                    await result
+            except Exception as error:
+                self.audit.record("module_close_failed", extension=loaded.extension.name, error=str(error))
         self.audit.record("core_stopped")
         self.tank.close()
         self.bottle.close()

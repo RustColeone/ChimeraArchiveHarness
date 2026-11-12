@@ -37,7 +37,7 @@ HISTORY = 16
 def key_from(name: str, env_file: str) -> str:
     if os.environ.get(name):
         return os.environ[name]
-    for line in Path(env_file).read_text().splitlines():
+    for line in Path(env_file).read_text(encoding="utf-8").splitlines():
         found, _, value = line.partition("=")
         if found.strip() == name:
             return value.strip().strip("\"'")
